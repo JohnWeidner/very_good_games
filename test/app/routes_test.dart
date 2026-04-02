@@ -16,6 +16,14 @@ void main() {
       expect(router, isA<GoRouter>());
     });
 
+    test('includes settings route', () {
+      final registry = GameRegistry(games: []);
+      final router = createRouter(registry);
+
+      final match = router.configuration.findMatch(Uri.parse('/settings'));
+      expect(match.matches, isNotEmpty);
+    });
+
     test('includes game routes from registry', () {
       final game = _MockGameDefinition();
       when(() => game.routes).thenReturn([

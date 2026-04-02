@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/home/cubit/home_cubit.dart';
 import 'package:very_good_games/home/view/widgets/game_tile.dart';
@@ -54,7 +55,15 @@ class _HomeViewState extends State<_HomeView> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Very Good Games')),
+      appBar: AppBar(
+        title: const Text('Very Good Games'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => context.push('/settings'),
+          ),
+        ],
+      ),
       body: BlocBuilder<HomeCubit, HomeState>(
         builder: (context, state) {
           return switch (state.status) {
