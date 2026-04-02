@@ -3,7 +3,25 @@
     "allow": [
       "Bash(git init:*)",
       "Bash(git add:*)",
-      "Bash(git commit -m 'Initial Flutter scaffold:*)"
+      "Bash(git commit -m 'Initial Flutter scaffold:*)",
+      "Bash(git checkout:*)",
+      "Bash(gh repo:*)",
+      "Bash(gh issue create --repo VeryGoodOpenSource/wingspan --title 'AskUserQuestion: Support a default selected option' --body ':*)",
+      "Bash(ls -la /Users/john/projects/very_good_games/docs/brainstorm/*.md)",
+      "Read(//Users/john/projects/wingspan/skills/plan/references/**)",
+      "Bash(git status:*)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(git -C /Users/john/projects/very_good_games status)",
+      "Bash(git -C /Users/john/projects/very_good_games diff --stat)",
+      "Bash(git -C /Users/john/projects/very_good_games log --oneline -5)",
+      "Bash(git -C /Users/john/projects/very_good_games add analysis_options.yaml pubspec.yaml pubspec.lock lib/main.dart lib/app/ lib/core/ lib/home/ test/ docs/brainstorm/ docs/plan/ macos/Flutter/GeneratedPluginRegistrant.swift)",
+      "Bash(git -C /Users/john/projects/very_good_games commit -m ':*)",
+      "Bash(git -C /Users/john/projects/very_good_games checkout -b plan/guess-the-number)",
+      "Bash(git -C /Users/john/projects/very_good_games add docs/plan/2026-04-02-feat-guess-the-number-game-plan.md)"
+    ],
+    "additionalDirectories": [
+      "/tmp",
+      "/private/tmp"
     ]
   }
 }
