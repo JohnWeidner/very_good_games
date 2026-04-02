@@ -5,6 +5,7 @@ import 'package:very_good_games/app/app.dart';
 import 'package:very_good_games/app/app_bloc_observer.dart';
 import 'package:very_good_games/app/routes/routes.dart';
 import 'package:very_good_games/core/core.dart';
+import 'package:very_good_games/games/guess_the_number/guess_the_number_game.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,7 +15,11 @@ void main() async {
   final storageRepository = GameStorageRepository(preferences: preferences);
 
   // Register games here as they are built.
-  final gameRegistry = GameRegistry(games: []);
+  final gameRegistry = GameRegistry(
+    games: [
+      GuessTheNumberGame(storageRepository: storageRepository),
+    ],
+  );
   final router = createRouter(gameRegistry);
 
   runApp(
