@@ -16,9 +16,7 @@ void main() async {
 
   // Register games here as they are built.
   final gameRegistry = GameRegistry(
-    games: [
-      GuessTheNumberGame(storageRepository: storageRepository),
-    ],
+    games: [GuessTheNumberGame(storageRepository: storageRepository)],
   );
   final router = createRouter(gameRegistry);
 

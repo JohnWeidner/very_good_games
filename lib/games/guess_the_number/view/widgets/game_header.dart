@@ -27,10 +27,7 @@ class GameHeader extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _StatChip(
-                icon: Icons.timer_outlined,
-                label: timeText,
-              ),
+              _StatChip(icon: Icons.timer_outlined, label: timeText),
               _StatChip(
                 icon: Icons.help_outline,
                 label: '${state.questionCount} asked',

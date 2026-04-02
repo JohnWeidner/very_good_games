@@ -22,10 +22,7 @@ void main() {
 
     test('initial state has 400 possible cells', () {
       expect(cubit.state.cells, hasLength(400));
-      expect(
-        cubit.state.cells.every((c) => c == CellState.possible),
-        isTrue,
-      );
+      expect(cubit.state.cells.every((c) => c == CellState.possible), isTrue);
       expect(cubit.state.status, equals(GameStatus.playing));
       expect(cubit.state.questionCount, equals(0));
       expect(cubit.state.elapsedSeconds, equals(0));
@@ -42,11 +39,7 @@ void main() {
         act: (cubit) => cubit.selectQuestion(QuestionType.lessThan),
         expect: () => [
           isA<GameState>()
-              .having(
-                (s) => s.status,
-                'status',
-                GameStatus.selectingParam,
-              )
+              .having((s) => s.status, 'status', GameStatus.selectingParam)
               .having(
                 (s) => s.activeQuestionType,
                 'activeQuestionType',
@@ -61,11 +54,7 @@ void main() {
         act: (cubit) => cubit.selectQuestion(QuestionType.isOdd),
         expect: () => [
           isA<GameState>()
-              .having(
-                (s) => s.status,
-                'status',
-                GameStatus.readyToConfirm,
-              )
+              .having((s) => s.status, 'status', GameStatus.readyToConfirm)
               .having(
                 (s) => s.activeQuestionType,
                 'activeQuestionType',
@@ -103,11 +92,7 @@ void main() {
             GameStatus.selectingParam,
           ),
           isA<GameState>()
-              .having(
-                (s) => s.status,
-                'status',
-                GameStatus.playing,
-              )
+              .having((s) => s.status, 'status', GameStatus.playing)
               .having(
                 (s) => s.activeQuestionType,
                 'activeQuestionType',
@@ -176,11 +161,7 @@ void main() {
             99,
           ),
           isA<GameState>()
-              .having(
-                (s) => s.status,
-                'status',
-                GameStatus.readyToConfirm,
-              )
+              .having((s) => s.status, 'status', GameStatus.readyToConfirm)
               .having(
                 (s) => s.firstParam,
                 'firstParam',
@@ -220,10 +201,7 @@ void main() {
         verify: (cubit) {
           expect(cubit.state.status, equals(GameStatus.playing));
           expect(cubit.state.questionCount, equals(1));
-          expect(
-            cubit.state.usedQuestionTypes,
-            contains(QuestionType.isOdd),
-          );
+          expect(cubit.state.usedQuestionTypes, contains(QuestionType.isOdd));
           expect(cubit.state.lastResult, isNotNull);
           // Target 200 is even, so "Is odd? NO" — odd numbers eliminated.
           expect(cubit.state.remainingCount, lessThan(400));
@@ -278,10 +256,7 @@ void main() {
         },
         verify: (cubit) {
           expect(cubit.state.status, equals(GameStatus.playing));
-          expect(
-            cubit.state.cells[wrongIndex],
-            CellState.wrongGuess,
-          );
+          expect(cubit.state.cells[wrongIndex], CellState.wrongGuess);
           expect(cubit.state.lastResult, contains('too low'));
         },
       );
@@ -318,10 +293,7 @@ void main() {
             ..confirmQuestion();
         },
         verify: (cubit) {
-          expect(
-            cubit.state.usedQuestionTypes,
-            contains(QuestionType.isOdd),
-          );
+          expect(cubit.state.usedQuestionTypes, contains(QuestionType.isOdd));
         },
       );
 
@@ -363,10 +335,7 @@ void main() {
           final cells = List.filled(400, CellState.eliminated);
           cells[targetIndex] = CellState.possible;
           cells[0] = CellState.possible; // number 1
-          return GameState(
-            cells: cells,
-            targetNumber: target,
-          );
+          return GameState(cells: cells, targetNumber: target);
         },
         act: (cubit) {
           // Use < 2 to eliminate number 1, leaving only target.
@@ -379,17 +348,13 @@ void main() {
         verify: (cubit) {
           expect(cubit.state.status, equals(GameStatus.won));
           expect(cubit.state.score, isNotNull);
-          expect(
-            cubit.state.cells[targetIndex],
-            CellState.target,
-          );
+          expect(cubit.state.cells[targetIndex], CellState.target);
         },
       );
 
       blocTest<GameCubit, GameState>(
         'shotgun eliminates cells with injectable random',
-        build: () =>
-            GameCubit(targetNumber: target, random: Random(42)),
+        build: () => GameCubit(targetNumber: target, random: Random(42)),
         act: (cubit) {
           cubit
             ..selectQuestion(QuestionType.shotgun)
@@ -399,10 +364,7 @@ void main() {
           expect(cubit.state.questionCount, equals(1));
           // Some cells eliminated, target still possible.
           expect(cubit.state.remainingCount, lessThan(400));
-          expect(
-            cubit.state.cells[targetIndex],
-            CellState.possible,
-          );
+          expect(cubit.state.cells[targetIndex], CellState.possible);
         },
       );
     });
@@ -430,21 +392,9 @@ void main() {
             ..tick();
         },
         expect: () => [
-          isA<GameState>().having(
-            (s) => s.elapsedSeconds,
-            'elapsedSeconds',
-            1,
-          ),
-          isA<GameState>().having(
-            (s) => s.elapsedSeconds,
-            'elapsedSeconds',
-            2,
-          ),
-          isA<GameState>().having(
-            (s) => s.elapsedSeconds,
-            'elapsedSeconds',
-            3,
-          ),
+          isA<GameState>().having((s) => s.elapsedSeconds, 'elapsedSeconds', 1),
+          isA<GameState>().having((s) => s.elapsedSeconds, 'elapsedSeconds', 2),
+          isA<GameState>().having((s) => s.elapsedSeconds, 'elapsedSeconds', 3),
         ],
       );
 
@@ -547,10 +497,7 @@ void main() {
     });
 
     test('assert fires for target out of range', () {
-      expect(
-        () => GameCubit(targetNumber: 0),
-        throwsA(isA<AssertionError>()),
-      );
+      expect(() => GameCubit(targetNumber: 0), throwsA(isA<AssertionError>()));
       expect(
         () => GameCubit(targetNumber: 401),
         throwsA(isA<AssertionError>()),

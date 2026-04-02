@@ -8,10 +8,7 @@ import 'package:very_good_games/games/guess_the_number/theme/game_colors.dart';
 /// Color shifts from green → yellow → red as the score drops.
 class ScoreBar extends StatelessWidget {
   /// Creates a [ScoreBar].
-  const ScoreBar({
-    required this.score,
-    super.key,
-  });
+  const ScoreBar({required this.score, super.key});
 
   /// The current score (0 to [ScoreCalculator.startingBudget]).
   final int score;
@@ -38,10 +35,9 @@ class ScoreBar extends StatelessWidget {
               Text(
                 '$budget',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.3),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.3),
                 ),
               ),
             ],
@@ -52,9 +48,9 @@ class ScoreBar extends StatelessWidget {
             child: LinearProgressIndicator(
               value: fraction,
               minHeight: 8,
-              backgroundColor: Theme.of(context)
-                  .colorScheme
-                  .surfaceContainerHighest,
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest,
               valueColor: AlwaysStoppedAnimation(_barColor(fraction)),
             ),
           ),

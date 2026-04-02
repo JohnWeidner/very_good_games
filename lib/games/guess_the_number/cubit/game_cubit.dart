@@ -23,22 +23,19 @@ class GameCubit extends Cubit<GameState> {
   /// The target must be between 1 and 400 inclusive.
   /// Provide [random] to override shotgun randomness in tests.
   /// Provide [dailySeed] for deterministic daily shotgun results.
-  GameCubit({
-    required int targetNumber,
-    Random? random,
-    int? dailySeed,
-  }) : _random = random,
-       _dailySeed = dailySeed,
-       assert(
-         targetNumber >= 1 && targetNumber <= 400,
-         'Target must be between 1 and 400',
-       ),
-       super(
-         GameState(
-           cells: List.filled(400, CellState.possible),
-           targetNumber: targetNumber,
-         ),
-       );
+  GameCubit({required int targetNumber, Random? random, int? dailySeed})
+    : _random = random,
+      _dailySeed = dailySeed,
+      assert(
+        targetNumber >= 1 && targetNumber <= 400,
+        'Target must be between 1 and 400',
+      ),
+      super(
+        GameState(
+          cells: List.filled(400, CellState.possible),
+          targetNumber: targetNumber,
+        ),
+      );
 
   final Random? _random;
   final int? _dailySeed;
@@ -163,8 +160,7 @@ class GameCubit extends Cubit<GameState> {
     }
 
     // Win when only one possible cell remains.
-    final remaining =
-        result.cells.where((c) => c == CellState.possible).length;
+    final remaining = result.cells.where((c) => c == CellState.possible).length;
     final isWin = remaining <= 1;
 
     if (isWin) {

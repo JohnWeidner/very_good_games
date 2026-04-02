@@ -8,8 +8,9 @@ void main() {
     });
 
     test('equals is the only repeatable type', () {
-      final repeatables =
-          QuestionType.values.where((t) => t.isRepeatable).toList();
+      final repeatables = QuestionType.values
+          .where((t) => t.isRepeatable)
+          .toList();
       expect(repeatables, hasLength(1));
       expect(repeatables.first, QuestionType.equals);
     });
@@ -39,8 +40,7 @@ void main() {
     });
 
     test('no two-param types exist', () {
-      final twoParam =
-          QuestionType.values.where((t) => t.paramCount == 2);
+      final twoParam = QuestionType.values.where((t) => t.paramCount == 2);
       expect(twoParam, isEmpty);
     });
 

@@ -28,10 +28,8 @@ class GamePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => GameCubit(
-        targetNumber: targetNumber,
-        dailySeed: dailySeed,
-      ),
+      create: (_) =>
+          GameCubit(targetNumber: targetNumber, dailySeed: dailySeed),
       child: const _GameView(),
     );
   }
@@ -102,8 +100,7 @@ class _GameViewState extends State<_GameView> {
       body: BlocConsumer<GameCubit, GameState>(
         listenWhen: (prev, curr) =>
             prev.status != curr.status &&
-            (curr.status == GameStatus.won ||
-                curr.status == GameStatus.lost),
+            (curr.status == GameStatus.won || curr.status == GameStatus.lost),
         listener: (context, state) {
           _timer?.cancel();
           if (state.status == GameStatus.won) {
@@ -116,8 +113,7 @@ class _GameViewState extends State<_GameView> {
               state.status == GameStatus.selectingParam ||
               state.status == GameStatus.readyToConfirm;
           final isGameOver =
-              state.status == GameStatus.won ||
-              state.status == GameStatus.lost;
+              state.status == GameStatus.won || state.status == GameStatus.lost;
 
           return Stack(
             children: [
@@ -133,10 +129,7 @@ class _GameViewState extends State<_GameView> {
                   const SizedBox(height: 8),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.only(
-                        left: 8,
-                        right: 28,
-                      ),
+                      padding: const EdgeInsets.only(left: 8, right: 28),
                       child: NumberGrid(
                         cells: state.cells,
                         highlightedCell: state.highlightedCell,
@@ -161,9 +154,7 @@ class _GameViewState extends State<_GameView> {
                 ],
               ),
               if (isGameOver)
-                Positioned.fill(
-                  child: ResultsOverlay(state: state),
-                ),
+                Positioned.fill(child: ResultsOverlay(state: state)),
             ],
           );
         },

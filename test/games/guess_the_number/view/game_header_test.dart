@@ -34,9 +34,7 @@ void main() {
     testWidgets('displays question count', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: GameHeader(state: makeState(questionCount: 3)),
-          ),
+          home: Scaffold(body: GameHeader(state: makeState(questionCount: 3))),
         ),
       );
       expect(find.text('3 asked'), findsOneWidget);
@@ -61,10 +59,7 @@ void main() {
           ),
         ),
       );
-      expect(
-        find.text('Is odd? NO — 200 eliminated'),
-        findsOneWidget,
-      );
+      expect(find.text('Is odd? NO — 200 eliminated'), findsOneWidget);
     });
 
     testWidgets('hides last result when null', (tester) async {

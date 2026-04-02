@@ -93,8 +93,7 @@ class _NumberGridState extends State<NumberGrid> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final gridWidth =
-            constraints.maxWidth - NumberGrid.rowLabelWidth;
+        final gridWidth = constraints.maxWidth - NumberGrid.rowLabelWidth;
         final cellSize = gridWidth / NumberGrid.columns;
         final gridHeight = cellSize * NumberGrid.rows;
 
@@ -110,10 +109,9 @@ class _NumberGridState extends State<NumberGrid> {
                 child: CustomPaint(
                   painter: _RowLabelPainter(
                     cellSize: cellSize,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.5),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ),
               ),
@@ -126,11 +124,7 @@ class _NumberGridState extends State<NumberGrid> {
                       _onTouch(d.localPosition, cellSize, gridWidth),
                   onPanEnd: (_) => _onLift(),
                   onTapUp: (d) {
-                    _onTouch(
-                      d.localPosition,
-                      cellSize,
-                      gridWidth,
-                    );
+                    _onTouch(d.localPosition, cellSize, gridWidth);
                     _onLift();
                   },
                   child: CustomPaint(
@@ -152,11 +146,7 @@ class _NumberGridState extends State<NumberGrid> {
     );
   }
 
-  void _onTouch(
-    Offset localPosition,
-    double cellSize,
-    double gridWidth,
-  ) {
+  void _onTouch(Offset localPosition, double cellSize, double gridWidth) {
     final col = (localPosition.dx / cellSize).floor();
     final row = (localPosition.dy / cellSize).floor();
 
@@ -190,15 +180,12 @@ class _NumberGridState extends State<NumberGrid> {
     int cellIndex,
   ) {
     // Convert local grid position to global screen position.
-    final renderBox =
-        _gridKey.currentContext?.findRenderObject() as RenderBox?;
+    final renderBox = _gridKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
     final globalPosition = renderBox.localToGlobal(localPosition);
 
-    const lensWidth =
-        _ZoomLens.lensColumns * _ZoomLens.zoomedCellSize;
-    const lensHeight =
-        _ZoomLens.lensRows * _ZoomLens.zoomedCellSize;
+    const lensWidth = _ZoomLens.lensColumns * _ZoomLens.zoomedCellSize;
+    const lensHeight = _ZoomLens.lensRows * _ZoomLens.zoomedCellSize;
 
     // Horizontal: centered on touch, no clamping — allow overflow.
     final left = globalPosition.dx - lensWidth / 2;
@@ -256,8 +243,7 @@ class _ZoomLens extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final (centerCol, centerVisualRow) =
-        NumberGrid.visualPosition(centerIndex);
+    final (centerCol, centerVisualRow) = NumberGrid.visualPosition(centerIndex);
 
     return Container(
       decoration: BoxDecoration(
@@ -318,10 +304,7 @@ class _ZoomLensPainter extends CustomPainter {
 
         final lensCol = dx + halfLens;
         final lensRow = dy + halfLens;
-        final center = Offset(
-          lensCol * zcs + zcs / 2,
-          lensRow * zcs + zcs / 2,
-        );
+        final center = Offset(lensCol * zcs + zcs / 2, lensRow * zcs + zcs / 2);
 
         // Out-of-bounds cells draw as empty.
         if (col < 0 ||
@@ -350,8 +333,7 @@ class _ZoomLensPainter extends CustomPainter {
             style: TextStyle(
               color: textColor,
               fontSize: isCenter ? 14 : 11,
-              fontWeight:
-                  isCenter ? FontWeight.bold : FontWeight.normal,
+              fontWeight: isCenter ? FontWeight.bold : FontWeight.normal,
             ),
           ),
           textDirection: TextDirection.ltr,
@@ -407,10 +389,7 @@ class _GridPainter extends CustomPainter {
     for (var bandRow = 1; bandRow < bandCount; bandRow += 2) {
       final y = bandRow * _bandRows * cellSize;
       final bandHeight = _bandRows * cellSize;
-      canvas.drawRect(
-        Rect.fromLTWH(0, y, size.width, bandHeight),
-        bandPaint,
-      );
+      canvas.drawRect(Rect.fromLTWH(0, y, size.width, bandHeight), bandPaint);
     }
 
     final radius = cellSize * 0.38;
@@ -463,31 +442,25 @@ class _RowLabelPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final labelEvery = cellSize < 14 ? 4 : 1;
 
-    for (var visualRow = 0;
-        visualRow < NumberGrid.rows;
-        visualRow += labelEvery) {
+    for (
+      var visualRow = 0;
+      visualRow < NumberGrid.rows;
+      visualRow += labelEvery
+    ) {
       final dataRow = (NumberGrid.rows - 1) - visualRow;
       final number = dataRow * NumberGrid.columns + 1;
       final textPainter = TextPainter(
         text: TextSpan(
           text: '$number',
-          style: TextStyle(
-            color: color,
-            fontSize: cellSize * 0.6,
-          ),
+          style: TextStyle(color: color, fontSize: cellSize * 0.6),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
 
-      final y =
-          visualRow * cellSize +
-          (cellSize - textPainter.height) / 2;
+      final y = visualRow * cellSize + (cellSize - textPainter.height) / 2;
       textPainter.paint(
         canvas,
-        Offset(
-          NumberGrid.rowLabelWidth - textPainter.width - 4,
-          y,
-        ),
+        Offset(NumberGrid.rowLabelWidth - textPainter.width - 4, y),
       );
     }
   }

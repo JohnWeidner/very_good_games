@@ -29,11 +29,10 @@ class GameColors {
   };
 
   /// Returns the color for a [QuestionCategory].
-  static Color forCategory(QuestionCategory category) =>
-      switch (category) {
-        QuestionCategory.comparison => const Color(0xFF1565C0),
-        QuestionCategory.math => const Color(0xFF7B1FA2),
-        QuestionCategory.guess => const Color(0xFFE65100),
-        QuestionCategory.special => const Color(0xFFC62828),
-      };
+  static Color forCategory(QuestionCategory category) => switch (category) {
+    QuestionCategory.comparison => const Color(0xFF1565C0),
+    QuestionCategory.math => const Color(0xFF7B1FA2),
+    QuestionCategory.guess => const Color(0xFFE65100),
+    QuestionCategory.special => const Color(0xFFC62828),
+  };
 }

@@ -18,8 +18,7 @@ class GuessTheNumberGame extends GameDefinition {
   String get name => 'Guess the Number';
 
   @override
-  String get description =>
-      'Narrow down 1-400 using strategic questions';
+  String get description => 'Narrow down 1-400 using strategic questions';
 
   @override
   IconData get icon => Icons.grid_on;

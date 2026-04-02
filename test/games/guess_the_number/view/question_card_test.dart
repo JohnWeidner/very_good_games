@@ -20,8 +20,9 @@ void main() {
       );
     }
 
-    testWidgets('renders nothing when activeQuestionType is null',
-        (tester) async {
+    testWidgets('renders nothing when activeQuestionType is null', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -36,8 +37,7 @@ void main() {
       expect(find.byType(Card), findsNothing);
     });
 
-    testWidgets('displays question label and description',
-        (tester) async {
+    testWidgets('displays question label and description', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -69,8 +69,7 @@ void main() {
       expect(find.text('Cancel'), findsOneWidget);
     });
 
-    testWidgets('Play button disabled when not readyToConfirm',
-        (tester) async {
+    testWidgets('Play button disabled when not readyToConfirm', (tester) async {
       var confirmed = false;
       await tester.pumpWidget(
         MaterialApp(
@@ -87,8 +86,7 @@ void main() {
       expect(confirmed, isFalse);
     });
 
-    testWidgets('Play button enabled when readyToConfirm',
-        (tester) async {
+    testWidgets('Play button enabled when readyToConfirm', (tester) async {
       var confirmed = false;
       await tester.pumpWidget(
         MaterialApp(
@@ -126,8 +124,7 @@ void main() {
       expect(cancelled, isTrue);
     });
 
-    testWidgets('shows instruction text for no-param question',
-        (tester) async {
+    testWidgets('shows instruction text for no-param question', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -142,10 +139,7 @@ void main() {
           ),
         ),
       );
-      expect(
-        find.text('Tap Play to ask this question'),
-        findsOneWidget,
-      );
+      expect(find.text('Tap Play to ask this question'), findsOneWidget);
     });
 
     testWidgets('shows digit picker for onesDigitIs', (tester) async {
@@ -154,9 +148,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: QuestionCard(
-              state: makeState(
-                activeType: QuestionType.onesDigitIs,
-              ),
+              state: makeState(activeType: QuestionType.onesDigitIs),
               onConfirm: () {},
               onCancel: () {},
               onDigitSelected: (d) => digitSelected = d,
@@ -172,25 +164,19 @@ void main() {
       expect(digitSelected, equals(5));
     });
 
-    testWidgets('shows grid instruction for param question',
-        (tester) async {
+    testWidgets('shows grid instruction for param question', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
             body: QuestionCard(
-              state: makeState(
-                activeType: QuestionType.lessThan,
-              ),
+              state: makeState(activeType: QuestionType.lessThan),
               onConfirm: () {},
               onCancel: () {},
             ),
           ),
         ),
       );
-      expect(
-        find.text('Slide on the grid to pick a number'),
-        findsOneWidget,
-      );
+      expect(find.text('Slide on the grid to pick a number'), findsOneWidget);
     });
   });
 }

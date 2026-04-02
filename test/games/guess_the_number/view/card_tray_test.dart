@@ -9,10 +9,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: CardTray(
-              usedTypes: const {},
-              onSelect: (_) {},
-            ),
+            body: CardTray(usedTypes: const {}, onSelect: (_) {}),
           ),
         ),
       );
@@ -25,16 +22,12 @@ void main() {
       }
     });
 
-    testWidgets('calls onSelect when unused card is tapped',
-        (tester) async {
+    testWidgets('calls onSelect when unused card is tapped', (tester) async {
       QuestionType? selected;
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: CardTray(
-              usedTypes: const {},
-              onSelect: (t) => selected = t,
-            ),
+            body: CardTray(usedTypes: const {}, onSelect: (t) => selected = t),
           ),
         ),
       );
@@ -63,17 +56,11 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: CardTray(
-              usedTypes: const {},
-              onSelect: (_) {},
-            ),
+            body: CardTray(usedTypes: const {}, onSelect: (_) {}),
           ),
         ),
       );
-      expect(
-        find.text(QuestionType.lessThan.description),
-        findsWidgets,
-      );
+      expect(find.text(QuestionType.lessThan.description), findsWidgets);
     });
   });
 }

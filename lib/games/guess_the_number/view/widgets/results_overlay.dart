@@ -55,8 +55,7 @@ class ResultsOverlay extends StatelessWidget {
                   Text(
                     'points',
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      color: theme.colorScheme.onSurface
-                          .withValues(alpha: 0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -76,8 +75,7 @@ class ResultsOverlay extends StatelessWidget {
                   Text(
                     'Score reached zero',
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      color: theme.colorScheme.onSurface
-                          .withValues(alpha: 0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -162,8 +160,8 @@ class _StarRating extends StatelessWidget {
     final stars = score >= 450
         ? 3
         : score >= 250
-            ? 2
-            : 1;
+        ? 2
+        : 1;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(3, (i) {

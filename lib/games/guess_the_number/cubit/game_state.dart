@@ -73,8 +73,7 @@ class GameState extends Equatable {
   final String? lastResult;
 
   /// The number of cells still in [CellState.possible] state.
-  int get remainingCount =>
-      cells.where((c) => c == CellState.possible).length;
+  int get remainingCount => cells.where((c) => c == CellState.possible).length;
 
   /// The live score based on current questions and time.
   int get currentScore => ScoreCalculator.calculate(

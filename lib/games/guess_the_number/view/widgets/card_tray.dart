@@ -9,11 +9,7 @@ import 'package:very_good_games/games/guess_the_number/theme/game_colors.dart';
 /// card stages it for parameter selection.
 class CardTray extends StatelessWidget {
   /// Creates a [CardTray].
-  const CardTray({
-    required this.usedTypes,
-    required this.onSelect,
-    super.key,
-  });
+  const CardTray({required this.usedTypes, required this.onSelect, super.key});
 
   /// The set of question types already used this game.
   final Set<QuestionType> usedTypes;
@@ -45,11 +41,7 @@ class CardTray extends StatelessWidget {
 }
 
 class _TrayCard extends StatelessWidget {
-  const _TrayCard({
-    required this.type,
-    required this.isUsed,
-    this.onTap,
-  });
+  const _TrayCard({required this.type, required this.isUsed, this.onTap});
 
   final QuestionType type;
   final bool isUsed;
@@ -70,9 +62,7 @@ class _TrayCard extends StatelessWidget {
           child: Card(
             elevation: isUsed ? 0 : 2,
             margin: EdgeInsets.zero,
-            color: isUsed
-                ? theme.colorScheme.surfaceContainerHighest
-                : null,
+            color: isUsed ? theme.colorScheme.surfaceContainerHighest : null,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
               side: BorderSide(
@@ -83,10 +73,7 @@ class _TrayCard extends StatelessWidget {
             ),
             clipBehavior: Clip.hardEdge,
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 6,
-                vertical: 4,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -95,8 +82,7 @@ class _TrayCard extends StatelessWidget {
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: isUsed
-                          ? theme.colorScheme.onSurface
-                              .withValues(alpha: 0.4)
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.4)
                           : categoryColor,
                     ),
                     maxLines: 1,
@@ -106,10 +92,9 @@ class _TrayCard extends StatelessWidget {
                     child: Text(
                       type.description,
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurface
-                            .withValues(
-                              alpha: isUsed ? 0.3 : 0.6,
-                            ),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: isUsed ? 0.3 : 0.6,
+                        ),
                       ),
                       textAlign: TextAlign.center,
                       maxLines: 2,
@@ -124,5 +109,4 @@ class _TrayCard extends StatelessWidget {
       ),
     );
   }
-
 }

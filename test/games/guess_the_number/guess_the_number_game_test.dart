@@ -12,9 +12,7 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       return SharedPreferences.getInstance().then((prefs) {
         storageRepository = GameStorageRepository(preferences: prefs);
-        game = GuessTheNumberGame(
-          storageRepository: storageRepository,
-        );
+        game = GuessTheNumberGame(storageRepository: storageRepository);
       });
     });
 
@@ -39,41 +37,31 @@ void main() {
       expect(status, equals(DailyGameStatus.notStarted));
     });
 
-    test(
-      'getDailyStatus returns completed when streak matches date',
-      () async {
-        final today = DateTime.utc(2026, 4, 2);
-        await storageRepository.saveStreak(
-          'guess_the_number',
-          StreakData(
-            currentStreak: 1,
-            bestStreak: 1,
-            lastCompletedDate: today,
-          ),
-        );
+    test('getDailyStatus returns completed when streak matches date', () async {
+      final today = DateTime.utc(2026, 4, 2);
+      await storageRepository.saveStreak(
+        'guess_the_number',
+        StreakData(currentStreak: 1, bestStreak: 1, lastCompletedDate: today),
+      );
 
-        final status = await game.getDailyStatus(today);
-        expect(status, equals(DailyGameStatus.completed));
-      },
-    );
+      final status = await game.getDailyStatus(today);
+      expect(status, equals(DailyGameStatus.completed));
+    });
 
-    test(
-      'getDailyStatus returns notStarted for a different day',
-      () async {
-        final yesterday = DateTime.utc(2026, 3, 31);
-        final today = DateTime.utc(2026, 4, 2);
-        await storageRepository.saveStreak(
-          'guess_the_number',
-          StreakData(
-            currentStreak: 1,
-            bestStreak: 1,
-            lastCompletedDate: yesterday,
-          ),
-        );
+    test('getDailyStatus returns notStarted for a different day', () async {
+      final yesterday = DateTime.utc(2026, 3, 31);
+      final today = DateTime.utc(2026, 4, 2);
+      await storageRepository.saveStreak(
+        'guess_the_number',
+        StreakData(
+          currentStreak: 1,
+          bestStreak: 1,
+          lastCompletedDate: yesterday,
+        ),
+      );
 
-        final status = await game.getDailyStatus(today);
-        expect(status, equals(DailyGameStatus.notStarted));
-      },
-    );
+      final status = await game.getDailyStatus(today);
+      expect(status, equals(DailyGameStatus.notStarted));
+    });
   });
 }

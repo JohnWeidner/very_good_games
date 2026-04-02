@@ -21,20 +21,16 @@ void main() {
           routes: [
             GoRoute(
               path: '/',
-              builder: (context, state) => const Scaffold(
-                body: Center(child: Text('Home')),
-              ),
+              builder: (context, state) =>
+                  const Scaffold(body: Center(child: Text('Home'))),
             ),
             GoRoute(
               path: '/game',
               builder: (context, state) =>
                   RepositoryProvider<GameStorageRepository>.value(
-                value: storageRepo,
-                child: const GamePage(
-                  targetNumber: 42,
-                  dailySeed: 12345,
-                ),
-              ),
+                    value: storageRepo,
+                    child: const GamePage(targetNumber: 42, dailySeed: 12345),
+                  ),
             ),
           ],
           initialLocation: '/game',

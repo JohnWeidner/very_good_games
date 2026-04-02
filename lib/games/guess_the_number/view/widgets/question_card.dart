@@ -74,10 +74,7 @@ class QuestionCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    type.description,
-                    style: theme.textTheme.bodyLarge,
-                  ),
+                  Text(type.description, style: theme.textTheme.bodyLarge),
                 ],
               ),
               const SizedBox(height: 12),
@@ -88,10 +85,7 @@ class QuestionCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
-                    onPressed: onCancel,
-                    child: const Text('Cancel'),
-                  ),
+                  TextButton(onPressed: onCancel, child: const Text('Cancel')),
                   const SizedBox(width: 8),
                   FilledButton.icon(
                     onPressed: state.canConfirm ? onConfirm : null,
@@ -147,7 +141,6 @@ class QuestionCard extends StatelessWidget {
           : null,
     );
   }
-
 }
 
 class _InstructionText extends StatelessWidget {
@@ -160,9 +153,7 @@ class _InstructionText extends StatelessWidget {
     return Text(
       text,
       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-        color: Theme.of(
-          context,
-        ).colorScheme.onSurface.withValues(alpha: 0.6),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
         fontStyle: FontStyle.italic,
       ),
     );
@@ -238,7 +229,8 @@ class _ParamSlot extends StatelessWidget {
     final theme = Theme.of(context);
 
     // Show the live highlighted number if this slot is active.
-    final displayNumber = value ??
+    final displayNumber =
+        value ??
         (isActive && highlightedCell != null
             ? GameState.numberForIndex(highlightedCell!)
             : null);
@@ -247,9 +239,9 @@ class _ParamSlot extends StatelessWidget {
     final statusColor = _statusColor(displayNumber);
 
     return Container(
-        width: 80,
-        height: 56,
-        decoration: BoxDecoration(
+      width: 80,
+      height: 56,
+      decoration: BoxDecoration(
         color: isActive
             ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
             : theme.colorScheme.surfaceContainerHighest,
@@ -273,16 +265,12 @@ class _ParamSlot extends StatelessWidget {
               ),
             ),
             if (value == null && isActive)
-              _StatusIndicator(
-                cellState: cells[highlightedCell!],
-              ),
+              _StatusIndicator(cellState: cells[highlightedCell!]),
           ] else
             Text(
               label,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(
-                  alpha: 0.4,
-                ),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
               ),
             ),
         ],
@@ -328,10 +316,7 @@ class _StatusIndicator extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 3),
-        Text(
-          text,
-          style: TextStyle(fontSize: 9, color: color),
-        ),
+        Text(text, style: TextStyle(fontSize: 9, color: color)),
       ],
     );
   }

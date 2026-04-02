@@ -7,9 +7,7 @@ void main() {
     testWidgets('renders digits 0 through 9', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: DigitPicker(onDigitSelected: (_) {}),
-          ),
+          home: Scaffold(body: DigitPicker(onDigitSelected: (_) {})),
         ),
       );
       for (var i = 0; i <= 9; i++) {
@@ -22,9 +20,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: DigitPicker(
-              onDigitSelected: (d) => selected = d,
-            ),
+            body: DigitPicker(onDigitSelected: (d) => selected = d),
           ),
         ),
       );
@@ -36,21 +32,14 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: DigitPicker(
-              selectedDigit: 3,
-              onDigitSelected: (_) {},
-            ),
+            body: DigitPicker(selectedDigit: 3, onDigitSelected: (_) {}),
           ),
         ),
       );
       // The selected digit's Material should use the primary color.
-      final materials = tester.widgetList<Material>(
-        find.byType(Material),
-      );
+      final materials = tester.widgetList<Material>(find.byType(Material));
       // Find the Material wrapping digit 3 — it should use primary.
-      final theme = Theme.of(
-        tester.element(find.text('3')),
-      );
+      final theme = Theme.of(tester.element(find.text('3')));
       final selectedMaterial = materials.where(
         (m) => m.color == theme.colorScheme.primary,
       );

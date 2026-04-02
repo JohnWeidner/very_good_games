@@ -12,9 +12,7 @@ void main() {
         routes: [
           GoRoute(
             path: '/',
-            builder: (_, __) => Scaffold(
-              body: ResultsOverlay(state: state),
-            ),
+            builder: (_, __) => Scaffold(body: ResultsOverlay(state: state)),
           ),
         ],
       );
