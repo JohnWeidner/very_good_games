@@ -8,17 +8,25 @@ import 'package:very_good_games/games/guess_the_number/cubit/game_cubit.dart';
 import 'package:very_good_games/games/guess_the_number/models/models.dart';
 import 'package:very_good_games/games/guess_the_number/view/widgets/results_overlay.dart';
 import 'package:very_good_games/nostr/sharing/cubit/result_sharing_cubit.dart';
+import 'package:very_good_games/nostr/stats/cubit/community_stats_cubit.dart';
+import 'package:very_good_games/nostr/stats/models/community_stats.dart';
 
 class _MockResultSharingCubit extends MockCubit<ResultSharingState>
     implements ResultSharingCubit {}
 
+class _MockCommunityStatsCubit extends MockCubit<CommunityStatsState>
+    implements CommunityStatsCubit {}
+
 void main() {
   group('ResultsOverlay', () {
     late ResultSharingCubit sharingCubit;
+    late CommunityStatsCubit statsCubit;
 
     setUp(() {
       sharingCubit = _MockResultSharingCubit();
       when(() => sharingCubit.state).thenReturn(const ResultSharingState());
+      statsCubit = _MockCommunityStatsCubit();
+      when(() => statsCubit.state).thenReturn(const CommunityStatsState());
     });
 
     Widget buildSubject(GameState state) {
@@ -26,8 +34,11 @@ void main() {
         routes: [
           GoRoute(
             path: '/',
-            builder: (_, __) => BlocProvider<ResultSharingCubit>.value(
-              value: sharingCubit,
+            builder: (_, __) => MultiBlocProvider(
+              providers: [
+                BlocProvider<ResultSharingCubit>.value(value: sharingCubit),
+                BlocProvider<CommunityStatsCubit>.value(value: statsCubit),
+              ],
               child: Scaffold(body: ResultsOverlay(state: state)),
             ),
           ),
@@ -154,6 +165,54 @@ void main() {
 
         expect(find.textContaining('Result shared!'), findsOneWidget);
         expect(find.textContaining('back up your key'), findsOneWidget);
+      });
+    });
+
+    group('Community stats', () {
+      testWidgets('shows stats when loaded', (tester) async {
+        when(() => statsCubit.state).thenReturn(
+          const CommunityStatsState(
+            status: CommunityStatsStatus.loaded,
+            stats: CommunityStats(playerCount: 25, avgStars: 2.5),
+          ),
+        );
+
+        await tester.pumpWidget(buildSubject(winState()));
+
+        expect(find.text('~25 players, ~2.5 avg stars'), findsOneWidget);
+      });
+
+      testWidgets('hides stats when unavailable', (tester) async {
+        when(() => statsCubit.state).thenReturn(
+          const CommunityStatsState(status: CommunityStatsStatus.unavailable),
+        );
+
+        await tester.pumpWidget(buildSubject(winState()));
+
+        expect(find.textContaining('players'), findsNothing);
+      });
+
+      testWidgets('hides stats during loading', (tester) async {
+        when(() => statsCubit.state).thenReturn(
+          const CommunityStatsState(status: CommunityStatsStatus.loading),
+        );
+
+        await tester.pumpWidget(buildSubject(winState()));
+
+        expect(find.textContaining('players'), findsNothing);
+      });
+
+      testWidgets('shows stats on loss overlay too', (tester) async {
+        when(() => statsCubit.state).thenReturn(
+          const CommunityStatsState(
+            status: CommunityStatsStatus.loaded,
+            stats: CommunityStats(playerCount: 10, avgStars: 1.8),
+          ),
+        );
+
+        await tester.pumpWidget(buildSubject(lossState()));
+
+        expect(find.text('~10 players, ~1.8 avg stars'), findsOneWidget);
       });
     });
   });

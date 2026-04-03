@@ -9,6 +9,8 @@ import 'package:very_good_games/games/guess_the_number/view/widgets/widgets.dart
 import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
 import 'package:very_good_games/nostr/sharing/cubit/result_sharing_cubit.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
+import 'package:very_good_games/nostr/stats/cubit/community_stats_cubit.dart';
+import 'package:very_good_games/nostr/stats/repository/community_stats_repository.dart';
 
 /// The top-level page for a Guess the Number game session.
 ///
@@ -40,6 +42,11 @@ class GamePage extends StatelessWidget {
           create: (context) => ResultSharingCubit(
             identityRepository: context.read<NostrIdentityRepository>(),
             publishRepository: context.read<NostrPublishRepository>(),
+          ),
+        ),
+        BlocProvider(
+          create: (context) => CommunityStatsCubit(
+            statsRepository: context.read<CommunityStatsRepository>(),
           ),
         ),
       ],
@@ -91,6 +98,15 @@ class _GameViewState extends State<_GameView> {
     repo.saveStreak(gameId, updated);
   }
 
+  void _fetchCommunityStats(BuildContext context) {
+    final now = DateTime.now().toUtc();
+    final date =
+        '${now.year}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    context.read<CommunityStatsCubit>().fetchStats('guess-the-number:$date');
+  }
+
   /// Returns the set of cell indices for locked parameters,
   /// so the grid can draw persistent selection rings.
   Set<int> _selectedCells(GameState state) {
@@ -119,6 +135,7 @@ class _GameViewState extends State<_GameView> {
           if (state.status == GameStatus.won) {
             _persistStreak(context);
           }
+          _fetchCommunityStats(context);
         },
         builder: (context, state) {
           final cubit = context.read<GameCubit>();

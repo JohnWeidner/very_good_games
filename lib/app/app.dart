@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
+import 'package:very_good_games/nostr/stats/repository/community_stats_repository.dart';
 
 /// The root widget of Very Good Games.
 class App extends StatelessWidget {
@@ -14,18 +15,21 @@ class App extends StatelessWidget {
     required GameStorageRepository gameStorageRepository,
     required NostrIdentityRepository nostrIdentityRepository,
     required NostrPublishRepository nostrPublishRepository,
+    required CommunityStatsRepository communityStatsRepository,
     super.key,
   }) : _router = router,
        _gameRegistry = gameRegistry,
        _gameStorageRepository = gameStorageRepository,
        _nostrIdentityRepository = nostrIdentityRepository,
-       _nostrPublishRepository = nostrPublishRepository;
+       _nostrPublishRepository = nostrPublishRepository,
+       _communityStatsRepository = communityStatsRepository;
 
   final GoRouter _router;
   final GameRegistry _gameRegistry;
   final GameStorageRepository _gameStorageRepository;
   final NostrIdentityRepository _nostrIdentityRepository;
   final NostrPublishRepository _nostrPublishRepository;
+  final CommunityStatsRepository _communityStatsRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +39,7 @@ class App extends StatelessWidget {
         RepositoryProvider.value(value: _gameStorageRepository),
         RepositoryProvider.value(value: _nostrIdentityRepository),
         RepositoryProvider.value(value: _nostrPublishRepository),
+        RepositoryProvider.value(value: _communityStatsRepository),
       ],
       child: MaterialApp.router(
         title: 'Very Good Games',

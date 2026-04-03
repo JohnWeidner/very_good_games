@@ -8,12 +8,16 @@ import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/games/guess_the_number/view/view.dart';
 import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
+import 'package:very_good_games/nostr/stats/repository/community_stats_repository.dart';
 
 class _MockNostrIdentityRepository extends Mock
     implements NostrIdentityRepository {}
 
 class _MockNostrPublishRepository extends Mock
     implements NostrPublishRepository {}
+
+class _MockCommunityStatsRepository extends Mock
+    implements CommunityStatsRepository {}
 
 void main() {
   group('GamePage', () {
@@ -45,6 +49,9 @@ void main() {
                   ),
                   RepositoryProvider<NostrPublishRepository>(
                     create: (_) => _MockNostrPublishRepository(),
+                  ),
+                  RepositoryProvider<CommunityStatsRepository>(
+                    create: (_) => _MockCommunityStatsRepository(),
                   ),
                 ],
                 child: const GamePage(targetNumber: 42, dailySeed: 12345),

@@ -8,6 +8,7 @@ import 'package:very_good_games/nostr/identity/repository/nostr_identity_reposit
 import 'package:very_good_games/nostr/identity/view/identity_explainer_flow.dart';
 import 'package:very_good_games/nostr/identity/view/identity_setup_page.dart';
 import 'package:very_good_games/nostr/sharing/cubit/result_sharing_cubit.dart';
+import 'package:very_good_games/nostr/stats/cubit/community_stats_cubit.dart';
 
 /// Overlay displayed when the game ends, showing score and stats.
 class ResultsOverlay extends StatelessWidget {
@@ -59,78 +60,82 @@ class ResultsOverlay extends StatelessWidget {
       child: ColoredBox(
         color: Colors.black54,
         child: Center(
-          child: Card(
-            margin: const EdgeInsets.all(32),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    isWin ? 'You found it!' : "Time's up!",
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: isWin ? null : theme.colorScheme.error,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'The number was ${state.targetNumber}',
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 24),
-                  if (isWin) ...[
+          child: SingleChildScrollView(
+            child: Card(
+              margin: const EdgeInsets.all(32),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     Text(
-                      '${state.score}',
-                      style: theme.textTheme.displayMedium?.copyWith(
+                      isWin ? 'You found it!' : "Time's up!",
+                      style: theme.textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                    Text(
-                      'points',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.6,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _BreakdownRow(
-                      label: 'Questions',
-                      value: '${state.questionCount}',
-                      penalty: '-${state.questionCount * 50}',
-                    ),
-                    _BreakdownRow(
-                      label: 'Time',
-                      value: timeText,
-                      penalty: '-${state.elapsedSeconds * 2}',
-                    ),
-                    const SizedBox(height: 24),
-                    _StarRating(score: state.score ?? 0),
-                    const SizedBox(height: 16),
-                    _ShareButton(state: state),
-                  ] else ...[
-                    Text(
-                      'Score reached zero',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.6,
-                        ),
+                        color: isWin ? null : theme.colorScheme.error,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${state.questionCount} questions, $timeText',
-                      style: theme.textTheme.bodyMedium,
+                      'The number was ${state.targetNumber}',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 24),
+                    if (isWin) ...[
+                      Text(
+                        '${state.score}',
+                        style: theme.textTheme.displayMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      Text(
+                        'points',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _BreakdownRow(
+                        label: 'Questions',
+                        value: '${state.questionCount}',
+                        penalty: '-${state.questionCount * 50}',
+                      ),
+                      _BreakdownRow(
+                        label: 'Time',
+                        value: timeText,
+                        penalty: '-${state.elapsedSeconds * 2}',
+                      ),
+                      const SizedBox(height: 24),
+                      _StarRating(score: state.score ?? 0),
+                      const SizedBox(height: 16),
+                      _ShareButton(state: state),
+                      const _CommunityStatsSection(),
+                    ] else ...[
+                      Text(
+                        'Score reached zero',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${state.questionCount} questions, $timeText',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                      const _CommunityStatsSection(),
+                    ],
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: () => context.go('/'),
+                      child: const Text('Back to Hub'),
                     ),
                   ],
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: () => context.go('/'),
-                    child: const Text('Back to Hub'),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -215,6 +220,37 @@ class _ShareButton extends StatelessWidget {
       questionCount: state.questionCount,
       elapsedSeconds: state.elapsedSeconds,
       date: date,
+    );
+  }
+}
+
+class _CommunityStatsSection extends StatelessWidget {
+  const _CommunityStatsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<CommunityStatsCubit, CommunityStatsState>(
+      builder: (context, state) {
+        if (state.status != CommunityStatsStatus.loaded ||
+            state.stats == null) {
+          return const SizedBox.shrink();
+        }
+
+        final stats = state.stats!;
+        return Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: Text(
+            '~${stats.playerCount} players, '
+            '~${stats.avgStars.toStringAsFixed(1)} avg stars',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        );
+      },
     );
   }
 }

@@ -8,12 +8,16 @@ import 'package:very_good_games/app/routes/routes.dart';
 import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
+import 'package:very_good_games/nostr/stats/repository/community_stats_repository.dart';
 
 class _MockNostrIdentityRepository extends Mock
     implements NostrIdentityRepository {}
 
 class _MockNostrPublishRepository extends Mock
     implements NostrPublishRepository {}
+
+class _MockCommunityStatsRepository extends Mock
+    implements CommunityStatsRepository {}
 
 void main() {
   group('App', () {
@@ -22,6 +26,7 @@ void main() {
     late GameStorageRepository storageRepository;
     late NostrIdentityRepository nostrIdentityRepository;
     late NostrPublishRepository nostrPublishRepository;
+    late CommunityStatsRepository communityStatsRepository;
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
@@ -31,6 +36,7 @@ void main() {
       router = createRouter(gameRegistry);
       nostrIdentityRepository = _MockNostrIdentityRepository();
       nostrPublishRepository = _MockNostrPublishRepository();
+      communityStatsRepository = _MockCommunityStatsRepository();
     });
 
     testWidgets('renders MaterialApp.router', (tester) async {
@@ -41,6 +47,7 @@ void main() {
           gameStorageRepository: storageRepository,
           nostrIdentityRepository: nostrIdentityRepository,
           nostrPublishRepository: nostrPublishRepository,
+          communityStatsRepository: communityStatsRepository,
         ),
       );
 
@@ -55,6 +62,7 @@ void main() {
           gameStorageRepository: storageRepository,
           nostrIdentityRepository: nostrIdentityRepository,
           nostrPublishRepository: nostrPublishRepository,
+          communityStatsRepository: communityStatsRepository,
         ),
       );
       await tester.pumpAndSettle();
