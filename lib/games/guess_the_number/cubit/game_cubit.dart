@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/games/guess_the_number/logic/logic.dart';
 import 'package:very_good_games/games/guess_the_number/models/models.dart';
 
@@ -23,22 +25,91 @@ class GameCubit extends Cubit<GameState> {
   /// The target must be between 1 and 400 inclusive.
   /// Provide [random] to override shotgun randomness in tests.
   /// Provide [dailySeed] for deterministic daily shotgun results.
-  GameCubit({required int targetNumber, Random? random, int? dailySeed})
-    : _random = random,
-      _dailySeed = dailySeed,
-      assert(
-        targetNumber >= 1 && targetNumber <= 400,
-        'Target must be between 1 and 400',
-      ),
-      super(
-        GameState(
-          cells: List.filled(400, CellState.possible),
-          targetNumber: targetNumber,
-        ),
+  /// Provide [storageRepository] to enable session persistence.
+  GameCubit({
+    required int targetNumber,
+    Random? random,
+    int? dailySeed,
+    GameStorageRepository? storageRepository,
+  }) : _random = random,
+       _dailySeed = dailySeed,
+       _storageRepository = storageRepository,
+       assert(
+         targetNumber >= 1 && targetNumber <= 400,
+         'Target must be between 1 and 400',
+       ),
+       super(
+         GameState(
+           cells: List.filled(400, CellState.possible),
+           targetNumber: targetNumber,
+         ),
+       );
+
+  /// Creates a [GameCubit] restored from a saved session.
+  GameCubit._restored({
+    required GameState restoredState,
+    Random? random,
+    int? dailySeed,
+    GameStorageRepository? storageRepository,
+  }) : _random = random,
+       _dailySeed = dailySeed,
+       _storageRepository = storageRepository,
+       super(restoredState);
+
+  /// Attempts to restore a [GameCubit] from a saved session.
+  ///
+  /// Returns `null` if no saved session exists or the saved session's
+  /// daily seed doesn't match [dailySeed] (i.e. it's from a different day).
+  static GameCubit? restore({
+    required int targetNumber,
+    required GameStorageRepository storageRepository,
+    int? dailySeed,
+  }) {
+    final session = storageRepository.getSession(_gameId);
+    if (session == null) return null;
+
+    final savedSeed = session['dailySeed'] as int?;
+    if (savedSeed != dailySeed) {
+      // Stale session from a different day — discard it.
+      unawaited(storageRepository.saveSession(_gameId, null));
+      return null;
+    }
+
+    try {
+      final cellInts = (session['cells'] as List<dynamic>).cast<int>();
+      final cells = cellInts.map((i) => CellState.values[i]).toList();
+      final usedTypes = (session['usedQuestionTypes'] as List<dynamic>)
+          .cast<int>()
+          .map((i) => QuestionType.values[i])
+          .toSet();
+
+      final restoredState = GameState(
+        cells: cells,
+        targetNumber: targetNumber,
+        status: GameStatus.playing,
+        usedQuestionTypes: usedTypes,
+        questionCount: session['questionCount'] as int,
+        elapsedSeconds: session['elapsedSeconds'] as int,
+        timerStarted: session['timerStarted'] as bool,
       );
+
+      return GameCubit._restored(
+        restoredState: restoredState,
+        dailySeed: dailySeed,
+        storageRepository: storageRepository,
+      );
+    } on Object {
+      // Corrupted session data — discard and start fresh.
+      unawaited(storageRepository.saveSession(_gameId, null));
+      return null;
+    }
+  }
+
+  static const _gameId = 'guess_the_number';
 
   final Random? _random;
   final int? _dailySeed;
+  final GameStorageRepository? _storageRepository;
 
   /// Returns the [Random] for shotgun, seeded deterministically
   /// from the daily seed and current question count so that two
@@ -185,6 +256,7 @@ class GameCubit extends Cubit<GameState> {
           lastResult: () => result.answer,
         ),
       );
+      _clearSession();
     } else {
       // Check if the question cost pushed score to zero.
       final liveScore = ScoreCalculator.calculate(
@@ -207,7 +279,32 @@ class GameCubit extends Cubit<GameState> {
           lastResult: () => result.answer,
         ),
       );
+
+      if (isLost) {
+        _clearSession();
+      } else {
+        _saveSession();
+      }
     }
+  }
+
+  /// Persists the current game state to storage.
+  void _saveSession() {
+    final future = _storageRepository?.saveSession(_gameId, {
+      'dailySeed': _dailySeed,
+      'cells': state.cells.map((c) => c.index).toList(),
+      'usedQuestionTypes': state.usedQuestionTypes.map((t) => t.index).toList(),
+      'questionCount': state.questionCount,
+      'elapsedSeconds': state.elapsedSeconds,
+      'timerStarted': state.timerStarted,
+    });
+    if (future != null) unawaited(future);
+  }
+
+  /// Clears the saved session (game is over).
+  void _clearSession() {
+    final future = _storageRepository?.saveSession(_gameId, null);
+    if (future != null) unawaited(future);
   }
 
   /// Increments the elapsed time by one second.
@@ -233,6 +330,7 @@ class GameCubit extends Cubit<GameState> {
           score: () => 0,
         ),
       );
+      _clearSession();
       return;
     }
 

@@ -65,6 +65,41 @@ void main() {
       });
     });
 
+    group('saveSession / getSession', () {
+      test('returns null when no session stored', () {
+        expect(repository.getSession('test_game'), isNull);
+      });
+
+      test('round-trips session data', () async {
+        final session = {
+          'dailySeed': 42,
+          'cells': [0, 1, 0, 2],
+          'usedQuestionTypes': [0, 1],
+          'questionCount': 3,
+          'elapsedSeconds': 45,
+          'timerStarted': true,
+        };
+
+        await repository.saveSession('test_game', session);
+
+        final loaded = repository.getSession('test_game');
+        expect(loaded, isNotNull);
+        expect(loaded!['dailySeed'], equals(42));
+        expect(loaded['cells'], equals([0, 1, 0, 2]));
+        expect(loaded['usedQuestionTypes'], equals([0, 1]));
+        expect(loaded['questionCount'], equals(3));
+        expect(loaded['elapsedSeconds'], equals(45));
+        expect(loaded['timerStarted'], isTrue);
+      });
+
+      test('clears session when saving null', () async {
+        await repository.saveSession('test_game', {'dailySeed': 1});
+        await repository.saveSession('test_game', null);
+
+        expect(repository.getSession('test_game'), isNull);
+      });
+    });
+
     test('isolates data between games', () async {
       final data1 = StreakData(
         currentStreak: 3,

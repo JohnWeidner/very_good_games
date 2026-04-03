@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/games/guess_the_number/cubit/game_cubit.dart';
 import 'package:very_good_games/games/guess_the_number/models/models.dart';
 
@@ -502,6 +504,182 @@ void main() {
         () => GameCubit(targetNumber: 401),
         throwsA(isA<AssertionError>()),
       );
+    });
+
+    group('session persistence', () {
+      late GameStorageRepository storage;
+
+      setUp(() async {
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+        storage = GameStorageRepository(preferences: prefs);
+      });
+
+      test('saves session after confirmQuestion', () {
+        final cubit = GameCubit(
+          targetNumber: target,
+          dailySeed: 42,
+          storageRepository: storage,
+        );
+
+        cubit
+          ..selectQuestion(QuestionType.isOdd)
+          ..confirmQuestion();
+
+        final session = storage.getSession('guess_the_number');
+        expect(session, isNotNull);
+        expect(session!['dailySeed'], equals(42));
+        expect(session['questionCount'], equals(1));
+        expect(session['timerStarted'], isTrue);
+        expect(session['cells'], isA<List<dynamic>>());
+        expect((session['cells'] as List<dynamic>).length, equals(400));
+
+        cubit.close();
+      });
+
+      test('clears session on win', () {
+        // Use lessThan with param=401 to eliminate nothing, then guess.
+        final cubit = GameCubit(
+          targetNumber: target,
+          dailySeed: 42,
+          storageRepository: storage,
+        );
+
+        // Ask a question to get a saved session.
+        cubit
+          ..selectQuestion(QuestionType.isOdd)
+          ..confirmQuestion();
+        expect(storage.getSession('guess_the_number'), isNotNull);
+
+        // Now play until win — use equals with correct number.
+        cubit
+          ..selectQuestion(QuestionType.equals)
+          ..highlightCell(targetIndex)
+          ..lockParam()
+          ..confirmQuestion();
+
+        // Session should be cleared after win.
+        expect(cubit.state.status, equals(GameStatus.won));
+        expect(storage.getSession('guess_the_number'), isNull);
+
+        cubit.close();
+      });
+
+      test('clears session on loss', () {
+        final cubit = GameCubit(
+          targetNumber: target,
+          dailySeed: 42,
+          storageRepository: storage,
+        );
+
+        // Ask a question to create a saved session.
+        cubit
+          ..selectQuestion(QuestionType.isOdd)
+          ..confirmQuestion();
+        expect(storage.getSession('guess_the_number'), isNotNull);
+
+        // Guess wrong repeatedly until score hits zero.
+        cubit
+          ..selectQuestion(QuestionType.equals)
+          ..highlightCell(wrongIndex)
+          ..lockParam()
+          ..confirmQuestion();
+
+        // Tick until score reaches zero.
+        while (cubit.state.status != GameStatus.lost) {
+          cubit.tick();
+        }
+
+        expect(cubit.state.status, equals(GameStatus.lost));
+        expect(storage.getSession('guess_the_number'), isNull);
+
+        cubit.close();
+      });
+
+      test('restore returns null when no saved session', () {
+        final cubit = GameCubit.restore(
+          targetNumber: target,
+          storageRepository: storage,
+          dailySeed: 42,
+        );
+
+        expect(cubit, isNull);
+      });
+
+      test('restore returns null when dailySeed does not match', () async {
+        // Save a session with seed 42.
+        final cubit = GameCubit(
+          targetNumber: target,
+          dailySeed: 42,
+          storageRepository: storage,
+        );
+        cubit
+          ..selectQuestion(QuestionType.isOdd)
+          ..confirmQuestion();
+        cubit.close();
+
+        // Try to restore with a different seed.
+        final restored = GameCubit.restore(
+          targetNumber: target,
+          storageRepository: storage,
+          dailySeed: 99,
+        );
+
+        expect(restored, isNull);
+        // Stale session should be cleared.
+        expect(storage.getSession('guess_the_number'), isNull);
+      });
+
+      test('restore returns null on corrupted session data', () async {
+        // Write a malformed session directly.
+        await storage.saveSession('guess_the_number', {
+          'dailySeed': 42,
+          'cells': 'not-a-list',
+        });
+
+        final restored = GameCubit.restore(
+          targetNumber: target,
+          storageRepository: storage,
+          dailySeed: 42,
+        );
+
+        expect(restored, isNull);
+        // Corrupted session should be cleared.
+        expect(storage.getSession('guess_the_number'), isNull);
+      });
+
+      test('restore returns cubit with saved state', () async {
+        // Play a question and save.
+        final cubit = GameCubit(
+          targetNumber: target,
+          dailySeed: 42,
+          storageRepository: storage,
+        );
+        cubit
+          ..selectQuestion(QuestionType.isOdd)
+          ..confirmQuestion();
+
+        final savedCells = List<CellState>.from(cubit.state.cells);
+        final savedQuestionCount = cubit.state.questionCount;
+        cubit.close();
+
+        // Restore.
+        final restored = GameCubit.restore(
+          targetNumber: target,
+          storageRepository: storage,
+          dailySeed: 42,
+        );
+
+        expect(restored, isNotNull);
+        expect(restored!.state.cells, equals(savedCells));
+        expect(restored.state.questionCount, equals(savedQuestionCount));
+        expect(restored.state.elapsedSeconds, equals(0));
+        expect(restored.state.timerStarted, isTrue);
+        expect(restored.state.status, equals(GameStatus.playing));
+        expect(restored.state.usedQuestionTypes, contains(QuestionType.isOdd));
+
+        restored.close();
+      });
     });
   });
 }

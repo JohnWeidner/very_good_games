@@ -40,6 +40,8 @@ enum QuestionType {
     description: 'Divisible by',
     category: QuestionCategory.math,
     paramCount: 1,
+    usesDigitPicker: true,
+    pickerValues: [2, 3, 5, 7, 11, 13, 17, 19],
   ),
 
   /// Is the target prime?
@@ -92,6 +94,7 @@ enum QuestionType {
     required this.paramCount,
     this.isRepeatable = false,
     this.usesDigitPicker = false,
+    this.pickerValues,
   });
 
   /// Short label shown on the card (e.g., '< N').
@@ -109,6 +112,11 @@ enum QuestionType {
   /// Whether this question can be used more than once.
   final bool isRepeatable;
 
-  /// Whether this question uses a digit picker (0–9) instead of the grid.
+  /// Whether this question uses a digit picker instead of the grid.
   final bool usesDigitPicker;
+
+  /// Custom values to display in the digit picker.
+  ///
+  /// When `null` and [usesDigitPicker] is `true`, defaults to 0–9.
+  final List<int>? pickerValues;
 }

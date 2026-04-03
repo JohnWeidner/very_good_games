@@ -22,7 +22,7 @@ void main() {
 
     Nip01Event makeEvent({
       required String pubKey,
-      required int stars,
+      required int score,
       int createdAt = 1000,
     }) {
       return Nip01Event(
@@ -30,14 +30,14 @@ void main() {
         kind: 30042,
         tags: [
           ['d', 'guess-the-number:2026-04-02'],
-          ['l', 'stars-$stars', 'games.vgg.score'],
+          ['l', 'score-$score', 'games.vgg.score'],
         ],
         content: 'test',
         createdAt: createdAt,
       );
     }
 
-    test('returns stats with correct player count and avg stars', () async {
+    test('returns stats with correct player count and avg score', () async {
       when(
         () => requests.query(
           filter: any(named: 'filter'),
@@ -49,9 +49,9 @@ void main() {
         NdkResponse(
           'test-id',
           Stream.fromIterable([
-            makeEvent(pubKey: 'alice', stars: 3),
-            makeEvent(pubKey: 'bob', stars: 2),
-            makeEvent(pubKey: 'carol', stars: 1),
+            makeEvent(pubKey: 'alice', score: 3),
+            makeEvent(pubKey: 'bob', score: 2),
+            makeEvent(pubKey: 'carol', score: 1),
           ]),
         ),
       );
@@ -60,7 +60,7 @@ void main() {
 
       expect(stats, isNotNull);
       expect(stats!.playerCount, equals(3));
-      expect(stats.avgStars, equals(2.0));
+      expect(stats.avgScore, equals(2.0));
     });
 
     test('deduplicates by pubkey keeping latest', () async {
@@ -75,8 +75,8 @@ void main() {
         NdkResponse(
           'test-id',
           Stream.fromIterable([
-            makeEvent(pubKey: 'alice', stars: 1, createdAt: 100),
-            makeEvent(pubKey: 'alice', stars: 3, createdAt: 200),
+            makeEvent(pubKey: 'alice', score: 1, createdAt: 100),
+            makeEvent(pubKey: 'alice', score: 3, createdAt: 200),
           ]),
         ),
       );
@@ -85,7 +85,7 @@ void main() {
 
       expect(stats, isNotNull);
       expect(stats!.playerCount, equals(1));
-      expect(stats.avgStars, equals(3.0));
+      expect(stats.avgScore, equals(3.0));
     });
 
     test('returns null when no events found', () async {
@@ -118,7 +118,7 @@ void main() {
       expect(stats, isNull);
     });
 
-    test('skips events with missing or malformed star labels', () async {
+    test('skips events with missing or malformed score labels', () async {
       when(
         () => requests.query(
           filter: any(named: 'filter'),
@@ -131,7 +131,7 @@ void main() {
           'test-id',
           Stream.fromIterable([
             // Valid event.
-            makeEvent(pubKey: 'alice', stars: 3),
+            makeEvent(pubKey: 'alice', score: 3),
             // Event with no l tags.
             Nip01Event(
               pubKey: 'bob',
@@ -141,13 +141,13 @@ void main() {
               ],
               content: 'test',
             ),
-            // Event with malformed star value.
+            // Event with malformed score value.
             Nip01Event(
               pubKey: 'carol',
               kind: 30042,
               tags: [
                 ['d', 'guess-the-number:2026-04-02'],
-                ['l', 'stars-abc', 'games.vgg.score'],
+                ['l', 'score-abc', 'games.vgg.score'],
               ],
               content: 'test',
             ),
@@ -158,9 +158,9 @@ void main() {
       final stats = await repository.fetchStats('guess-the-number:2026-04-02');
 
       expect(stats, isNotNull);
-      // Only alice counts — bob and carol have invalid star data.
+      // Only alice counts — bob and carol have invalid score data.
       expect(stats!.playerCount, equals(1));
-      expect(stats.avgStars, equals(3.0));
+      expect(stats.avgScore, equals(3.0));
     });
 
     test('caches results by d tag', () async {
@@ -174,7 +174,7 @@ void main() {
       ).thenReturn(
         NdkResponse(
           'test-id',
-          Stream.fromIterable([makeEvent(pubKey: 'alice', stars: 3)]),
+          Stream.fromIterable([makeEvent(pubKey: 'alice', score: 3)]),
         ),
       );
 

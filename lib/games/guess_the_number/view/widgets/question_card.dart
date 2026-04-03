@@ -112,6 +112,7 @@ class QuestionCard extends StatelessWidget {
         children: [
           DigitPicker(
             selectedDigit: state.firstParam,
+            values: type.pickerValues,
             onDigitSelected: (d) => onDigitSelected?.call(d),
           ),
           if (state.firstParam == null) ...[

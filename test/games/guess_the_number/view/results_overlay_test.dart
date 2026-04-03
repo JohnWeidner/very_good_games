@@ -173,13 +173,13 @@ void main() {
         when(() => statsCubit.state).thenReturn(
           const CommunityStatsState(
             status: CommunityStatsStatus.loaded,
-            stats: CommunityStats(playerCount: 25, avgStars: 2.5),
+            stats: CommunityStats(playerCount: 25, avgScore: 2.5),
           ),
         );
 
         await tester.pumpWidget(buildSubject(winState()));
 
-        expect(find.text('~25 players, ~2.5 avg stars'), findsOneWidget);
+        expect(find.text('~25 players, ~3 avg score'), findsOneWidget);
       });
 
       testWidgets('hides stats when unavailable', (tester) async {
@@ -206,13 +206,13 @@ void main() {
         when(() => statsCubit.state).thenReturn(
           const CommunityStatsState(
             status: CommunityStatsStatus.loaded,
-            stats: CommunityStats(playerCount: 10, avgStars: 1.8),
+            stats: CommunityStats(playerCount: 10, avgScore: 1.8),
           ),
         );
 
         await tester.pumpWidget(buildSubject(lossState()));
 
-        expect(find.text('~10 players, ~1.8 avg stars'), findsOneWidget);
+        expect(find.text('~10 players, ~2 avg score'), findsOneWidget);
       });
     });
   });

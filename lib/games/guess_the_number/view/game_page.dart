@@ -35,8 +35,19 @@ class GamePage extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider(
-          create: (_) =>
-              GameCubit(targetNumber: targetNumber, dailySeed: dailySeed),
+          create: (context) {
+            final storage = context.read<GameStorageRepository>();
+            return GameCubit.restore(
+                  targetNumber: targetNumber,
+                  dailySeed: dailySeed,
+                  storageRepository: storage,
+                ) ??
+                GameCubit(
+                  targetNumber: targetNumber,
+                  dailySeed: dailySeed,
+                  storageRepository: storage,
+                );
+          },
         ),
         BlocProvider(
           create: (context) => ResultSharingCubit(

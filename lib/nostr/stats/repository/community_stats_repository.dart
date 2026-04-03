@@ -67,13 +67,13 @@ class CommunityStatsRepository {
         }
       }
 
-      // Extract star counts from NIP-32 labels.
-      var totalStars = 0;
+      // Extract scores from NIP-32 labels.
+      var totalScore = 0;
       var validCount = 0;
       for (final event in byPubkey.values) {
-        final starCount = _extractStars(event);
-        if (starCount != null) {
-          totalStars += starCount;
+        final score = _extractScore(event);
+        if (score != null) {
+          totalScore += score;
           validCount++;
         }
       }
@@ -82,7 +82,7 @@ class CommunityStatsRepository {
 
       final stats = CommunityStats(
         playerCount: validCount,
-        avgStars: totalStars / validCount,
+        avgScore: totalScore / validCount,
       );
 
       _cache[dTag] = stats;
@@ -92,13 +92,13 @@ class CommunityStatsRepository {
     }
   }
 
-  /// Extracts the star count from an event's NIP-32 `l` tags.
-  static int? _extractStars(Nip01Event event) {
+  /// Extracts the score from an event's NIP-32 `l` tags.
+  static int? _extractScore(Nip01Event event) {
     for (final tag in event.tags) {
       if (tag.length >= 3 &&
           tag[0] == 'l' &&
           tag[2] == 'games.vgg.score' &&
-          tag[1].startsWith('stars-')) {
+          tag[1].startsWith('score-')) {
         return int.tryParse(tag[1].substring(6));
       }
     }

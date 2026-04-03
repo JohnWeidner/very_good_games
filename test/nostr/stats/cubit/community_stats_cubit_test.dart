@@ -31,7 +31,7 @@ void main() {
         when(
           () => repository.fetchStats('guess-the-number:2026-04-02'),
         ).thenAnswer(
-          (_) async => const CommunityStats(playerCount: 25, avgStars: 2.5),
+          (_) async => const CommunityStats(playerCount: 25, avgScore: 2.5),
         );
       },
       build: buildCubit,
@@ -40,7 +40,7 @@ void main() {
         const CommunityStatsState(status: CommunityStatsStatus.loading),
         const CommunityStatsState(
           status: CommunityStatsStatus.loaded,
-          stats: CommunityStats(playerCount: 25, avgStars: 2.5),
+          stats: CommunityStats(playerCount: 25, avgScore: 2.5),
         ),
       ],
     );

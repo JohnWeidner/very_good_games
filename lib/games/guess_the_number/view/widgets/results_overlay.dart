@@ -243,7 +243,7 @@ class _CommunityStatsSection extends StatelessWidget {
           padding: const EdgeInsets.only(top: 16),
           child: Text(
             '~${stats.playerCount} players, '
-            '~${stats.avgStars.toStringAsFixed(1)} avg stars',
+            '~${stats.avgScore.toStringAsFixed(0)} avg score',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(
                 context,
