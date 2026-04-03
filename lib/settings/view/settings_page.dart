@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:very_good_games/nostr/identity/cubit/nostr_identity_cubit.dart';
+import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
+import 'package:very_good_games/settings/view/widgets/widgets.dart';
 
 /// The settings screen for Very Good Games.
 ///
@@ -9,16 +13,13 @@ class SettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        children: const [
-          ListTile(
-            title: Text('Nostr Identity'),
-            subtitle: Text('Set up your identity'),
-            trailing: Icon(Icons.chevron_right),
-          ),
-        ],
+    return BlocProvider(
+      create: (context) => NostrIdentityCubit(
+        identityRepository: context.read<NostrIdentityRepository>(),
+      )..loadIdentity(),
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Settings')),
+        body: ListView(children: const [NostrIdentitySection()]),
       ),
     );
   }

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/home/view/home_page.dart';
+import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
 import 'package:very_good_games/settings/settings.dart';
 
 class _MockGameRegistry extends Mock implements GameRegistry {
@@ -14,6 +15,9 @@ class _MockGameRegistry extends Mock implements GameRegistry {
 
 class _MockGameStorageRepository extends Mock
     implements GameStorageRepository {}
+
+class _MockNostrIdentityRepository extends Mock
+    implements NostrIdentityRepository {}
 
 void main() {
   group('HomePage settings icon', () {
@@ -40,6 +44,14 @@ void main() {
             ),
             RepositoryProvider<GameStorageRepository>(
               create: (_) => _MockGameStorageRepository(),
+            ),
+            RepositoryProvider<NostrIdentityRepository>(
+              create: (_) {
+                final mock = _MockNostrIdentityRepository();
+                when(() => mock.getPublicKey()).thenAnswer((_) async => null);
+                when(() => mock.hasIdentity()).thenAnswer((_) async => false);
+                return mock;
+              },
             ),
           ],
           child: MaterialApp.router(routerConfig: router),

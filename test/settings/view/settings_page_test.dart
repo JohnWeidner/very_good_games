@@ -1,10 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
 import 'package:very_good_games/settings/settings.dart';
+
+class _MockNostrIdentityRepository extends Mock
+    implements NostrIdentityRepository {}
 
 extension on WidgetTester {
   Future<void> pumpSettingsPage() {
-    return pumpWidget(const MaterialApp(home: SettingsPage()));
+    final repository = _MockNostrIdentityRepository();
+    when(() => repository.getPublicKey()).thenAnswer((_) async => null);
+    when(() => repository.hasIdentity()).thenAnswer((_) async => false);
+
+    return pumpWidget(
+      RepositoryProvider<NostrIdentityRepository>(
+        create: (_) => repository,
+        child: const MaterialApp(home: SettingsPage()),
+      ),
+    );
   }
 }
 
@@ -12,16 +27,17 @@ void main() {
   group('SettingsPage', () {
     testWidgets('renders Settings title in AppBar', (tester) async {
       await tester.pumpSettingsPage();
+      await tester.pumpAndSettle();
 
       expect(find.text('Settings'), findsOneWidget);
     });
 
-    testWidgets('renders Nostr Identity ListTile', (tester) async {
+    testWidgets('renders Nostr Identity section', (tester) async {
       await tester.pumpSettingsPage();
+      await tester.pumpAndSettle();
 
       expect(find.text('Nostr Identity'), findsOneWidget);
       expect(find.text('Set up your identity'), findsOneWidget);
-      expect(find.byIcon(Icons.chevron_right), findsOneWidget);
     });
   });
 }
