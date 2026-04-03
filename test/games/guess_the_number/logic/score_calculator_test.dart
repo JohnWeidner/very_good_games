@@ -46,4 +46,21 @@ void main() {
       );
     });
   });
+
+  group('stars', () {
+    test('returns 3 stars for score >= 450', () {
+      expect(ScoreCalculator.stars(450), equals(3));
+      expect(ScoreCalculator.stars(600), equals(3));
+    });
+
+    test('returns 2 stars for score >= 250 and < 450', () {
+      expect(ScoreCalculator.stars(250), equals(2));
+      expect(ScoreCalculator.stars(449), equals(2));
+    });
+
+    test('returns 1 star for score < 250', () {
+      expect(ScoreCalculator.stars(249), equals(1));
+      expect(ScoreCalculator.stars(0), equals(1));
+    });
+  });
 }

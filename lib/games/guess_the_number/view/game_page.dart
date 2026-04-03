@@ -6,6 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/games/guess_the_number/cubit/game_cubit.dart';
 import 'package:very_good_games/games/guess_the_number/view/widgets/widgets.dart';
+import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
+import 'package:very_good_games/nostr/sharing/cubit/result_sharing_cubit.dart';
+import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
 
 /// The top-level page for a Guess the Number game session.
 ///
@@ -27,9 +30,19 @@ class GamePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) =>
-          GameCubit(targetNumber: targetNumber, dailySeed: dailySeed),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) =>
+              GameCubit(targetNumber: targetNumber, dailySeed: dailySeed),
+        ),
+        BlocProvider(
+          create: (context) => ResultSharingCubit(
+            identityRepository: context.read<NostrIdentityRepository>(),
+            publishRepository: context.read<NostrPublishRepository>(),
+          ),
+        ),
+      ],
       child: const _GameView(),
     );
   }

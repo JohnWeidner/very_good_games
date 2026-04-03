@@ -2,9 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/games/guess_the_number/view/view.dart';
+import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
+import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
+
+class _MockNostrIdentityRepository extends Mock
+    implements NostrIdentityRepository {}
+
+class _MockNostrPublishRepository extends Mock
+    implements NostrPublishRepository {}
 
 void main() {
   group('GamePage', () {
@@ -26,11 +35,20 @@ void main() {
             ),
             GoRoute(
               path: '/game',
-              builder: (context, state) =>
+              builder: (context, state) => MultiRepositoryProvider(
+                providers: [
                   RepositoryProvider<GameStorageRepository>.value(
                     value: storageRepo,
-                    child: const GamePage(targetNumber: 42, dailySeed: 12345),
                   ),
+                  RepositoryProvider<NostrIdentityRepository>(
+                    create: (_) => _MockNostrIdentityRepository(),
+                  ),
+                  RepositoryProvider<NostrPublishRepository>(
+                    create: (_) => _MockNostrPublishRepository(),
+                  ),
+                ],
+                child: const GamePage(targetNumber: 42, dailySeed: 12345),
+              ),
             ),
           ],
           initialLocation: '/game',

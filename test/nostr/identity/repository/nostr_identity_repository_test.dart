@@ -120,6 +120,30 @@ void main() {
       });
     });
 
+    group('getPublicKeyHex', () {
+      test('returns hex public key when identity exists', () async {
+        final keyPair = Bip340.generatePrivateKey();
+        when(
+          () => secureStorage.read(key: 'nostr_private_key_hex'),
+        ).thenAnswer((_) async => keyPair.privateKey);
+
+        final hex = await repository.getPublicKeyHex();
+
+        expect(hex, isNotNull);
+        expect(hex!.length, equals(64));
+      });
+
+      test('returns null when no identity exists', () async {
+        when(
+          () => secureStorage.read(key: 'nostr_private_key_hex'),
+        ).thenAnswer((_) async => null);
+
+        final hex = await repository.getPublicKeyHex();
+
+        expect(hex, isNull);
+      });
+    });
+
     group('hasIdentity', () {
       test('returns true when key exists', () async {
         when(

@@ -8,6 +8,7 @@ import 'package:very_good_games/app/routes/routes.dart';
 import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/games/guess_the_number/guess_the_number_game.dart';
 import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
+import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,6 +27,7 @@ void main() async {
   final nostrIdentityRepository = NostrIdentityRepository(
     secureStorage: secureStorage,
   );
+  final nostrPublishRepository = NostrPublishRepository.lazy();
 
   runApp(
     App(
@@ -33,6 +35,7 @@ void main() async {
       gameRegistry: gameRegistry,
       gameStorageRepository: storageRepository,
       nostrIdentityRepository: nostrIdentityRepository,
+      nostrPublishRepository: nostrPublishRepository,
     ),
   );
 }

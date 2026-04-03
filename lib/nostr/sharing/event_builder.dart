@@ -1,0 +1,49 @@
+import 'package:ndk/ndk.dart';
+
+/// Builds kind 30042 Nostr events for Guess the Number results.
+///
+/// This is intentionally game-specific. Generalize when game #2 arrives.
+class EventBuilder {
+  /// Builds an unsigned kind 30042 event for a Guess the Number result.
+  ///
+  /// The [pubKeyHex] is the hex-encoded public key of the signer.
+  /// The [date] should be a UTC date string (e.g. "2026-04-02").
+  static Nip01Event buildGuessTheNumberResult({
+    required String pubKeyHex,
+    required int score,
+    required int stars,
+    required int questionCount,
+    required int elapsedSeconds,
+    required String date,
+  }) {
+    final minutes = elapsedSeconds ~/ 60;
+    final seconds = elapsedSeconds % 60;
+    final timeText =
+        '${minutes.toString().padLeft(2, '0')}:'
+        '${seconds.toString().padLeft(2, '0')}';
+
+    final starEmoji = '\u2b50' * stars;
+
+    final content =
+        '\ud83c\udfaf Very Good Games \u2014 Guess the Number\n'
+        '\ud83c\udfaf $score points \u00b7 $starEmoji $stars Stars\n'
+        '\ud83d\udcac $questionCount questions \u00b7 '
+        '\u23f1 $timeText\n\n$date';
+
+    return Nip01Event(
+      pubKey: pubKeyHex,
+      kind: 30042,
+      tags: [
+        ['d', 'guess-the-number:$date'],
+        ['t', 'vgg'],
+        ['t', 'guess-the-number'],
+        ['L', 'games.vgg.score'],
+        ['l', 'score-$score', 'games.vgg.score'],
+        ['l', 'stars-$stars', 'games.vgg.score'],
+        ['l', 'questions-$questionCount', 'games.vgg.score'],
+        ['l', 'time-$elapsedSeconds', 'games.vgg.score'],
+      ],
+      content: content,
+    );
+  }
+}

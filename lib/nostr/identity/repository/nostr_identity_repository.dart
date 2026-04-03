@@ -67,11 +67,16 @@ class NostrIdentityRepository {
 
   /// Returns the npub (bech32) for the stored identity, or `null` if none.
   Future<String?> getPublicKey() async {
+    final hex = await getPublicKeyHex();
+    if (hex == null) return null;
+    return Nip19.encodePubKey(hex);
+  }
+
+  /// Returns the hex-encoded public key, or `null` if no identity exists.
+  Future<String?> getPublicKeyHex() async {
     final privateKeyHex = await _secureStorage.read(key: _privateKeyStorageKey);
     if (privateKeyHex == null || privateKeyHex.isEmpty) return null;
-
-    final pubKeyHex = Bip340.getPublicKey(privateKeyHex);
-    return Nip19.encodePubKey(pubKeyHex);
+    return Bip340.getPublicKey(privateKeyHex);
   }
 
   /// Whether an identity exists in secure storage.

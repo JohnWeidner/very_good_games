@@ -24,4 +24,15 @@ class ScoreCalculator {
           (seconds * costPerSecond),
     );
   }
+
+  /// Returns the star rating (1–3) for a given score.
+  ///
+  /// - 3 stars: score >= 450
+  /// - 2 stars: score >= 250
+  /// - 1 star: everything else
+  static int stars(int score) {
+    if (score >= 450) return 3;
+    if (score >= 250) return 2;
+    return 1;
+  }
 }
