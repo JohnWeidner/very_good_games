@@ -1,6 +1,7 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
+import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
 
 part 'nostr_identity_state.dart';
 
@@ -9,11 +10,15 @@ part 'nostr_identity_state.dart';
 /// Emits state transitions: none -> loading -> ready/error.
 class NostrIdentityCubit extends Cubit<NostrIdentityState> {
   /// Creates a [NostrIdentityCubit].
-  NostrIdentityCubit({required NostrIdentityRepository identityRepository})
-    : _identityRepository = identityRepository,
-      super(const NostrIdentityState());
+  NostrIdentityCubit({
+    required NostrIdentityRepository identityRepository,
+    required NostrDeletionRepository deletionRepository,
+  }) : _identityRepository = identityRepository,
+       _deletionRepository = deletionRepository,
+       super(const NostrIdentityState());
 
   final NostrIdentityRepository _identityRepository;
+  final NostrDeletionRepository _deletionRepository;
 
   /// Loads the current identity from secure storage.
   Future<void> loadIdentity() async {
@@ -87,8 +92,49 @@ class NostrIdentityCubit extends Cubit<NostrIdentityState> {
   }
 
   /// Deletes the stored identity.
+  ///
+  /// Attempts best-effort NIP-09 relay content deletion before removing
+  /// the local key. The local key is always deleted regardless of relay
+  /// outcome.
   Future<void> deleteIdentity() async {
     emit(state.copyWith(status: NostrIdentityStatus.loading));
+
+    try {
+      // Obtain signer and pubkey before deleting the local key.
+      final signer = await _identityRepository.getSigner();
+      final pubKeyHex = await _identityRepository.getPublicKeyHex();
+
+      if (pubKeyHex != null) {
+        emit(
+          state.copyWith(
+            deletionProgress: 'Searching for published results...',
+          ),
+        );
+
+        final eventIds = await _deletionRepository.queryUserEvents(pubKeyHex);
+
+        if (eventIds.isNotEmpty) {
+          emit(
+            state.copyWith(
+              deletionProgress:
+                  'Deleting ${eventIds.length} '
+                  '${eventIds.length == 1 ? 'result' : 'results'} '
+                  'from relays...',
+            ),
+          );
+
+          await _deletionRepository.deleteEvents(
+            eventIds: eventIds,
+            signer: signer,
+            pubKeyHex: pubKeyHex,
+          );
+        }
+      }
+    } on StateError {
+      // getSigner() throws StateError when no identity exists.
+    } on Exception {
+      // Best-effort: proceed to local key deletion regardless.
+    }
 
     try {
       await _identityRepository.deleteIdentity();
@@ -98,6 +144,7 @@ class NostrIdentityCubit extends Cubit<NostrIdentityState> {
         state.copyWith(
           status: NostrIdentityStatus.error,
           errorMessage: e.toString(),
+          clearDeletionProgress: true,
         ),
       );
     }

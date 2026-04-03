@@ -8,6 +8,7 @@ import 'package:very_good_games/nostr/identity/repository/nostr_identity_reposit
 import 'package:very_good_games/nostr/identity/view/identity_explainer_flow.dart';
 import 'package:very_good_games/nostr/identity/view/identity_setup_page.dart';
 import 'package:very_good_games/nostr/sharing/cubit/result_sharing_cubit.dart';
+import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
 import 'package:very_good_games/nostr/stats/cubit/community_stats_cubit.dart';
 
 /// Overlay displayed when the game ends, showing score and stats.
@@ -158,6 +159,7 @@ class ResultsOverlay extends StatelessWidget {
           builder: (_) => BlocProvider(
             create: (_) => NostrIdentityCubit(
               identityRepository: context.read<NostrIdentityRepository>(),
+              deletionRepository: context.read<NostrDeletionRepository>(),
             ),
             child: const IdentitySetupPage(),
           ),

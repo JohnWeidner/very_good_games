@@ -3,20 +3,38 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:very_good_games/nostr/identity/cubit/nostr_identity_cubit.dart';
 import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
+import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
+import 'package:very_good_games/nostr/signing/signing.dart';
 
 class _MockNostrIdentityRepository extends Mock
     implements NostrIdentityRepository {}
 
+class _MockNostrDeletionRepository extends Mock
+    implements NostrDeletionRepository {}
+
+class _MockNostrSigner extends Mock implements NostrSigner {}
+
 void main() {
+  setUpAll(() {
+    registerFallbackValue(_MockNostrSigner());
+  });
+
   group('NostrIdentityCubit', () {
-    late NostrIdentityRepository repository;
+    late NostrIdentityRepository identityRepository;
+    late NostrDeletionRepository deletionRepository;
 
     setUp(() {
-      repository = _MockNostrIdentityRepository();
+      identityRepository = _MockNostrIdentityRepository();
+      deletionRepository = _MockNostrDeletionRepository();
     });
 
+    NostrIdentityCubit buildCubit() => NostrIdentityCubit(
+      identityRepository: identityRepository,
+      deletionRepository: deletionRepository,
+    );
+
     test('initial state is none', () {
-      final cubit = NostrIdentityCubit(identityRepository: repository);
+      final cubit = buildCubit();
       expect(cubit.state.status, equals(NostrIdentityStatus.none));
       expect(cubit.state.npub, isNull);
     });
@@ -26,10 +44,10 @@ void main() {
         'emits [loading, ready] when identity exists',
         setUp: () {
           when(
-            () => repository.getPublicKey(),
+            () => identityRepository.getPublicKey(),
           ).thenAnswer((_) async => 'npub1test');
         },
-        build: () => NostrIdentityCubit(identityRepository: repository),
+        build: buildCubit,
         act: (cubit) => cubit.loadIdentity(),
         expect: () => [
           const NostrIdentityState(status: NostrIdentityStatus.loading),
@@ -43,9 +61,11 @@ void main() {
       blocTest<NostrIdentityCubit, NostrIdentityState>(
         'emits [loading, none] when no identity exists',
         setUp: () {
-          when(() => repository.getPublicKey()).thenAnswer((_) async => null);
+          when(
+            () => identityRepository.getPublicKey(),
+          ).thenAnswer((_) async => null);
         },
-        build: () => NostrIdentityCubit(identityRepository: repository),
+        build: buildCubit,
         act: (cubit) => cubit.loadIdentity(),
         expect: () => [
           const NostrIdentityState(status: NostrIdentityStatus.loading),
@@ -56,9 +76,11 @@ void main() {
       blocTest<NostrIdentityCubit, NostrIdentityState>(
         'emits [loading, error] on exception',
         setUp: () {
-          when(() => repository.getPublicKey()).thenThrow(Exception('fail'));
+          when(
+            () => identityRepository.getPublicKey(),
+          ).thenThrow(Exception('fail'));
         },
-        build: () => NostrIdentityCubit(identityRepository: repository),
+        build: buildCubit,
         act: (cubit) => cubit.loadIdentity(),
         expect: () => [
           const NostrIdentityState(status: NostrIdentityStatus.loading),
@@ -75,10 +97,10 @@ void main() {
         'emits [loading, ready] with npub and nsec on success',
         setUp: () {
           when(
-            () => repository.generateKeyPair(),
+            () => identityRepository.generateKeyPair(),
           ).thenAnswer((_) async => (nsec: 'nsec1test', npub: 'npub1test'));
         },
-        build: () => NostrIdentityCubit(identityRepository: repository),
+        build: buildCubit,
         act: (cubit) => cubit.generateIdentity(),
         expect: () => [
           const NostrIdentityState(status: NostrIdentityStatus.loading),
@@ -94,10 +116,10 @@ void main() {
         'emits [loading, error] on exception',
         setUp: () {
           when(
-            () => repository.generateKeyPair(),
+            () => identityRepository.generateKeyPair(),
           ).thenThrow(Exception('storage fail'));
         },
-        build: () => NostrIdentityCubit(identityRepository: repository),
+        build: buildCubit,
         act: (cubit) => cubit.generateIdentity(),
         expect: () => [
           const NostrIdentityState(status: NostrIdentityStatus.loading),
@@ -114,10 +136,10 @@ void main() {
         'emits [loading, ready] on valid nsec',
         setUp: () {
           when(
-            () => repository.importKey('nsec1valid'),
+            () => identityRepository.importKey('nsec1valid'),
           ).thenAnswer((_) async => 'npub1imported');
         },
-        build: () => NostrIdentityCubit(identityRepository: repository),
+        build: buildCubit,
         act: (cubit) => cubit.importKey('nsec1valid'),
         expect: () => [
           const NostrIdentityState(status: NostrIdentityStatus.loading),
@@ -132,10 +154,10 @@ void main() {
         'emits [loading, error] on FormatException',
         setUp: () {
           when(
-            () => repository.importKey('bad-key'),
+            () => identityRepository.importKey('bad-key'),
           ).thenThrow(const FormatException('Invalid nsec key'));
         },
-        build: () => NostrIdentityCubit(identityRepository: repository),
+        build: buildCubit,
         act: (cubit) => cubit.importKey('bad-key'),
         expect: () => [
           const NostrIdentityState(status: NostrIdentityStatus.loading),
@@ -150,10 +172,10 @@ void main() {
         'emits [loading, error] on generic Exception',
         setUp: () {
           when(
-            () => repository.importKey('nsec1fail'),
+            () => identityRepository.importKey('nsec1fail'),
           ).thenThrow(Exception('storage fail'));
         },
-        build: () => NostrIdentityCubit(identityRepository: repository),
+        build: buildCubit,
         act: (cubit) => cubit.importKey('nsec1fail'),
         expect: () => [
           const NostrIdentityState(status: NostrIdentityStatus.loading),
@@ -166,27 +188,198 @@ void main() {
     });
 
     group('deleteIdentity', () {
+      late NostrSigner signer;
+
+      setUp(() {
+        signer = _MockNostrSigner();
+      });
+
       blocTest<NostrIdentityCubit, NostrIdentityState>(
-        'emits [loading, none] on success',
+        'queries relays and sends deletion before deleting local key',
         setUp: () {
-          when(() => repository.deleteIdentity()).thenAnswer((_) async {});
+          when(
+            () => identityRepository.getSigner(),
+          ).thenAnswer((_) async => signer);
+          when(
+            () => identityRepository.getPublicKeyHex(),
+          ).thenAnswer((_) async => 'abc123');
+          when(
+            () => deletionRepository.queryUserEvents('abc123'),
+          ).thenAnswer((_) async => ['event-1', 'event-2']);
+          when(
+            () => deletionRepository.deleteEvents(
+              eventIds: any(named: 'eventIds'),
+              signer: any(named: 'signer'),
+              pubKeyHex: any(named: 'pubKeyHex'),
+            ),
+          ).thenAnswer((_) async => true);
+          when(
+            () => identityRepository.deleteIdentity(),
+          ).thenAnswer((_) async {});
         },
-        build: () => NostrIdentityCubit(identityRepository: repository),
+        build: buildCubit,
+        act: (cubit) => cubit.deleteIdentity(),
+        expect: () => [
+          const NostrIdentityState(status: NostrIdentityStatus.loading),
+          const NostrIdentityState(
+            status: NostrIdentityStatus.loading,
+            deletionProgress: 'Searching for published results...',
+          ),
+          const NostrIdentityState(
+            status: NostrIdentityStatus.loading,
+            deletionProgress: 'Deleting 2 results from relays...',
+          ),
+          const NostrIdentityState(),
+        ],
+        verify: (_) {
+          verify(
+            () => deletionRepository.deleteEvents(
+              eventIds: ['event-1', 'event-2'],
+              signer: signer,
+              pubKeyHex: 'abc123',
+            ),
+          ).called(1);
+          verify(() => identityRepository.deleteIdentity()).called(1);
+        },
+      );
+
+      blocTest<NostrIdentityCubit, NostrIdentityState>(
+        'skips deletion when no events found',
+        setUp: () {
+          when(
+            () => identityRepository.getSigner(),
+          ).thenAnswer((_) async => signer);
+          when(
+            () => identityRepository.getPublicKeyHex(),
+          ).thenAnswer((_) async => 'abc123');
+          when(
+            () => deletionRepository.queryUserEvents('abc123'),
+          ).thenAnswer((_) async => []);
+          when(
+            () => identityRepository.deleteIdentity(),
+          ).thenAnswer((_) async {});
+        },
+        build: buildCubit,
+        act: (cubit) => cubit.deleteIdentity(),
+        expect: () => [
+          const NostrIdentityState(status: NostrIdentityStatus.loading),
+          const NostrIdentityState(
+            status: NostrIdentityStatus.loading,
+            deletionProgress: 'Searching for published results...',
+          ),
+          const NostrIdentityState(),
+        ],
+        verify: (_) {
+          verifyNever(
+            () => deletionRepository.deleteEvents(
+              eventIds: any(named: 'eventIds'),
+              signer: any(named: 'signer'),
+              pubKeyHex: any(named: 'pubKeyHex'),
+            ),
+          );
+          verify(() => identityRepository.deleteIdentity()).called(1);
+        },
+      );
+
+      blocTest<NostrIdentityCubit, NostrIdentityState>(
+        'deletes local key even when relay query fails',
+        setUp: () {
+          when(
+            () => identityRepository.getSigner(),
+          ).thenThrow(StateError('No identity stored'));
+          when(
+            () => identityRepository.deleteIdentity(),
+          ).thenAnswer((_) async {});
+        },
+        build: buildCubit,
         act: (cubit) => cubit.deleteIdentity(),
         expect: () => [
           const NostrIdentityState(status: NostrIdentityStatus.loading),
           const NostrIdentityState(),
         ],
+        verify: (_) {
+          verify(() => identityRepository.deleteIdentity()).called(1);
+        },
       );
 
       blocTest<NostrIdentityCubit, NostrIdentityState>(
-        'emits [loading, error] on exception',
+        'skips relay deletion when getPublicKeyHex returns null',
         setUp: () {
           when(
-            () => repository.deleteIdentity(),
+            () => identityRepository.getSigner(),
+          ).thenAnswer((_) async => signer);
+          when(
+            () => identityRepository.getPublicKeyHex(),
+          ).thenAnswer((_) async => null);
+          when(
+            () => identityRepository.deleteIdentity(),
+          ).thenAnswer((_) async {});
+        },
+        build: buildCubit,
+        act: (cubit) => cubit.deleteIdentity(),
+        expect: () => [
+          const NostrIdentityState(status: NostrIdentityStatus.loading),
+          const NostrIdentityState(),
+        ],
+        verify: (_) {
+          verifyNever(() => deletionRepository.queryUserEvents(any()));
+          verify(() => identityRepository.deleteIdentity()).called(1);
+        },
+      );
+
+      blocTest<NostrIdentityCubit, NostrIdentityState>(
+        'deletes local key even when relay deletion fails',
+        setUp: () {
+          when(
+            () => identityRepository.getSigner(),
+          ).thenAnswer((_) async => signer);
+          when(
+            () => identityRepository.getPublicKeyHex(),
+          ).thenAnswer((_) async => 'abc123');
+          when(
+            () => deletionRepository.queryUserEvents('abc123'),
+          ).thenAnswer((_) async => ['event-1']);
+          when(
+            () => deletionRepository.deleteEvents(
+              eventIds: any(named: 'eventIds'),
+              signer: any(named: 'signer'),
+              pubKeyHex: any(named: 'pubKeyHex'),
+            ),
+          ).thenAnswer((_) async => false);
+          when(
+            () => identityRepository.deleteIdentity(),
+          ).thenAnswer((_) async {});
+        },
+        build: buildCubit,
+        act: (cubit) => cubit.deleteIdentity(),
+        expect: () => [
+          const NostrIdentityState(status: NostrIdentityStatus.loading),
+          const NostrIdentityState(
+            status: NostrIdentityStatus.loading,
+            deletionProgress: 'Searching for published results...',
+          ),
+          const NostrIdentityState(
+            status: NostrIdentityStatus.loading,
+            deletionProgress: 'Deleting 1 result from relays...',
+          ),
+          const NostrIdentityState(),
+        ],
+        verify: (_) {
+          verify(() => identityRepository.deleteIdentity()).called(1);
+        },
+      );
+
+      blocTest<NostrIdentityCubit, NostrIdentityState>(
+        'emits error when local key deletion fails',
+        setUp: () {
+          when(
+            () => identityRepository.getSigner(),
+          ).thenThrow(StateError('No identity stored'));
+          when(
+            () => identityRepository.deleteIdentity(),
           ).thenThrow(Exception('delete fail'));
         },
-        build: () => NostrIdentityCubit(identityRepository: repository),
+        build: buildCubit,
         act: (cubit) => cubit.deleteIdentity(),
         expect: () => [
           const NostrIdentityState(status: NostrIdentityStatus.loading),

@@ -7,6 +7,7 @@ import 'package:very_good_games/app/app.dart';
 import 'package:very_good_games/app/routes/routes.dart';
 import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
+import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
 import 'package:very_good_games/nostr/stats/repository/community_stats_repository.dart';
 
@@ -15,6 +16,9 @@ class _MockNostrIdentityRepository extends Mock
 
 class _MockNostrPublishRepository extends Mock
     implements NostrPublishRepository {}
+
+class _MockNostrDeletionRepository extends Mock
+    implements NostrDeletionRepository {}
 
 class _MockCommunityStatsRepository extends Mock
     implements CommunityStatsRepository {}
@@ -26,6 +30,7 @@ void main() {
     late GameStorageRepository storageRepository;
     late NostrIdentityRepository nostrIdentityRepository;
     late NostrPublishRepository nostrPublishRepository;
+    late NostrDeletionRepository nostrDeletionRepository;
     late CommunityStatsRepository communityStatsRepository;
 
     setUp(() async {
@@ -36,6 +41,7 @@ void main() {
       router = createRouter(gameRegistry);
       nostrIdentityRepository = _MockNostrIdentityRepository();
       nostrPublishRepository = _MockNostrPublishRepository();
+      nostrDeletionRepository = _MockNostrDeletionRepository();
       communityStatsRepository = _MockCommunityStatsRepository();
     });
 
@@ -47,6 +53,7 @@ void main() {
           gameStorageRepository: storageRepository,
           nostrIdentityRepository: nostrIdentityRepository,
           nostrPublishRepository: nostrPublishRepository,
+          nostrDeletionRepository: nostrDeletionRepository,
           communityStatsRepository: communityStatsRepository,
         ),
       );
@@ -62,6 +69,7 @@ void main() {
           gameStorageRepository: storageRepository,
           nostrIdentityRepository: nostrIdentityRepository,
           nostrPublishRepository: nostrPublishRepository,
+          nostrDeletionRepository: nostrDeletionRepository,
           communityStatsRepository: communityStatsRepository,
         ),
       );

@@ -113,9 +113,7 @@ void main() {
     });
 
     testWidgets('Skip button renders on first page', (tester) async {
-      await tester.pumpWidget(
-        const MaterialApp(home: IdentityExplainerFlow()),
-      );
+      await tester.pumpWidget(const MaterialApp(home: IdentityExplainerFlow()));
 
       expect(find.text('Skip'), findsOneWidget);
     });

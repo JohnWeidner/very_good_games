@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:very_good_games/nostr/identity/cubit/nostr_identity_cubit.dart';
 import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
+import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
 import 'package:very_good_games/settings/view/widgets/widgets.dart';
 
 /// The settings screen for Very Good Games.
@@ -16,6 +17,7 @@ class SettingsPage extends StatelessWidget {
     return BlocProvider(
       create: (context) => NostrIdentityCubit(
         identityRepository: context.read<NostrIdentityRepository>(),
+        deletionRepository: context.read<NostrDeletionRepository>(),
       )..loadIdentity(),
       child: Scaffold(
         appBar: AppBar(title: const Text('Settings')),

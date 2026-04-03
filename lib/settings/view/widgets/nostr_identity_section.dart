@@ -5,6 +5,7 @@ import 'package:very_good_games/nostr/identity/cubit/nostr_identity_cubit.dart';
 import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
 import 'package:very_good_games/nostr/identity/view/identity_explainer_flow.dart';
 import 'package:very_good_games/nostr/identity/view/identity_setup_page.dart';
+import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
 
 /// Settings section for managing Nostr identity.
 ///
@@ -58,6 +59,7 @@ class NostrIdentitySection extends StatelessWidget {
           builder: (_) => BlocProvider(
             create: (_) => NostrIdentityCubit(
               identityRepository: context.read<NostrIdentityRepository>(),
+              deletionRepository: context.read<NostrDeletionRepository>(),
             ),
             child: const IdentitySetupPage(),
           ),
@@ -76,8 +78,8 @@ class NostrIdentitySection extends StatelessWidget {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Identity'),
         content: const Text(
-          'Your published results will remain on the network '
-          "but you won't be able to share new results.",
+          "We'll try to delete your published results from relays. "
+          'This cannot be guaranteed.',
         ),
         actions: [
           TextButton(
@@ -87,11 +89,42 @@ class NostrIdentitySection extends StatelessWidget {
           FilledButton(
             onPressed: () {
               Navigator.of(dialogContext).pop();
+              _showDeletionProgress(context);
               context.read<NostrIdentityCubit>().deleteIdentity();
             },
             child: const Text('Delete'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showDeletionProgress(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => BlocConsumer<NostrIdentityCubit, NostrIdentityState>(
+        bloc: context.read<NostrIdentityCubit>(),
+        listenWhen: (previous, current) =>
+            current.status != NostrIdentityStatus.loading,
+        listener: (dialogContext, state) {
+          Navigator.of(dialogContext).pop();
+        },
+        builder: (_, state) => AlertDialog(
+          content: Row(
+            children: [
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(state.deletionProgress ?? 'Deleting identity...'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

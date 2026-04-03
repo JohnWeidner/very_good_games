@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
+import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
 import 'package:very_good_games/nostr/stats/repository/community_stats_repository.dart';
 
@@ -15,6 +16,7 @@ class App extends StatelessWidget {
     required GameStorageRepository gameStorageRepository,
     required NostrIdentityRepository nostrIdentityRepository,
     required NostrPublishRepository nostrPublishRepository,
+    required NostrDeletionRepository nostrDeletionRepository,
     required CommunityStatsRepository communityStatsRepository,
     super.key,
   }) : _router = router,
@@ -22,6 +24,7 @@ class App extends StatelessWidget {
        _gameStorageRepository = gameStorageRepository,
        _nostrIdentityRepository = nostrIdentityRepository,
        _nostrPublishRepository = nostrPublishRepository,
+       _nostrDeletionRepository = nostrDeletionRepository,
        _communityStatsRepository = communityStatsRepository;
 
   final GoRouter _router;
@@ -29,6 +32,7 @@ class App extends StatelessWidget {
   final GameStorageRepository _gameStorageRepository;
   final NostrIdentityRepository _nostrIdentityRepository;
   final NostrPublishRepository _nostrPublishRepository;
+  final NostrDeletionRepository _nostrDeletionRepository;
   final CommunityStatsRepository _communityStatsRepository;
 
   @override
@@ -39,6 +43,7 @@ class App extends StatelessWidget {
         RepositoryProvider.value(value: _gameStorageRepository),
         RepositoryProvider.value(value: _nostrIdentityRepository),
         RepositoryProvider.value(value: _nostrPublishRepository),
+        RepositoryProvider.value(value: _nostrDeletionRepository),
         RepositoryProvider.value(value: _communityStatsRepository),
       ],
       child: MaterialApp.router(

@@ -23,6 +23,7 @@ class NostrIdentityState extends Equatable {
     this.npub,
     this.nsec,
     this.errorMessage,
+    this.deletionProgress,
   });
 
   /// The current identity status.
@@ -39,6 +40,12 @@ class NostrIdentityState extends Equatable {
   /// Error message when [status] is [NostrIdentityStatus.error].
   final String? errorMessage;
 
+  /// Progress message during relay content deletion.
+  ///
+  /// Non-null while relay deletion is in progress (e.g. "Found 3 results to
+  /// delete", "Deletion request sent").
+  final String? deletionProgress;
+
   /// Creates a copy with the given fields replaced.
   ///
   /// Pass [clearNpub] to explicitly set npub to null (e.g. after deletion).
@@ -48,15 +55,26 @@ class NostrIdentityState extends Equatable {
     bool clearNpub = false,
     String? nsec,
     String? errorMessage,
+    String? deletionProgress,
+    bool clearDeletionProgress = false,
   }) {
     return NostrIdentityState(
       status: status ?? this.status,
       npub: clearNpub ? null : (npub ?? this.npub),
       nsec: nsec,
       errorMessage: errorMessage,
+      deletionProgress: clearDeletionProgress
+          ? null
+          : (deletionProgress ?? this.deletionProgress),
     );
   }
 
   @override
-  List<Object?> get props => [status, npub, nsec, errorMessage];
+  List<Object?> get props => [
+    status,
+    npub,
+    nsec,
+    errorMessage,
+    deletionProgress,
+  ];
 }
