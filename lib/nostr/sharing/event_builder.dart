@@ -1,8 +1,8 @@
 import 'package:ndk/ndk.dart';
 
-/// Builds kind 30042 Nostr events for Guess the Number results.
+/// Builds kind 30042 Nostr events for game results.
 ///
-/// This is intentionally game-specific. Generalize when game #2 arrives.
+/// Each game has its own builder method with game-specific tags and content.
 class EventBuilder {
   /// Builds an unsigned kind 30042 event for a Guess the Number result.
   ///
@@ -42,6 +42,37 @@ class EventBuilder {
         ['l', 'stars-$stars', 'games.vgg.score'],
         ['l', 'questions-$questionCount', 'games.vgg.score'],
         ['l', 'time-$elapsedSeconds', 'games.vgg.score'],
+      ],
+      content: content,
+    );
+  }
+
+  /// Builds an unsigned kind 30042 event for a Signal puzzle result.
+  static Nip01Event buildSignalResult({
+    required String pubKeyHex,
+    required int score,
+    required int stars,
+    required int moveCount,
+    required String date,
+  }) {
+    final starEmoji = '\u2b50' * stars;
+
+    final content =
+        '\ud83d\udce1 Very Good Games \u2014 Signal\n'
+        '\ud83c\udfaf $score points \u00b7 $starEmoji $stars Stars\n'
+        '\ud83e\uddf1 $moveCount moves\n\n$date';
+
+    return Nip01Event(
+      pubKey: pubKeyHex,
+      kind: 30042,
+      tags: [
+        ['d', 'signal:$date'],
+        ['t', 'vgg'],
+        ['t', 'signal'],
+        ['L', 'games.vgg.score'],
+        ['l', 'score-$score', 'games.vgg.score'],
+        ['l', 'stars-$stars', 'games.vgg.score'],
+        ['l', 'moves-$moveCount', 'games.vgg.score'],
       ],
       content: content,
     );

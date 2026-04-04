@@ -17,6 +17,11 @@ class _MockNostrSigner extends Mock implements NostrSigner {}
 
 class _FakeNip01Event extends Fake implements Nip01Event {}
 
+Nip01Event _testEventBuilder({
+  required String pubKeyHex,
+  required String date,
+}) => _FakeNip01Event();
+
 void main() {
   setUpAll(() {
     registerFallbackValue(_FakeNip01Event());
@@ -25,14 +30,6 @@ void main() {
   group('ResultSharingCubit', () {
     late NostrIdentityRepository identityRepository;
     late NostrPublishRepository publishRepository;
-
-    const resultArgs = {
-      'score': 350,
-      'stars': 2,
-      'questionCount': 8,
-      'elapsedSeconds': 102,
-      'date': '2026-04-02',
-    };
 
     setUp(() {
       identityRepository = _MockNostrIdentityRepository();
@@ -58,13 +55,7 @@ void main() {
           ).thenAnswer((_) async => false);
         },
         build: buildCubit,
-        act: (cubit) => cubit.share(
-          score: resultArgs['score']! as int,
-          stars: resultArgs['stars']! as int,
-          questionCount: resultArgs['questionCount']! as int,
-          elapsedSeconds: resultArgs['elapsedSeconds']! as int,
-          date: resultArgs['date']! as String,
-        ),
+        act: (cubit) => cubit.share(eventBuilder: _testEventBuilder),
         expect: () => [
           const ResultSharingState(
             status: ResultSharingStatus.checkingIdentity,
@@ -94,13 +85,7 @@ void main() {
           ).thenAnswer((_) async => true);
         },
         build: buildCubit,
-        act: (cubit) => cubit.share(
-          score: 350,
-          stars: 2,
-          questionCount: 8,
-          elapsedSeconds: 102,
-          date: '2026-04-02',
-        ),
+        act: (cubit) => cubit.share(eventBuilder: _testEventBuilder),
         expect: () => [
           const ResultSharingState(status: ResultSharingStatus.publishing),
           const ResultSharingState(status: ResultSharingStatus.success),
@@ -129,13 +114,7 @@ void main() {
           ).thenAnswer((_) async => false);
         },
         build: buildCubit,
-        act: (cubit) => cubit.share(
-          score: 350,
-          stars: 2,
-          questionCount: 8,
-          elapsedSeconds: 102,
-          date: '2026-04-02',
-        ),
+        act: (cubit) => cubit.share(eventBuilder: _testEventBuilder),
         expect: () => [
           const ResultSharingState(status: ResultSharingStatus.publishing),
           const ResultSharingState(
@@ -161,13 +140,7 @@ void main() {
           ).thenAnswer((_) async => null);
         },
         build: buildCubit,
-        act: (cubit) => cubit.share(
-          score: 350,
-          stars: 2,
-          questionCount: 8,
-          elapsedSeconds: 102,
-          date: '2026-04-02',
-        ),
+        act: (cubit) => cubit.share(eventBuilder: _testEventBuilder),
         expect: () => [
           const ResultSharingState(status: ResultSharingStatus.publishing),
           const ResultSharingState(
@@ -197,13 +170,7 @@ void main() {
           ).thenThrow(Exception('signing failed'));
         },
         build: buildCubit,
-        act: (cubit) => cubit.share(
-          score: 350,
-          stars: 2,
-          questionCount: 8,
-          elapsedSeconds: 102,
-          date: '2026-04-02',
-        ),
+        act: (cubit) => cubit.share(eventBuilder: _testEventBuilder),
         expect: () => [
           const ResultSharingState(status: ResultSharingStatus.publishing),
           const ResultSharingState(
@@ -236,14 +203,8 @@ void main() {
         },
         build: buildCubit,
         act: (cubit) async {
-          // First call sets pending result but emits checkingIdentity.
-          await cubit.share(
-            score: 350,
-            stars: 2,
-            questionCount: 8,
-            elapsedSeconds: 102,
-            date: '2026-04-02',
-          );
+          // First call sets pending event builder but emits checkingIdentity.
+          await cubit.share(eventBuilder: _testEventBuilder);
           // Simulate identity created, then resume.
           await cubit.publish();
         },

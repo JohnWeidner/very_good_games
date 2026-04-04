@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/games/guess_the_number/cubit/game_cubit.dart';
@@ -129,8 +131,20 @@ class _GameViewState extends State<_GameView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/'),
+        ),
         title: const Text('Guess the Number'),
         actions: [
+          if (kDebugMode)
+            IconButton(
+              icon: const Icon(Icons.shuffle),
+              tooltip: 'New Game',
+              onPressed: () => context.read<GameCubit>().resetWithSeed(
+                DateTime.now().microsecondsSinceEpoch,
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: () => InstructionsDialog.show(context),

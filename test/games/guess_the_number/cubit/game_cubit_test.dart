@@ -259,7 +259,7 @@ void main() {
         verify: (cubit) {
           expect(cubit.state.status, equals(GameStatus.playing));
           expect(cubit.state.cells[wrongIndex], CellState.wrongGuess);
-          expect(cubit.state.lastResult, contains('too low'));
+          expect(cubit.state.lastResult, contains('NO'));
         },
       );
 

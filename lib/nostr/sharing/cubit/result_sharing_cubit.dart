@@ -1,10 +1,15 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:ndk/ndk.dart';
 import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
-import 'package:very_good_games/nostr/sharing/event_builder.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
 
 part 'result_sharing_state.dart';
+
+/// A function that builds a Nostr event given the author's public key hex
+/// and the date string.
+typedef EventBuilderFn =
+    Nip01Event Function({required String pubKeyHex, required String date});
 
 /// Manages the share-to-Nostr flow for game results.
 ///
@@ -21,28 +26,16 @@ class ResultSharingCubit extends Cubit<ResultSharingState> {
   final NostrIdentityRepository _identityRepository;
   final NostrPublishRepository _publishRepository;
 
-  /// Cached result data for retry/resume after identity setup.
-  _ResultData? _pendingResult;
+  /// Cached event builder for retry/resume after identity setup.
+  EventBuilderFn? _pendingEventBuilder;
 
-  /// Initiates the share flow.
+  /// Initiates the share flow with a game-specific [eventBuilder].
   ///
   /// If no identity exists, emits [ResultSharingStatus.checkingIdentity]
   /// so the UI can launch the identity setup flow. Call [publish] after
   /// identity is created.
-  Future<void> share({
-    required int score,
-    required int stars,
-    required int questionCount,
-    required int elapsedSeconds,
-    required String date,
-  }) async {
-    _pendingResult = _ResultData(
-      score: score,
-      stars: stars,
-      questionCount: questionCount,
-      elapsedSeconds: elapsedSeconds,
-      date: date,
-    );
+  Future<void> share({required EventBuilderFn eventBuilder}) async {
+    _pendingEventBuilder = eventBuilder;
 
     final hasIdentity = await _identityRepository.hasIdentity();
     if (!hasIdentity) {
@@ -58,8 +51,8 @@ class ResultSharingCubit extends Cubit<ResultSharingState> {
   /// Called directly when identity already exists, or after identity
   /// setup completes.
   Future<void> publish() async {
-    final result = _pendingResult;
-    if (result == null) return;
+    final eventBuilder = _pendingEventBuilder;
+    if (eventBuilder == null) return;
 
     emit(state.copyWith(status: ResultSharingStatus.publishing));
 
@@ -76,15 +69,13 @@ class ResultSharingCubit extends Cubit<ResultSharingState> {
         return;
       }
 
-      final event = EventBuilder.buildGuessTheNumberResult(
-        pubKeyHex: pubKeyHex,
-        score: result.score,
-        stars: result.stars,
-        questionCount: result.questionCount,
-        elapsedSeconds: result.elapsedSeconds,
-        date: result.date,
-      );
+      final now = DateTime.now().toUtc();
+      final date =
+          '${now.year}-'
+          '${now.month.toString().padLeft(2, '0')}-'
+          '${now.day.toString().padLeft(2, '0')}';
 
+      final event = eventBuilder(pubKeyHex: pubKeyHex, date: date);
       final signedEvent = await signer.sign(event);
       final success = await _publishRepository.publish(signedEvent);
 
@@ -107,20 +98,4 @@ class ResultSharingCubit extends Cubit<ResultSharingState> {
       );
     }
   }
-}
-
-class _ResultData {
-  const _ResultData({
-    required this.score,
-    required this.stars,
-    required this.questionCount,
-    required this.elapsedSeconds,
-    required this.date,
-  });
-
-  final int score;
-  final int stars;
-  final int questionCount;
-  final int elapsedSeconds;
-  final String date;
 }

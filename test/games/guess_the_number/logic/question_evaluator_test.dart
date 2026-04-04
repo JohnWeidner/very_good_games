@@ -120,18 +120,9 @@ void main() {
           currentCells: allPossible,
           param1: 50,
         );
-        expect(result.answer, contains('too low'));
+        expect(result.answer, contains('NO'));
+        expect(result.answer, isNot(contains('too')));
         expect(result.cells[49], CellState.wrongGuess);
-      });
-
-      test('wrong guess above target says too high', () {
-        final result = QuestionEvaluator.apply(
-          type: QuestionType.equals,
-          targetNumber: target,
-          currentCells: allPossible,
-          param1: 350,
-        );
-        expect(result.answer, contains('too high'));
       });
     });
 

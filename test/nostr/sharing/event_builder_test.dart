@@ -81,5 +81,61 @@ void main() {
         expect(content, contains('\u2b50\u2b50'));
       });
     });
+
+    group('buildSignalResult', () {
+      late Map<String, dynamic> result;
+
+      setUp(() {
+        final event = EventBuilder.buildSignalResult(
+          pubKeyHex: 'abc123',
+          score: 400,
+          stars: 3,
+          moveCount: 5,
+          date: '2026-04-03',
+        );
+        result = {
+          'kind': event.kind,
+          'pubKey': event.pubKey,
+          'tags': event.tags,
+          'content': event.content,
+        };
+      });
+
+      test('uses kind 30042', () {
+        expect(result['kind'], equals(30042));
+      });
+
+      test('includes d tag with signal and date', () {
+        final tags = result['tags'] as List<List<String>>;
+        final dTag = tags.firstWhere((t) => t[0] == 'd');
+        expect(dTag[1], equals('signal:2026-04-03'));
+      });
+
+      test('includes t tags for vgg and signal', () {
+        final tags = result['tags'] as List<List<String>>;
+        final tTags = tags.where((t) => t[0] == 't').toList();
+        expect(tTags.length, equals(2));
+        expect(tTags[0][1], equals('vgg'));
+        expect(tTags[1][1], equals('signal'));
+      });
+
+      test('includes NIP-32 labels for score, stars, moves', () {
+        final tags = result['tags'] as List<List<String>>;
+        final labels = tags.where((t) => t[0] == 'l').toList();
+        expect(labels.length, equals(3));
+        expect(labels[0][1], equals('score-400'));
+        expect(labels[1][1], equals('stars-3'));
+        expect(labels[2][1], equals('moves-5'));
+      });
+
+      test('content includes Signal game info', () {
+        final content = result['content'] as String;
+        expect(content, contains('Signal'));
+        expect(content, contains('400 points'));
+        expect(content, contains('3 Stars'));
+        expect(content, contains('5 moves'));
+        expect(content, contains('2026-04-03'));
+      });
+    });
   });
 }

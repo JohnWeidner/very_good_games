@@ -107,6 +107,17 @@ class GameCubit extends Cubit<GameState> {
 
   static const _gameId = 'guess_the_number';
 
+  /// Resets with a new random target number. For playtesting only.
+  void resetWithSeed(int seed) {
+    final target = (seed.abs() % 400) + 1;
+    emit(
+      GameState(
+        cells: List.filled(400, CellState.possible),
+        targetNumber: target,
+      ),
+    );
+  }
+
   final Random? _random;
   final int? _dailySeed;
   final GameStorageRepository? _storageRepository;

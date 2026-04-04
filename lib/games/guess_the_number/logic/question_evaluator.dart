@@ -142,10 +142,9 @@ class QuestionEvaluator {
     }
 
     updated[index] = CellState.wrongGuess;
-    final direction = guess > targetNumber ? 'too high' : 'too low';
     return QuestionResult(
       cells: updated,
-      answer: '= $guess? NO — $direction',
+      answer: '= $guess? NO',
       eliminatedCount: 1,
     );
   }
