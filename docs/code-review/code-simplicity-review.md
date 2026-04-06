@@ -1,9 +1,8 @@
-# Code Simplicity Review
+# Code Simplicity Review: Leaderboard Feature
 
-**Branch**: `plan/guess-the-number`
-**Date**: 2026-04-02
-**Scope**: All files changed from `main` plus uncommitted game module (`lib/games/guess_the_number/`, `test/games/guess_the_number/`)
-**Total LOC**: ~3,107 (lib) + ~1,792 (test) = ~4,899
+**Date**: 2026-04-06
+**Scope**: 12 files (6 source, 6 test) -- leaderboard feature implementation
+**Reviewer**: Code Simplicity Agent
 
 ---
 
@@ -11,162 +10,148 @@
 
 ### Core Purpose
 
-Build a daily "Guess the Number" puzzle game as the first game module in a Flutter hub app. The game presents a 20x20 grid of 400 numbers, lets the player ask strategic questions to eliminate candidates, and scores based on questions asked and time taken. It integrates with an existing game hub shell via `GameDefinition`, `DailySeed`, and streak tracking.
+Display a ranked top-10 leaderboard for each daily game by querying Nostr relay events, deduplicating by pubkey, sorting by score, and rendering a simple table. Handle the case where the user has no Nostr identity by prompting for setup.
 
 ### Unnecessary Complexity Found
 
-#### 1. [Important] Two-param question infrastructure is dead code
+#### 1. [Important] `containsUser` and `findUserEntry` are dead code
+**File**: `lib/nostr/stats/models/leaderboard.dart:69-83`
 
-**Files**: `lib/games/guess_the_number/cubit/game_cubit.dart` (lines 106-153), `lib/games/guess_the_number/cubit/game_state.dart` (lines 64-69, 115-116, 138-140), `lib/games/guess_the_number/view/widgets/question_card.dart` (lines 155-201)
+Neither `containsUser()` nor `findUserEntry()` is called anywhere in the production codebase outside of the model file itself and its tests. The view widget (`_LeaderboardTable`) does its own user-matching directly via `_isUserEntry()` using `Helpers.decodeBech32`. These two methods perform redundant hex-to-npub conversion via `Nip19.encodePubKey` to search entries, but nothing calls them.
 
-The plan originally called for 13 question types including `between (excl)` and `between (incl)` which require two parameters. The implementation was scoped down to 8 question types, none of which use two parameters. However, the full two-parameter infrastructure remains:
-
-- `GameState.secondParam` field
-- `GameState.editingParam` field
-- `GameStatus.selectingSecondParam` enum value
-- `lockParam()` branch for `selectingSecondParam`
-- `lockParam()` branch for re-picking when `editingParam` is set
-- `editParam()` method on the cubit
-- `_twoParamInstruction` getter in `QuestionCard`
-- The entire two-param `_ParamSlotRow` branch in `_buildParamArea`
-- The "to" separator label rendering logic in `_ParamSlotRow`
-
-The `QuestionType` test file (`test/games/guess_the_number/models/question_type_test.dart` line 41-43) explicitly asserts that no two-param types exist: `expect(twoParam, isEmpty)`. This confirms the feature is not needed today.
-
-**Estimated LOC reduction**: ~60 lines in lib, ~10 in tests
+**Suggestion**: Remove both methods and their corresponding tests (~20 LOC saved in source, ~25 LOC saved in tests).
 
 ---
 
-#### 2. [Important] Duplicate `_colorForCategory` helper defined in two widgets
+#### 2. [Important] Duplicated event-fetching and dedup logic in repository
+**File**: `lib/nostr/stats/repository/community_stats_repository.dart:25-72` and `79-136`
 
-**Files**: `lib/games/guess_the_number/view/widgets/card_tray.dart` (lines 135-142), `lib/games/guess_the_number/view/widgets/question_card.dart` (lines 203-210)
+`fetchStats()` and `fetchLeaderboard()` both:
+- Build the same `Filter(kinds: [30042], dTags: [dTag], limit: 100)`
+- Await with the same 5-second timeout
+- Deduplicate by pubkey keeping latest `createdAt` (identical loop, lines 41-47 and 93-99)
+- Call `_extractScore()` on each deduplicated event
 
-The same static method mapping `QuestionCategory` to a `Color` is copy-pasted across two files. If the palette changes, both must be updated. This should either live on the `QuestionCategory` enum itself as an extension method or be extracted into a shared helper.
+The dedup-and-fetch portion is duplicated almost verbatim (~15 lines).
 
-**Estimated LOC reduction**: ~8 lines (net, after extraction)
-
----
-
-#### 3. [Important] Duplicate `_colorForState` helper defined in two painters
-
-**Files**: `lib/games/guess_the_number/view/widgets/number_grid.dart` (lines 378-385 and lines 453-459)
-
-`_ZoomLensPainter._colorForState` and `_GridPainter._colorForState` are identical switch expressions. Extract to a single top-level function or `CellState` extension.
-
-**Estimated LOC reduction**: ~7 lines
+**Suggestion**: Extract a private `_fetchDedupedEvents(String dTag)` method that returns `Map<String, Nip01Event>`. Both public methods call it and then diverge for their specific aggregation. Saves ~15 LOC and removes a maintenance hazard where a fix in one copy gets missed in the other.
 
 ---
 
-#### 4. [Suggestion] `QuestionCategory` enum is only used for card coloring
+#### 3. [Important] `_isUserEntry` in the view decodes bech32 on every row render
+**File**: `lib/nostr/stats/view/leaderboard_section.dart:192-204`
 
-**File**: `lib/games/guess_the_number/models/question_type.dart` (lines 1-14)
+`_isUserEntry` calls `Helpers.decodeBech32(entry.npub)` for every row during every build. The conversion direction is also backwards from the model methods: the model converts hex->npub while the view converts npub->hex. Pick one direction and stick to it.
 
-`QuestionCategory` adds an indirection layer. Each `QuestionType` has a `category` field, and the only consumers are the two `_colorForCategory` helpers. The color could be a property directly on `QuestionType` instead, removing the enum entirely. This is a minor simplification and a matter of style -- the current approach is reasonable if more category-based behavior is planned.
+**Suggestion**: Since entries store npub (bech32), the simplest approach is to convert `userPubKeyHex` to npub once at the top of `_LeaderboardTable.build()` and compare strings directly. This eliminates the try/catch and repeated decode calls:
 
-**Estimated LOC reduction**: ~15 lines
+```dart
+@override
+Widget build(BuildContext context) {
+  final userNpub = userPubKeyHex != null
+      ? Nip19.encodePubKey(userPubKeyHex!)
+      : null;
+  // ...
+  // In the row builder:
+  color: entry.npub == userNpub
+      ? theme.colorScheme.primaryContainer
+      : null,
+}
+```
 
----
-
-#### 5. [Suggestion] `GameState.copyWith` uses nullable-function pattern for 7 fields
-
-**File**: `lib/games/guess_the_number/cubit/game_state.dart` (lines 107-147)
-
-The `() => value` wrapper pattern for nullable fields (e.g., `activeQuestionType`, `highlightedCell`, `firstParam`, `secondParam`, `editingParam`, `score`, `lastResult`) is correct for distinguishing "set to null" from "keep current value." However, with 14 parameters total, the `copyWith` method is dense. Two of those nullable-function parameters (`secondParam`, `editingParam`) support the unused two-param feature and can be removed immediately. The remaining pattern is a known Dart idiom and is fine.
-
-**Estimated LOC reduction**: ~6 lines (from removing secondParam and editingParam)
-
----
-
-#### 6. [Suggestion] `_StarRating` score thresholds may be unreachable
-
-**File**: `lib/games/guess_the_number/view/widgets/results_overlay.dart` (lines 162-163)
-
-The `_StarRating` widget awards 3 stars for scores >= 800. However, `ScoreCalculator.startingBudget` is 600, meaning the maximum possible score is 600 (0 questions, 0 seconds) and a realistic best is 550 (1 question, 0 seconds). A score of 800 is impossible. This means every win shows exactly 2 stars (if score >= 500) or 1 star, and the 3-star tier is dead code.
-
-This appears to be a leftover from the plan which originally specified a 1000-point budget (with a later suggestion to bump to 1050). The budget was reduced to 600 during implementation but the star thresholds were not adjusted.
-
-**Impact**: Not a crash, but it is misleading -- players can never earn 3 stars. Thresholds should be recalibrated to the 600-point budget (e.g., 3 stars >= 450, 2 stars >= 300, 1 star for any completion).
+This removes the `_isUserEntry` method entirely and the `nip01/helpers.dart` import (~13 LOC).
 
 ---
 
-#### 7. [Suggestion] Plan-vs-implementation drift: grid is 20x20 / 400, plan says 32x32 / 1024
+#### 4. [Suggestion] `LeaderboardEntry.copyWith` is only used internally for rank assignment
+**File**: `lib/nostr/stats/models/leaderboard.dart:36-48`
 
-**Files**: Plan doc (`docs/plan/2026-04-02-feat-guess-the-number-game-plan.md`), all game code
+`copyWith` on `LeaderboardEntry` is only called in the repository to assign ranks after sorting (line 129 of the repository). No other production code calls it. It copies all four fields for a single-field override.
 
-The plan specifies a 32x32 grid with 1024 numbers, but the implementation uses a 20x20 grid with 400 numbers. The scoring formula also changed from `1000 - 50q - 2s` to `600 - 50q - 2s`. The plan document should be updated to match what was actually built, or a note added explaining the deviation.
-
-This is a documentation issue, not a code issue. Leaving the plan out of sync makes it confusing for anyone reading the plan before the code.
+**Suggestion**: This follows project convention so keeping it is reasonable. However, an alternative is to construct entries with the correct rank inline during the take-and-assign loop, eliminating `copyWith` entirely. Low priority.
 
 ---
 
-#### 8. [Suggestion] Duplicate time-formatting logic in `GameHeader` and `ResultsOverlay`
+#### 5. [Suggestion] `LeaderboardState.copyWith` cannot clear `leaderboard` to null
+**File**: `lib/nostr/stats/cubit/leaderboard_state.dart:41-51`
 
-**Files**: `lib/games/guess_the_number/view/widgets/game_header.dart` (lines 18-20), `lib/games/guess_the_number/view/widgets/results_overlay.dart` (lines 17-19)
+The `copyWith` uses `leaderboard ?? this.leaderboard`, which means once a leaderboard is set, it cannot be explicitly cleared back to null. The cubit works around this by constructing new `LeaderboardState(...)` instances directly (lines 43, 47-50, 53, 56 of the cubit). This means `copyWith` is only used once (line 36, for `hasIdentity`), and that single use could construct a new state directly.
 
-The `MM:SS` formatting code is duplicated. Could be a small helper function or extension on `int`. Low priority since it is only 3 lines each.
+**Suggestion**: Either use the project's `Type? Function()?` nullable copyWith pattern (documented in CLAUDE.md conventions) for the `leaderboard` field, or remove `copyWith` from `LeaderboardState` entirely since the cubit barely uses it. The simpler option: remove `copyWith` and always construct states directly. Saves ~10 LOC in source and ~33 LOC in tests.
 
-**Estimated LOC reduction**: ~3 lines
+---
+
+#### 6. [Suggestion] `fetchLeaderboard` does not cache (inconsistent with `fetchStats`)
+**File**: `lib/nostr/stats/repository/community_stats_repository.dart:79-136`
+
+`fetchStats` caches results in `_cache`, but `fetchLeaderboard` does not. For a daily leaderboard that changes infrequently, the user pays a relay query (up to 5-second timeout) every time the cubit calls `fetchLeaderboard`.
+
+**Suggestion**: Either add a simple cache (like `fetchStats` has) or add a comment explaining why caching is intentionally omitted for leaderboard.
+
+---
+
+#### 7. [Suggestion] `Leaderboard.isEmpty` is a trivial wrapper
+**File**: `lib/nostr/stats/models/leaderboard.dart:66`
+
+`isEmpty` delegates to `entries.isEmpty`. It is used once in the view. Callers could use `leaderboard.entries.isEmpty` directly without any clarity loss. Minor -- keep for readability if preferred.
 
 ---
 
 ### Code to Remove
 
-| Location | Reason | Est. LOC |
+| Location | Reason | LOC |
 |---|---|---|
-| `game_state.dart`: `secondParam`, `editingParam` fields + copyWith + props | Unused two-param support | ~20 |
-| `game_cubit.dart`: `selectingSecondParam` handling in `lockParam()` | Unused two-param support | ~10 |
-| `game_cubit.dart`: `editParam()` method | Unused two-param support | ~5 |
-| `game_state.dart`: `GameStatus.selectingSecondParam` | Unused two-param support | ~2 |
-| `question_card.dart`: two-param branch in `_buildParamArea` | Unused two-param support | ~25 |
-| `question_card.dart`: `_twoParamInstruction` getter | Unused two-param support | ~8 |
-| **Total removable** | | **~70** |
+| `leaderboard.dart:69-83` | `containsUser` + `findUserEntry` unused in prod | ~15 |
+| `leaderboard_test.dart:111-135` | Tests for dead methods | ~25 |
+| `leaderboard_section.dart:192-204` | `_isUserEntry` method (replace with inline npub comparison) | ~13 |
+
+**Estimated total removable LOC**: ~53 lines (source + test)
+**With optional removals** (state copyWith, entry copyWith): ~96 lines
 
 ### Simplification Recommendations
 
-#### 1. Remove two-param infrastructure (Most impactful)
+1. **Extract shared fetch+dedup logic in repository** (Important)
+   - Current: 15 lines of identical relay-query + dedup code in both `fetchStats` and `fetchLeaderboard`
+   - Proposed: Single `_fetchDedupedEvents(String dTag)` returning `Map<String, Nip01Event>`
+   - Impact: ~15 LOC saved, eliminates copy-paste maintenance risk
 
-- **Current**: Full two-parameter question flow is implemented across cubit state, cubit methods, and UI. Zero question types use it.
-- **Proposed**: Remove `secondParam`, `editingParam`, `selectingSecondParam`, `editParam()`, and the two-param UI branch. If two-param questions are added later, re-implement at that time.
-- **Impact**: ~70 LOC removed. Reduces `GameState` from 14 props to 12. Simplifies `lockParam()` from 3 branches to 1. Removes an entire UI code path that cannot be reached.
+2. **Remove dead `containsUser`/`findUserEntry` methods** (Important)
+   - Current: Two methods in `Leaderboard` that no production code calls
+   - Proposed: Delete them and their tests
+   - Impact: ~40 LOC removed (source + test), reduced API surface
 
-#### 2. Extract duplicate color helpers
+3. **Simplify user-highlight logic in view** (Important)
+   - Current: `_isUserEntry` decodes bech32 per row with try/catch
+   - Proposed: Convert `userPubKeyHex` to npub once, compare strings
+   - Impact: ~13 LOC saved, cleaner code, removes `nip01/helpers.dart` import
 
-- **Current**: `_colorForCategory` is duplicated in `card_tray.dart` and `question_card.dart`. `_colorForState` is duplicated in two painters in `number_grid.dart`.
-- **Proposed**: Add a `color` getter to `QuestionCategory` (or an extension). Add a top-level `colorForCellState` function in the models or a shared file.
-- **Impact**: ~15 LOC removed. Single source of truth for game colors.
-
-#### 3. Fix star rating thresholds
-
-- **Current**: 3-star threshold is 800, but max score is 600.
-- **Proposed**: Recalibrate to 600-point scale. Suggested: 3 stars >= 450 (9+ questions budget remaining), 2 stars >= 250, 1 star for any win.
-- **Impact**: 2 lines changed. Makes the star display meaningful.
+4. **Remove or fix `LeaderboardState.copyWith`** (Suggestion)
+   - Current: `copyWith` used once; cannot null-clear `leaderboard`; violates project's nullable copyWith convention
+   - Proposed: Remove it; construct states directly (cubit already does this for 3 of 4 emits)
+   - Impact: ~10 LOC saved in source, ~33 in tests
 
 ### YAGNI Violations
 
-#### 1. Two-parameter question support (Important)
+1. **`containsUser` and `findUserEntry` on `Leaderboard`**
+   - These methods anticipate future callers that do not exist today.
+   - The view solves user-matching independently.
+   - Remove them; add back if/when a caller needs them.
 
-No current `QuestionType` has `paramCount == 2`. The test suite explicitly asserts this. Yet the codebase contains a complete two-parameter flow: state fields, cubit methods, status enum values, and UI rendering paths. This is a textbook YAGNI violation -- building for a hypothetical future requirement that may never arrive.
+2. **Full `copyWith` on `LeaderboardEntry`**
+   - Only the `rank` field override is ever used (in the repository's rank-assignment loop).
+   - A four-field `copyWith` anticipates future mutations that do not exist.
+   - Low severity since it follows project convention.
 
-**What to do instead**: Delete the two-param code. If `between` questions are added in a future PR, implement the support at that time. The code will be simpler and the implementation can be tailored to the actual requirements.
+### Additional Observations
 
-#### 2. `QuestionCategory` enum (Minor)
-
-The category enum exists primarily to color-code cards. It is a reasonable lightweight abstraction but adds a layer of indirection that is not strictly necessary. If no other category-based behavior is planned (e.g., filtering, collapsing), the color could live directly on `QuestionType`. However, this is a stylistic preference and the current approach is clean enough to keep.
-
-### What Is Done Well
-
-- **Clean separation of concerns**: Logic layer (`QuestionEvaluator`, `PrimeChecker`, `ScoreCalculator`) is pure Dart with no Flutter dependency. This makes it trivially testable.
-- **Cubit design**: `GameCubit` manages a complex state machine cleanly. The guard clauses at the top of each method (`if (state.status == GameStatus.won) return;`) are clear and consistent.
-- **`CustomPaint` for the grid**: Using a single canvas draw pass for 400 cells is the right performance choice. The zoom lens overlay is a nice UX touch.
-- **Test coverage**: Logic and cubit are well-tested with meaningful assertions. The test for `QuestionEvaluator` covers every question type.
-- **GameDefinition contract**: The abstraction is earned -- it enables the hub shell to discover and display games without knowing their internals.
-- **Barrel files**: Consistent use of barrel exports keeps imports clean.
-- **DailySeed with deterministic hash**: Pinned regression test (`expect(seed, equals(134668363))`) catches accidental algorithm changes.
+- **Test quality is solid**: Good coverage of edge cases (malformed scores, dedup, caching, exception handling, multiple calls). Tests are well-structured with appropriate use of `bloc_test`.
+- **Barrel files are correct**: `models.dart`, `view.dart`, `stats.dart` all export appropriately.
+- **State machine is clean**: The `LeaderboardStatus` enum and state transitions are straightforward.
+- **View widget decomposition is good**: Private widgets for each state (`_IdentitySetupPrompt`, `_LoadingPlaceholder`, `_NoScoresYetMessage`, `_UnavailableMessage`, `_LeaderboardTable`) keep `LeaderboardSection.build` readable.
+- **Triggering fetch via `addPostFrameCallback` in build**: This is a common Flutter pattern but can fire multiple times if the widget rebuilds while still in `initial` state. Consider whether the fetch should be triggered from the parent or via cubit constructor/`BlocProvider.create` instead.
 
 ### Final Assessment
 
-**Total potential LOC reduction**: ~70 lines (~2.3% of lib code)
-**Complexity score**: Low
-**Recommended action**: Remove two-param dead code and fix star thresholds; the rest is already quite clean.
-
-The codebase is well-structured and appropriately minimal for its scope. The main actionable finding is the two-parameter question infrastructure that was built ahead of need. The unreachable 3-star threshold is a minor bug worth fixing. Beyond those, the code is lean, well-tested, and follows good Flutter/bloc patterns.
+**Total potential LOC reduction**: ~53-96 lines (~10-15% of reviewed code)
+**Complexity score**: Low -- the code is generally well-structured and follows project conventions
+**Recommended action**: Proceed with simplifications -- focus on the three Important items (extract shared dedup, remove dead methods, simplify user-highlight). The suggestions are lower priority and can be deferred.

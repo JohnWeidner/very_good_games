@@ -29,31 +29,44 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
   /// If identity exists, fetches leaderboard from relays and emits
   /// loaded or unavailable state.
   Future<void> fetchLeaderboard(String dTag) async {
-    // Check identity first (let exceptions bubble up as critical failures)
-    final hasIdentity = await _identityRepository.hasIdentity();
-
-    if (!hasIdentity) {
-      emit(state.copyWith(hasIdentity: false));
-      return;
-    }
-
-    // Fetch leaderboard with exception handling for relay failures
     try {
-      emit(const LeaderboardState(status: LeaderboardStatus.loading));
+      final hasIdentity = await _identityRepository.hasIdentity();
+
+      if (!hasIdentity) {
+        emit(state.copyWith(hasIdentity: false));
+        return;
+      }
+
+      emit(
+        state.copyWith(
+          status: LeaderboardStatus.loading,
+          leaderboard: () => null,
+        ),
+      );
 
       final leaderboard = await _statsRepository.fetchLeaderboard(dTag);
       if (leaderboard != null) {
         emit(
-          LeaderboardState(
+          state.copyWith(
             status: LeaderboardStatus.loaded,
-            leaderboard: leaderboard,
+            leaderboard: () => leaderboard,
           ),
         );
       } else {
-        emit(const LeaderboardState(status: LeaderboardStatus.unavailable));
+        emit(
+          state.copyWith(
+            status: LeaderboardStatus.unavailable,
+            leaderboard: () => null,
+          ),
+        );
       }
     } on Exception {
-      emit(const LeaderboardState(status: LeaderboardStatus.unavailable));
+      emit(
+        state.copyWith(
+          status: LeaderboardStatus.unavailable,
+          leaderboard: () => null,
+        ),
+      );
     }
   }
 }

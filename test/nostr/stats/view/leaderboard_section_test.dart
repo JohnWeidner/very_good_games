@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:ndk/ndk.dart';
 import 'package:very_good_games/nostr/stats/cubit/leaderboard_cubit.dart';
 import 'package:very_good_games/nostr/stats/models/leaderboard.dart';
 import 'package:very_good_games/nostr/stats/view/leaderboard_section.dart';
@@ -138,23 +139,24 @@ void main() {
     testWidgets('highlights user entry when pubkey matches', (
       WidgetTester tester,
     ) async {
-      const entry = LeaderboardEntry(
-        npub: 'npub1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      // Use a valid hex pubkey and its encoded npub for the entry.
+      const userHex =
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+      final userNpub = Nip19.encodePubKey(userHex);
+      final entry = LeaderboardEntry(
+        npub: userNpub,
         score: 100,
         rank: 1,
         createdAt: 1000,
       );
-      const state = LeaderboardState(
+      final state = LeaderboardState(
         status: LeaderboardStatus.loaded,
         leaderboard: Leaderboard(dTag: 'test:2026-04-06', entries: [entry]),
       );
 
-      // Valid 64-char hex pubkey
-      const userHex =
-          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-
       when(() => mockCubit.state).thenReturn(state);
       when(() => mockCubit.fetchLeaderboard(any())).thenAnswer((_) async {});
+      mockCubit.emitState(state);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -170,9 +172,12 @@ void main() {
         ),
       );
 
-      // Verify the highlighted row has the primaryContainer color
-      // (This is a visual test; we check that the row exists)
-      expect(find.text('100'), findsOneWidget);
+      // Verify the user's row has primaryContainer background color.
+      final table = tester.widget<Table>(find.byType(Table));
+      // Row 0 is header, row 1 is the user's data row.
+      final userRow = table.children[1];
+      final decoration = userRow.decoration! as BoxDecoration;
+      expect(decoration.color, isNotNull);
     });
 
     testWidgets('displays truncated npub as player name', (

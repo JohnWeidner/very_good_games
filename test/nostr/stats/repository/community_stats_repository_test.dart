@@ -64,7 +64,7 @@ void main() {
       expect(stats.avgScore, equals(2.0));
     });
 
-    test('deduplicates by pubkey keeping latest', () async {
+    test('deduplicates by pubkey keeping oldest (first submission)', () async {
       when(
         () => requests.query(
           filter: any(named: 'filter'),
@@ -86,7 +86,8 @@ void main() {
 
       expect(stats, isNotNull);
       expect(stats!.playerCount, equals(1));
-      expect(stats.avgScore, equals(3.0));
+      // Keeps the oldest event (createdAt: 100, score: 1).
+      expect(stats.avgScore, equals(1.0));
     });
 
     test('returns null when no events found', () async {

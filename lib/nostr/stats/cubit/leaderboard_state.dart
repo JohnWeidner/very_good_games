@@ -38,14 +38,18 @@ class LeaderboardState extends Equatable {
   final bool hasIdentity;
 
   /// Creates a copy with optional field overrides.
+  ///
+  /// Uses `Leaderboard? Function()?` wrapper for nullable [leaderboard]
+  /// so callers can explicitly set it to null (e.g., when transitioning
+  /// back to loading).
   LeaderboardState copyWith({
     LeaderboardStatus? status,
-    Leaderboard? leaderboard,
+    Leaderboard? Function()? leaderboard,
     bool? hasIdentity,
   }) {
     return LeaderboardState(
       status: status ?? this.status,
-      leaderboard: leaderboard ?? this.leaderboard,
+      leaderboard: leaderboard != null ? leaderboard() : this.leaderboard,
       hasIdentity: hasIdentity ?? this.hasIdentity,
     );
   }

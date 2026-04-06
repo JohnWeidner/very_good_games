@@ -1,9 +1,9 @@
-# Architecture Review: Guess the Number Game
+# Architecture Review: Leaderboard Feature
 
-**Branch**: `plan/guess-the-number`
-**Date**: 2026-04-02
+**Branch**: `main`
+**Date**: 2026-04-06
 **Reviewer**: Architecture Review Agent
-**Scope**: All files changed from `main` plus uncommitted/untracked files
+**Scope**: 8 changed files in `lib/nostr/stats/` for leaderboard feature
 
 ---
 
@@ -11,203 +11,185 @@
 
 ### Layer Separation
 
-**Layers identified**:
-- **Core** (`lib/core/`): Shared infrastructure — daily seed, game registry, storage, theme
-- **Home** (`lib/home/`): Presentation layer for the hub screen (cubit + views)
-- **Games** (`lib/games/guess_the_number/`): Self-contained game module with cubit, logic, models, and views
-- **App** (`lib/app/`): Application shell — routing, bloc observer, root widget
+**Layers within `lib/nostr/stats/`**:
+- **Models** (`models/`): Data classes -- `LeaderboardEntry`, `Leaderboard`
+- **Repository** (`repository/`): Relay queries and data transformation -- `CommunityStatsRepository`
+- **Cubit** (`cubit/`): State management -- `LeaderboardCubit`, `LeaderboardState`
+- **View** (`view/`): Presentation -- `LeaderboardSection` and private helper widgets
 
 **Import scan results**:
 
 | File | Imports | Status |
 |------|---------|--------|
-| `lib/main.dart` | `app/*`, `core/*`, `games/guess_the_number/guess_the_number_game.dart` | Clean |
-| `lib/app/app.dart` | `core/*` | Clean |
-| `lib/app/routes/routes.dart` | `core/*`, `home/view/home_page.dart` | Clean |
-| `lib/home/cubit/home_cubit.dart` | `core/*` | Clean |
-| `lib/home/view/home_page.dart` | `core/*`, `home/cubit/*`, `home/view/widgets/*` | Clean |
-| `lib/home/view/widgets/game_tile.dart` | `core/*`, `home/cubit/*` | Clean |
-| `lib/games/guess_the_number/guess_the_number_game.dart` | `core/*`, own `view/game_page.dart` | Clean |
-| `lib/games/guess_the_number/cubit/game_cubit.dart` | own `logic/*`, own `models/*` | Clean |
-| `lib/games/guess_the_number/view/game_page.dart` | `core/*`, own `cubit/*`, own `view/widgets/*` | Clean |
-| `lib/games/guess_the_number/view/widgets/card_tray.dart` | own `models/*` | Clean |
-| `lib/games/guess_the_number/view/widgets/digit_picker.dart` | (none beyond Flutter) | Clean |
-| `lib/games/guess_the_number/view/widgets/game_header.dart` | own `cubit/*` | Clean |
-| `lib/games/guess_the_number/view/widgets/number_grid.dart` | own `models/*` | Clean |
-| `lib/games/guess_the_number/view/widgets/question_card.dart` | own `cubit/*`, own `models/*`, own `view/widgets/digit_picker.dart` | Clean |
-| `lib/games/guess_the_number/view/widgets/results_overlay.dart` | own `cubit/*` | Clean |
-| `lib/games/guess_the_number/view/widgets/score_bar.dart` | own `logic/*` | See [I-1] |
-| `lib/games/guess_the_number/logic/question_evaluator.dart` | own `logic/prime_checker.dart`, own `models/*` | Clean |
-| `lib/games/guess_the_number/logic/score_calculator.dart` | (none beyond `dart:math`) | Clean |
+| `models/leaderboard.dart` | `equatable`, `ndk` | Clean |
+| `models/models.dart` | (barrel) | Clean |
+| `repository/community_stats_repository.dart` | `ndk`, `nostr/relay/*`, `nostr/stats/models/*` | Clean |
+| `cubit/leaderboard_cubit.dart` | `bloc`, `equatable`, `nostr/identity/repository/*`, `nostr/stats/models/*`, `nostr/stats/repository/*` | Clean |
+| `cubit/leaderboard_state.dart` | (part of cubit) | Clean |
+| `view/leaderboard_section.dart` | `flutter`, `flutter_bloc`, `ndk/shared/nips/nip01/helpers.dart`, `nostr/identity/view/*`, `nostr/stats/cubit/*`, `nostr/stats/models/*` | **Violation** |
+| `view/view.dart` | (barrel) | Clean |
+| `stats.dart` | (barrel) | Clean |
 
-- **Violations found: 0** (strict cross-module violations)
-- **Observations: 1** (see [I-1] below)
+- **Violations found: 1**
+  - `lib/nostr/stats/view/leaderboard_section.dart:3` -- View layer imports `package:ndk/shared/nips/nip01/helpers.dart` directly. The `_LeaderboardTable._isUserEntry()` method (lines 192-203) performs bech32 decoding via `Helpers.decodeBech32()`, which is a data/protocol-layer operation leaking into a presentation widget.
 
-All cross-module imports flow in the correct direction: `main` wires everything together, `app` depends on `core`, `home` depends on `core`, each game depends on `core` and its own internal subpackages. No game depends on another game. No core module depends on presentation.
+- **Clean files**: All other 7 files have correct layer-respecting imports.
+
+**Recommended fix**: The `Leaderboard` model already provides `containsUser(String userPubKeyHex)` (line 69) and `findUserEntry(String userPubKeyHex)` (line 75) which perform the same hex-to-npub conversion internally. The view's `_isUserEntry` duplicates this logic in reverse (npub-to-hex). Replace it with:
+
+```dart
+bool _isUserEntry(LeaderboardEntry entry) {
+  if (userPubKeyHex == null) return false;
+  return leaderboard.findUserEntry(userPubKeyHex!) == entry;
+}
+```
+
+This eliminates the ndk import from the view entirely and reuses existing model logic.
 
 ---
 
 ### State Management Assessment
 
-#### HomeCubit
+#### LeaderboardCubit: Correct
 
-**Verdict**: Correct
+- Uses `Cubit` with `part of` state file -- follows VGV convention.
+- State class (`LeaderboardState`) extends `Equatable` with all-`final` immutable fields.
+- `copyWith` pattern present on state.
+- Business logic (identity check, relay fetch, error handling) lives in the cubit, not the view.
+- Both `CommunityStatsRepository` and `NostrIdentityRepository` injected via constructor -- testable.
+- Status enum (`LeaderboardStatus`) covers all states: `initial`, `loading`, `loaded`, `unavailable` -- complete state machine.
+- Exception handling wraps relay calls and emits `unavailable` on failure -- correct resilience pattern.
 
-- Descriptive naming following VGV convention (`HomeCubit`, `HomeState`, `HomeStatus`)
-- State is immutable with `copyWith` and `Equatable`
-- Business logic (loading game statuses, reading streaks) is in the cubit, not the view
-- Data access goes through `GameRegistry` and `GameStorageRepository`
-- `BlocProvider` creation in `HomePage.build()` with proper `context.read` for dependencies
-- Lifecycle management: `WidgetsBindingObserver` used correctly in the `_HomeView` `StatefulWidget` to refresh on app resume
+#### LeaderboardState: Correct
 
-#### GameCubit
+- All fields are `final` -- immutable.
+- `props` includes all three fields (`status`, `leaderboard`, `hasIdentity`) -- Equatable will detect all changes.
+- Nullable `Leaderboard?` field is appropriate (only present when loaded).
+- Default values are sensible: `status = initial`, `hasIdentity = true`.
 
-**Verdict**: Correct, with one important observation
+#### Minor Observation
 
-- Descriptive naming (`GameCubit`, `GameState`, `GameStatus`)
-- State is immutable with `copyWith` using closure-based nullable field pattern — this is the correct VGV pattern for distinguishing "not provided" from "set to null"
-- All business logic lives in the cubit: question selection, parameter locking, question confirmation, scoring, win/loss detection, timer ticking
-- No direct data access from UI — the cubit encapsulates all game logic
-- `QuestionEvaluator` and `ScoreCalculator` are pure static utility classes called from the cubit, keeping the cubit as the orchestrator
-
-**[I-2] GameCubit does not persist completion to GameStorageRepository**: When the player wins, the cubit emits `GameStatus.won` but never calls `storageRepository.saveStreak()`. The `GamePage` does not have access to the `GameStorageRepository`, so streak data is never persisted after a win. This means the home screen will always show `DailyGameStatus.notStarted` and streaks will never increment. This is a functional gap that also represents an architectural question: either the cubit should receive the repository (preferred — keeps side effects in the state management layer), or a `BlocListener` in the view should trigger the save (acceptable but less clean).
-
-**[S-1] GameState has many fields (14 props)**: While each field is justified by the game mechanics, the state class is large. Consider whether grouping related fields into sub-objects (e.g., a `StagedQuestion` value object holding `activeQuestionType`, `firstParam`, `secondParam`, `editingParam`) would improve readability. This is a suggestion, not a violation — the current flat structure works and all fields participate in equality.
+`leaderboard_section.dart:32-37`: The view triggers `fetchLeaderboard` inside `BlocBuilder` using `addPostFrameCallback` when status is `initial`. The `initial` check prevents duplicate fetches on rebuild, which is good. However, triggering data loading from within a builder is borderline. Ideally, the cubit would receive the `dTag` at construction time and fetch automatically. This is a style observation, not a violation.
 
 ---
 
 ### Dependency Direction
 
-**Direction violations: 0**
-
-The dependency graph flows strictly one way:
+**Direction violations: 0** (excluding the view-layer ndk import covered under Layer Separation)
 
 ```
-main.dart (composition root)
+stats.dart (barrel)
   |
-  +---> app/ (shell)
-  |       |---> core/ (infrastructure)
-  |       +---> home/ (presentation)
+  +---> models/leaderboard.dart
+  |       +---> equatable, ndk (external only)
   |
-  +---> core/ (infrastructure)
-  |       |---> game_registry/ (contracts)
-  |       |---> storage/ (persistence)
-  |       |---> daily_seed/ (utility)
-  |       +---> theme/ (UI config)
+  +---> repository/community_stats_repository.dart
+  |       +---> ndk, nostr/relay/*, models/*
   |
-  +---> home/ (presentation)
-  |       +---> core/ (reads registry + storage)
+  +---> cubit/leaderboard_cubit.dart
+  |       +---> bloc, equatable
+  |       +---> nostr/identity/repository/* (sibling module)
+  |       +---> models/*, repository/*
   |
-  +---> games/guess_the_number/ (game module)
-          |---> core/ (reads daily_seed, storage, game_definition)
-          |---> cubit/ ---> logic/, models/
-          +---> view/ ---> cubit/, models/
+  +---> view/leaderboard_section.dart
+          +---> flutter, flutter_bloc
+          +---> nostr/identity/view/* (sibling module)
+          +---> cubit/*, models/*
 ```
 
-- No circular dependencies detected
-- No presentation-to-data shortcuts
-- Game module depends on `core` for shared contracts (`GameDefinition`, `GameStorageRepository`, `DailySeed`) and keeps all game-specific code internal
-- `GameDefinition` serves as the contract between the hub shell and game modules — clean abstraction boundary
+- No circular dependencies detected.
+- No reverse dependencies (models do not import cubit, repository does not import view, etc.).
+- Cross-module dependencies (`nostr/identity/`) flow at appropriate layers: cubit imports identity repository, view imports identity view. Both are lateral dependencies within the `nostr/` module, not upward violations.
+
+**Minor note**: The cubit imports `nostr/identity/repository/nostr_identity_repository.dart` directly rather than through the `nostr/identity/identity.dart` barrel file. Per CLAUDE.md conventions ("use barrel files"), the import should be `package:very_good_games/nostr/identity/identity.dart` or the repository's barrel. Not a blocking issue.
 
 ---
 
 ### Package Structure
 
-This is a single-package Flutter app (not a multi-package monorepo), so package-level checks apply to the module/directory structure.
+#### Barrel Files: Complete
 
-#### `lib/core/`
-- [x] Barrel file (`core.dart`) exports all public APIs
-- [x] Clear responsibility: shared infrastructure
-- [x] No UI dependencies (except `flutter/widgets.dart` for `IconData` in `GameDefinition`)
-- [x] Tests exist for all core modules (`daily_seed`, `game_registry`, `storage`, `streak_data`, `theme`)
+- `lib/nostr/stats/models/models.dart` -- exports `community_stats.dart` and `leaderboard.dart`.
+- `lib/nostr/stats/view/view.dart` -- exports `leaderboard_section.dart`.
+- `lib/nostr/stats/stats.dart` -- exports cubits, models, and repository.
+- Exports are alphabetically ordered -- matches VGV convention.
 
-#### `lib/home/`
-- [x] Barrel file (`home.dart`) exports cubit and views
-- [x] Clear responsibility: hub screen presentation
-- [x] Tests exist for cubit, home page, and game tile
+#### Test Coverage: Complete
 
-#### `lib/games/guess_the_number/`
-- [x] Entry point (`guess_the_number_game.dart`) implements `GameDefinition`
-- [x] Clean internal structure: `cubit/`, `logic/`, `models/`, `view/widgets/`
-- [x] Barrel files at each level (`logic.dart`, `models.dart`, `view.dart`, `widgets.dart`)
-- [x] Tests exist for cubit, logic (3 files), models (2 files), and game definition
-- **[I-3] No view/widget tests**: The `test/games/guess_the_number/view/` directory is empty. There are 7 widget files (`card_tray.dart`, `digit_picker.dart`, `game_header.dart`, `number_grid.dart`, `question_card.dart`, `results_overlay.dart`, `score_bar.dart`) and the `game_page.dart` with no corresponding tests. VGV standards expect widget tests for all public widgets.
+All four layers have corresponding test files:
+- `test/nostr/stats/models/leaderboard_test.dart`
+- `test/nostr/stats/repository/community_stats_repository_test.dart`
+- `test/nostr/stats/cubit/leaderboard_cubit_test.dart`
+- `test/nostr/stats/view/leaderboard_section_test.dart`
 
-#### `lib/app/`
-- [x] Tests exist for `app_test.dart`, `app_bloc_observer_test.dart`, `routes_test.dart`
-- [x] Clean responsibility: app shell and routing
+#### Single Responsibility: Good
+
+The leaderboard feature extends the existing `lib/nostr/stats/` module rather than creating a new top-level directory. This is correct since it shares the relay infrastructure (`CommunityStatsRepository`) and the same Nostr event type (kind 30042).
+
+#### Naming: Consistent
+
+All names are descriptive and follow Dart/VGV conventions: `LeaderboardCubit`, `LeaderboardState`, `LeaderboardStatus`, `LeaderboardEntry`, `Leaderboard`, `LeaderboardSection`.
+
+---
+
+### Additional Observations
+
+#### Duplicate Deduplication Logic in Repository
+
+`community_stats_repository.dart` contains identical "deduplicate by pubkey, keeping latest" logic in both `fetchStats` (lines 41-47) and `fetchLeaderboard` (lines 93-99). Extracting a shared private helper would reduce duplication:
+
+```dart
+Map<String, Nip01Event> _deduplicateByPubkey(Iterable<Nip01Event> events) {
+  final byPubkey = <String, Nip01Event>{};
+  for (final event in events) {
+    final existing = byPubkey[event.pubKey];
+    if (existing == null || event.createdAt > existing.createdAt) {
+      byPubkey[event.pubKey] = event;
+    }
+  }
+  return byPubkey;
+}
+```
+
+#### Identity Setup Pattern: Correct
+
+The view correctly uses `IdentitySetupLauncher.launch(context)` as specified in CLAUDE.md conventions. No custom navigation flow is duplicated.
 
 ---
 
 ### Detailed Findings
 
-#### [I-1] View widget imports logic layer directly
+#### [I-1] View layer imports ndk data package directly
 
-**File**: `lib/games/guess_the_number/view/widgets/score_bar.dart:2`
+**File**: `lib/nostr/stats/view/leaderboard_section.dart:3`
 **Severity**: Important
 
-`ScoreBar` imports `logic/logic.dart` to access `ScoreCalculator.startingBudget`. While this is within the same game module (not a cross-module violation), it breaks the internal layering convention where views should depend on the cubit/state, not the logic layer directly.
+The `_LeaderboardTable._isUserEntry()` method imports `package:ndk/shared/nips/nip01/helpers.dart` to call `Helpers.decodeBech32()` for comparing user identity. This is a protocol-level operation that belongs in the model or repository layer. The `Leaderboard` model already provides equivalent methods (`containsUser`, `findUserEntry`) that encapsulate this logic. The view should use those instead.
 
-**Recommendation**: Expose `startingBudget` through `GameState` (e.g., a static const or getter) so the view only depends on the state, not the logic internals. Alternatively, pass `maxScore` as a constructor parameter to `ScoreBar`.
+#### [S-1] Extract deduplication helper in repository
 
-#### [I-2] No streak persistence on game completion
-
-**File**: `lib/games/guess_the_number/cubit/game_cubit.dart` and `lib/games/guess_the_number/view/game_page.dart`
-**Severity**: Important (functional gap with architectural implications)
-
-When the player wins, `GameCubit.confirmQuestion()` emits `GameStatus.won` but never persists the result. The `GamePage` creates `GameCubit` without a `GameStorageRepository`, so there is no path for saving streak data. The `GuessTheNumberGame.getDailyStatus()` reads from storage, but nothing writes to it after a win.
-
-**Recommendation**: Inject `GameStorageRepository` into `GameCubit` and call `saveStreak()` when the game is won. This keeps side effects in the state management layer, consistent with VGV patterns.
-
-#### [I-3] Missing widget tests for the game view layer
-
-**Directory**: `test/games/guess_the_number/view/` (empty)
-**Severity**: Important
-
-Seven widget files and the game page have no tests. The cubit and logic layers are well-tested, but the view layer has zero coverage. VGV standards require widget tests for all public widgets.
-
-**Missing test files**:
-- `test/games/guess_the_number/view/game_page_test.dart`
-- `test/games/guess_the_number/view/widgets/card_tray_test.dart`
-- `test/games/guess_the_number/view/widgets/digit_picker_test.dart`
-- `test/games/guess_the_number/view/widgets/game_header_test.dart`
-- `test/games/guess_the_number/view/widgets/number_grid_test.dart`
-- `test/games/guess_the_number/view/widgets/question_card_test.dart`
-- `test/games/guess_the_number/view/widgets/results_overlay_test.dart`
-- `test/games/guess_the_number/view/widgets/score_bar_test.dart`
-
-#### [S-1] GameState field count
-
-**File**: `lib/games/guess_the_number/cubit/game_state.dart`
+**File**: `lib/nostr/stats/repository/community_stats_repository.dart:41-47, 93-99`
 **Severity**: Suggestion
 
-`GameState` has 14 fields. Consider grouping staging-related fields (`activeQuestionType`, `firstParam`, `secondParam`, `editingParam`, `highlightedCell`) into a `StagedQuestion` value object to reduce cognitive load.
+Identical pubkey deduplication logic is duplicated between `fetchStats` and `fetchLeaderboard`. Extract to a shared private method.
 
-#### [S-2] Hardcoded colors in widget painters
+#### [S-2] Use barrel file for identity repository import
 
-**Files**: `lib/games/guess_the_number/view/widgets/number_grid.dart`, `card_tray.dart`, `question_card.dart`
+**File**: `lib/nostr/stats/cubit/leaderboard_cubit.dart:3`
 **Severity**: Suggestion
 
-Several widgets use hardcoded `Color` constants (e.g., `Color(0xFF4CAF50)`, `Color(0xFF1565C0)`) rather than referencing the app theme. The `_colorForState` method appears in both `_GridPainter` and `_ZoomLensPainter` with identical implementations. Consider:
-1. Extracting a shared color mapping (e.g., `CellStateColors` or an extension on `CellState`)
-2. Similarly, `_colorForCategory` is duplicated between `CardTray` and `QuestionCard`
-
-#### [S-3] Star rating thresholds use impossible values
-
-**File**: `lib/games/guess_the_number/view/widgets/results_overlay.dart:162-166`
-**Severity**: Suggestion
-
-`_StarRating` awards 3 stars for `score >= 800`, but `ScoreCalculator.startingBudget` is 600. The maximum possible score is 600 (0 questions, 0 seconds), so 3 stars is impossible. The thresholds should be recalibrated against the actual budget.
+Direct file import `nostr/identity/repository/nostr_identity_repository.dart` should use the barrel file per project convention.
 
 ---
 
 ### Verdict
 
-**Architecture is sound. Fix 3 important issues before merging.**
+**Ready to merge after fixing 1 important issue.**
 
-The codebase demonstrates clean layer separation, correct use of flutter_bloc with immutable state and the VGV closure-based `copyWith` pattern, proper dependency direction, and a well-designed game registry abstraction. The modular structure under `lib/games/` will scale cleanly as new games are added.
+| Severity | Count | Summary |
+|----------|-------|---------|
+| Critical | 0 | -- |
+| Important | 1 | View imports ndk data-layer package directly; should use existing `Leaderboard` model methods instead |
+| Suggestion | 2 | Extract deduplication helper in repository; use barrel file for identity repository import |
 
-**Summary of required actions**:
-1. **[I-1]** Remove direct logic-layer import from `ScoreBar` widget — pass the value through state or constructor
-2. **[I-2]** Wire `GameStorageRepository` into `GameCubit` to persist streak on win — this is a functional gap
-3. **[I-3]** Add widget tests for all 8 view files in the guess_the_number game module
+The leaderboard feature demonstrates clean architecture overall: proper Cubit/state separation with `part of`, Equatable models with immutable fields, constructor-based dependency injection, complete barrel exports, and test files for every layer. The one important issue is a straightforward fix that eliminates a data-layer import from the view by using model methods that already exist.

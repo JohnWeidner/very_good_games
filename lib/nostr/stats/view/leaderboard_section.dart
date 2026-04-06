@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:ndk/shared/nips/nip01/helpers.dart';
+import 'package:ndk/ndk.dart';
 import 'package:very_good_games/nostr/identity/view/identity_setup_launcher.dart';
 import 'package:very_good_games/nostr/stats/cubit/leaderboard_cubit.dart';
 import 'package:very_good_games/nostr/stats/models/leaderboard.dart';
 
 /// Displays the top 10 leaderboard entries for a daily game.
 ///
-/// Wraps [BlocBuilder<LeaderboardCubit>] and renders different UI based on
-/// state: identity setup prompt, loading skeleton, leaderboard table with
-/// user highlight, "no scores yet" message, or "unavailable" fallback.
-///
-/// Call [LeaderboardCubit.fetchLeaderboard(dTag)] manually or provide context
-/// where cubit is already instantiated.
-class LeaderboardSection extends StatelessWidget {
+/// Fetches leaderboard on first build via [initState], then renders
+/// different UI based on cubit state: identity setup prompt, loading
+/// skeleton, leaderboard table with user highlight, "no scores yet"
+/// message, or "unavailable" fallback.
+class LeaderboardSection extends StatefulWidget {
   /// Creates a [LeaderboardSection].
   const LeaderboardSection({required this.dTag, this.userPubKeyHex, super.key});
 
@@ -25,18 +23,20 @@ class LeaderboardSection extends StatelessWidget {
   final String? userPubKeyHex;
 
   @override
+  State<LeaderboardSection> createState() => _LeaderboardSectionState();
+}
+
+class _LeaderboardSectionState extends State<LeaderboardSection> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<LeaderboardCubit>().fetchLeaderboard(widget.dTag);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return BlocBuilder<LeaderboardCubit, LeaderboardState>(
       builder: (context, state) {
-        // Fetch leaderboard on first build
-        if (state.status == LeaderboardStatus.initial) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted) {
-              context.read<LeaderboardCubit>().fetchLeaderboard(dTag);
-            }
-          });
-        }
-
         // Identity setup required
         if (!state.hasIdentity) {
           return const _IdentitySetupPrompt();
@@ -58,11 +58,11 @@ class LeaderboardSection extends StatelessWidget {
 
           return _LeaderboardTable(
             leaderboard: leaderboard,
-            userPubKeyHex: userPubKeyHex,
+            userPubKeyHex: widget.userPubKeyHex,
           );
         }
 
-        // Unavailable state
+        // Unavailable or initial state
         return const _UnavailableMessage();
       },
     );
@@ -152,6 +152,9 @@ class _LeaderboardTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    // Encode user's hex pubkey to npub once for comparison.
+    final userNpub = _encodeUserNpub();
+
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: Table(
@@ -173,7 +176,7 @@ class _LeaderboardTable extends StatelessWidget {
           for (final entry in leaderboard.entries)
             TableRow(
               decoration: BoxDecoration(
-                color: _isUserEntry(entry)
+                color: userNpub != null && entry.npub == userNpub
                     ? theme.colorScheme.primaryContainer
                     : null,
               ),
@@ -188,17 +191,14 @@ class _LeaderboardTable extends StatelessWidget {
     );
   }
 
-  /// Whether the entry belongs to the current user.
-  bool _isUserEntry(LeaderboardEntry entry) {
-    if (userPubKeyHex == null) return false;
-    // Compare hex pubkey against entry's npub (which is bech32 encoded)
-    // Decode npub to hex for comparison
+  /// Encodes [userPubKeyHex] to npub for string comparison.
+  /// Returns null if no user key or encoding fails.
+  String? _encodeUserNpub() {
+    if (userPubKeyHex == null) return null;
     try {
-      final decoded = Helpers.decodeBech32(entry.npub);
-      final entryPubKeyHex = decoded[0];
-      return entryPubKeyHex == userPubKeyHex;
-    } catch (e) {
-      return false;
+      return Nip19.encodePubKey(userPubKeyHex!);
+    } on Exception {
+      return null;
     }
   }
 }

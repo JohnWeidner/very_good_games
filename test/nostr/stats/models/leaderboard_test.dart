@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ndk/ndk.dart';
 import 'package:very_good_games/nostr/stats/models/leaderboard.dart';
 
 void main() {
@@ -108,17 +109,52 @@ void main() {
       expect(leaderboard.isEmpty, false);
     });
 
+    test('containsUser returns true when user is in leaderboard', () {
+      const hexPubkey =
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+      final npub = Nip19.encodePubKey(hexPubkey);
+      final leaderboard = Leaderboard(
+        dTag: 'test:2026-04-06',
+        entries: [
+          LeaderboardEntry(npub: npub, score: 100, rank: 1, createdAt: 100),
+        ],
+      );
+
+      expect(leaderboard.containsUser(hexPubkey), true);
+    });
+
     test('containsUser returns false for non-existent pubkey', () {
       const leaderboard = Leaderboard(
         dTag: 'test:2026-04-06',
         entries: [entry1, entry2],
       );
 
-      // Use a valid 64-char hex pubkey that's not in the entries
       const hexPubkey =
           'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
       expect(leaderboard.containsUser(hexPubkey), false);
+    });
+
+    test('findUserEntry returns entry when user is in leaderboard', () {
+      const hexPubkey =
+          'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+      final npub = Nip19.encodePubKey(hexPubkey);
+      final entry = LeaderboardEntry(
+        npub: npub,
+        score: 200,
+        rank: 1,
+        createdAt: 300,
+      );
+      final leaderboard = Leaderboard(
+        dTag: 'test:2026-04-06',
+        entries: [entry],
+      );
+
+      final result = leaderboard.findUserEntry(hexPubkey);
+
+      expect(result, isNotNull);
+      expect(result!.npub, npub);
+      expect(result.score, 200);
     });
 
     test('findUserEntry returns null for non-existent pubkey', () {
@@ -127,7 +163,6 @@ void main() {
         entries: [entry1, entry2],
       );
 
-      // Use a valid 64-char hex pubkey
       const hexPubkey =
           'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 

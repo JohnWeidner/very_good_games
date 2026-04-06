@@ -136,7 +136,7 @@ void main() {
       );
 
       blocTest<LeaderboardCubit, LeaderboardState>(
-        'handles identity check exception gracefully',
+        'emits unavailable when identity check throws',
         setUp: () {
           when(
             () => mockIdentityRepository.hasIdentity(),
@@ -147,8 +147,9 @@ void main() {
           identityRepository: mockIdentityRepository,
         ),
         act: (cubit) => cubit.fetchLeaderboard('test:2026-04-06'),
-        expect: () => const [],
-        errors: () => [isA<Exception>()],
+        expect: () => [
+          const LeaderboardState(status: LeaderboardStatus.unavailable),
+        ],
       );
 
       blocTest<LeaderboardCubit, LeaderboardState>(
@@ -250,6 +251,27 @@ void main() {
       expect(updated.leaderboard, leaderboard);
       expect(updated.hasIdentity, true);
       expect(updated.status, LeaderboardStatus.initial);
+    });
+
+    test('copyWith can explicitly null-clear leaderboard', () {
+      const entry = LeaderboardEntry(
+        npub: 'npub1test',
+        score: 100,
+        rank: 1,
+        createdAt: 1000,
+      );
+      const original = LeaderboardState(
+        status: LeaderboardStatus.loaded,
+        leaderboard: Leaderboard(dTag: 'test:2026-04-06', entries: [entry]),
+      );
+
+      final updated = original.copyWith(
+        status: LeaderboardStatus.loading,
+        leaderboard: () => null,
+      );
+
+      expect(updated.status, LeaderboardStatus.loading);
+      expect(updated.leaderboard, isNull);
     });
 
     test('equality works via Equatable', () {

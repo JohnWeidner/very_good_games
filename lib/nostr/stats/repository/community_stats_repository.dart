@@ -16,35 +16,21 @@ class CommunityStatsRepository {
   final NdkProvider _ndkProvider;
 
   /// In-memory cache keyed by `d` tag.
-  final _cache = <String, CommunityStats>{};
+  final _statsCache = <String, CommunityStats>{};
+
+  /// In-memory cache keyed by `d` tag.
+  final _leaderboardCache = <String, Leaderboard>{};
 
   /// Fetches community stats for the given [dTag].
   ///
   /// Returns cached results if available. Returns `null` on failure
   /// or if no events are found.
   Future<CommunityStats?> fetchStats(String dTag) async {
-    if (_cache.containsKey(dTag)) return _cache[dTag];
+    if (_statsCache.containsKey(dTag)) return _statsCache[dTag];
 
     try {
-      final response = _ndkProvider.ndk.requests.query(
-        filter: Filter(kinds: [30042], dTags: [dTag], limit: 100),
-        explicitRelays: defaultRelayUrls,
-        cacheRead: false,
-        cacheWrite: false,
-      );
-
-      final events = await response.future.timeout(const Duration(seconds: 5));
-
-      if (events.isEmpty) return null;
-
-      // Deduplicate by pubkey, keeping the latest created_at.
-      final byPubkey = <String, Nip01Event>{};
-      for (final event in events) {
-        final existing = byPubkey[event.pubKey];
-        if (existing == null || event.createdAt > existing.createdAt) {
-          byPubkey[event.pubKey] = event;
-        }
-      }
+      final byPubkey = await _fetchDedupedEvents(dTag);
+      if (byPubkey == null) return null;
 
       // Extract scores from NIP-32 labels.
       var totalScore = 0;
@@ -64,7 +50,7 @@ class CommunityStatsRepository {
         avgScore: totalScore / validCount,
       );
 
-      _cache[dTag] = stats;
+      _statsCache[dTag] = stats;
       return stats;
     } on Exception {
       return null;
@@ -77,26 +63,11 @@ class CommunityStatsRepository {
   /// extracts scores, and sorts by score DESC then createdAt ASC.
   /// Returns null if no events found or relay timeout.
   Future<Leaderboard?> fetchLeaderboard(String dTag, {int limit = 10}) async {
+    if (_leaderboardCache.containsKey(dTag)) return _leaderboardCache[dTag];
+
     try {
-      final response = _ndkProvider.ndk.requests.query(
-        filter: Filter(kinds: [30042], dTags: [dTag], limit: 100),
-        explicitRelays: defaultRelayUrls,
-        cacheRead: false,
-        cacheWrite: false,
-      );
-
-      final events = await response.future.timeout(const Duration(seconds: 5));
-
-      if (events.isEmpty) return null;
-
-      // Deduplicate by pubkey, keeping the latest created_at.
-      final byPubkey = <String, Nip01Event>{};
-      for (final event in events) {
-        final existing = byPubkey[event.pubKey];
-        if (existing == null || event.createdAt > existing.createdAt) {
-          byPubkey[event.pubKey] = event;
-        }
-      }
+      final byPubkey = await _fetchDedupedEvents(dTag);
+      if (byPubkey == null) return null;
 
       // Extract scores and build entries (without rank yet).
       final entries = <LeaderboardEntry>[];
@@ -116,7 +87,8 @@ class CommunityStatsRepository {
 
       if (entries.isEmpty) return null;
 
-      // Sort: score DESC, then createdAt ASC (deterministic tie-breaking).
+      // Sort: score DESC, then createdAt ASC (rewards earliest submission
+      // for tie-breaking).
       entries.sort((a, b) {
         final scoreComp = b.score.compareTo(a.score);
         if (scoreComp != 0) return scoreComp;
@@ -129,10 +101,39 @@ class CommunityStatsRepository {
         top[i] = top[i].copyWith(rank: i + 1);
       }
 
-      return Leaderboard(dTag: dTag, entries: top);
+      final leaderboard = Leaderboard(dTag: dTag, entries: top);
+      _leaderboardCache[dTag] = leaderboard;
+      return leaderboard;
     } on Exception {
       return null;
     }
+  }
+
+  /// Queries kind 30042 events for [dTag] and deduplicates by pubkey,
+  /// keeping the oldest `createdAt` per author (first submission wins).
+  ///
+  /// Returns null if no events found or relay timeout.
+  Future<Map<String, Nip01Event>?> _fetchDedupedEvents(String dTag) async {
+    final response = _ndkProvider.ndk.requests.query(
+      filter: Filter(kinds: [30042], dTags: [dTag], limit: 100),
+      explicitRelays: defaultRelayUrls,
+      cacheRead: false,
+      cacheWrite: false,
+    );
+
+    final events = await response.future.timeout(const Duration(seconds: 5));
+
+    if (events.isEmpty) return null;
+
+    final byPubkey = <String, Nip01Event>{};
+    for (final event in events) {
+      final existing = byPubkey[event.pubKey];
+      if (existing == null || event.createdAt < existing.createdAt) {
+        byPubkey[event.pubKey] = event;
+      }
+    }
+
+    return byPubkey;
   }
 
   /// Extracts the score from an event's NIP-32 `l` tags.
