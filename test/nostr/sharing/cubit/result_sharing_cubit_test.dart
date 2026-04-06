@@ -2,10 +2,9 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:ndk/ndk.dart';
-import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
+import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/nostr/sharing/cubit/result_sharing_cubit.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
-import 'package:very_good_games/nostr/signing/signing.dart';
 
 class _MockNostrIdentityRepository extends Mock
     implements NostrIdentityRepository {}

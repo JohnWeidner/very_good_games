@@ -2,10 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/games/signal/cubit/signal_cubit.dart';
 import 'package:very_good_games/games/signal/view/widgets/widgets.dart';
-import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
+import 'package:very_good_games/nostr/profile/profile.dart';
 import 'package:very_good_games/nostr/sharing/cubit/result_sharing_cubit.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
 import 'package:very_good_games/nostr/stats/cubit/community_stats_cubit.dart';
@@ -47,6 +48,12 @@ class SignalPage extends StatelessWidget {
         BlocProvider(
           create: (context) => LeaderboardCubit(
             statsRepository: context.read<CommunityStatsRepository>(),
+            identityRepository: context.read<NostrIdentityRepository>(),
+          ),
+        ),
+        BlocProvider(
+          create: (context) => ProfileCubit(
+            profileRepository: context.read<NostrProfileRepository>(),
             identityRepository: context.read<NostrIdentityRepository>(),
           ),
         ),

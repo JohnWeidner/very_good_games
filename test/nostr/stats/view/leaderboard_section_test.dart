@@ -1,13 +1,18 @@
 import 'dart:async';
 
+import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:ndk/ndk.dart';
+import 'package:very_good_games/nostr/profile/profile.dart';
 import 'package:very_good_games/nostr/stats/cubit/leaderboard_cubit.dart';
 import 'package:very_good_games/nostr/stats/models/leaderboard.dart';
 import 'package:very_good_games/nostr/stats/view/leaderboard_section.dart';
+
+class _MockProfileCubit extends MockCubit<ProfileState>
+    implements ProfileCubit {}
 
 class _MockLeaderboardCubit extends Mock implements LeaderboardCubit {
   final _stateController = StreamController<LeaderboardState>.broadcast();
@@ -28,9 +33,12 @@ class _MockLeaderboardCubit extends Mock implements LeaderboardCubit {
 void main() {
   group('LeaderboardSection', () {
     late _MockLeaderboardCubit mockCubit;
+    late _MockProfileCubit mockProfileCubit;
 
     setUp(() {
       mockCubit = _MockLeaderboardCubit();
+      mockProfileCubit = _MockProfileCubit();
+      when(() => mockProfileCubit.state).thenReturn(const ProfileState());
     });
 
     tearDown(() {
@@ -43,8 +51,11 @@ void main() {
       mockCubit.emitState(initialState);
 
       return MaterialApp(
-        home: BlocProvider<LeaderboardCubit>.value(
-          value: mockCubit,
+        home: MultiBlocProvider(
+          providers: [
+            BlocProvider<LeaderboardCubit>.value(value: mockCubit),
+            BlocProvider<ProfileCubit>.value(value: mockProfileCubit),
+          ],
           child: const Scaffold(
             body: LeaderboardSection(dTag: 'test:2026-04-06'),
           ),
@@ -160,8 +171,11 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: BlocProvider<LeaderboardCubit>.value(
-            value: mockCubit,
+          home: MultiBlocProvider(
+            providers: [
+              BlocProvider<LeaderboardCubit>.value(value: mockCubit),
+              BlocProvider<ProfileCubit>.value(value: mockProfileCubit),
+            ],
             child: const Scaffold(
               body: LeaderboardSection(
                 dTag: 'test:2026-04-06',

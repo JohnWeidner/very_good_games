@@ -8,6 +8,7 @@ environment:
 
 dependencies:
   bloc: ^9.0.0
+  drift: ^2.26.0
   equatable: ^2.0.7
   flutter:
     sdk: flutter
@@ -16,7 +17,12 @@ dependencies:
   flutter_secure_storage: ^9.0.0
   go_router: ^15.1.2
   ndk: ^0.8.1
+  nostr_identity:
+    path: packages/nostr_identity
+  path: ^1.9.0
+  path_provider: ^2.1.5
   shared_preferences: ^2.5.3
+  sqlite3_flutter_libs: ^0.5.32
 
 dev_dependencies:
   bloc_test: ^10.0.0

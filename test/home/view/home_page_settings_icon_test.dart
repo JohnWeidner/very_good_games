@@ -3,9 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/home/view/home_page.dart';
-import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
 import 'package:very_good_games/settings/settings.dart';
 
@@ -22,6 +22,9 @@ class _MockNostrIdentityRepository extends Mock
 
 class _MockNostrDeletionRepository extends Mock
     implements NostrDeletionRepository {}
+
+class _MockNostrProfileRepository extends Mock
+    implements NostrProfileRepository {}
 
 void main() {
   group('HomePage settings icon', () {
@@ -59,6 +62,9 @@ void main() {
             ),
             RepositoryProvider<NostrDeletionRepository>(
               create: (_) => _MockNostrDeletionRepository(),
+            ),
+            RepositoryProvider<NostrProfileRepository>(
+              create: (_) => _MockNostrProfileRepository(),
             ),
           ],
           child: MaterialApp.router(routerConfig: router),

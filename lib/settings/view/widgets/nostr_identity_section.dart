@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:very_good_games/nostr/identity/cubit/nostr_identity_cubit.dart';
 import 'package:very_good_games/nostr/identity/view/identity_setup_launcher.dart';
+import 'package:very_good_games/nostr/profile/profile.dart';
+import 'package:very_good_games/settings/view/profile_edit_page.dart';
 
 /// Settings section for managing Nostr identity.
 ///
@@ -31,6 +33,7 @@ class NostrIdentitySection extends StatelessWidget {
           ),
           NostrIdentityStatus.ready => _HasIdentityView(
             npub: state.npub!,
+            onEditProfile: () => _openProfileEdit(context),
             onImport: () => _startExplainerFlow(context),
             onDelete: () => _showDeleteDialog(context),
           ),
@@ -42,10 +45,23 @@ class NostrIdentitySection extends StatelessWidget {
     );
   }
 
+  void _openProfileEdit(BuildContext context) {
+    final profileCubit = context.read<ProfileCubit>();
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: profileCubit,
+          child: const ProfileEditPage(),
+        ),
+      ),
+    );
+  }
+
   Future<void> _startExplainerFlow(BuildContext context) async {
+    final cubit = context.read<NostrIdentityCubit>();
     final completed = await IdentitySetupLauncher.launch(context);
     if (completed) {
-      await context.read<NostrIdentityCubit>().loadIdentity();
+      await cubit.loadIdentity();
     }
   }
 
@@ -126,11 +142,13 @@ class _NoIdentityView extends StatelessWidget {
 class _HasIdentityView extends StatelessWidget {
   const _HasIdentityView({
     required this.npub,
+    required this.onEditProfile,
     required this.onImport,
     required this.onDelete,
   });
 
   final String npub;
+  final VoidCallback onEditProfile;
   final VoidCallback onImport;
   final VoidCallback onDelete;
 
@@ -154,13 +172,17 @@ class _HasIdentityView extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
+          child: Wrap(
+            spacing: 8,
             children: [
+              TextButton(
+                onPressed: onEditProfile,
+                child: const Text('Edit Profile'),
+              ),
               TextButton(
                 onPressed: onImport,
                 child: const Text('Import different key'),
               ),
-              const SizedBox(width: 8),
               TextButton(
                 onPressed: onDelete,
                 child: const Text('Delete identity'),

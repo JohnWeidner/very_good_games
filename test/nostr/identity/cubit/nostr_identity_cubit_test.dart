@@ -1,10 +1,9 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/nostr/identity/cubit/nostr_identity_cubit.dart';
-import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
-import 'package:very_good_games/nostr/signing/signing.dart';
 
 class _MockNostrIdentityRepository extends Mock
     implements NostrIdentityRepository {}
@@ -138,6 +137,9 @@ void main() {
           when(
             () => identityRepository.importKey('nsec1valid'),
           ).thenAnswer((_) async => 'npub1imported');
+          when(
+            () => identityRepository.getPublicKeyHex(),
+          ).thenAnswer((_) async => null);
         },
         build: buildCubit,
         act: (cubit) => cubit.importKey('nsec1valid'),

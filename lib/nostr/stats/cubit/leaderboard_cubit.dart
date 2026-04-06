@@ -1,6 +1,6 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
+import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/nostr/stats/models/leaderboard.dart';
 import 'package:very_good_games/nostr/stats/repository/community_stats_repository.dart';
 

@@ -2,8 +2,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:ndk/shared/nips/nip01/bip340.dart';
-import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
-import 'package:very_good_games/nostr/signing/signing.dart';
+import 'package:nostr_identity/nostr_identity.dart';
 
 class _MockFlutterSecureStorage extends Mock implements FlutterSecureStorage {}
 

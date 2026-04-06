@@ -2,7 +2,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:ndk/ndk.dart';
 import 'package:ndk/shared/nips/nip01/bip340.dart';
 import 'package:ndk/shared/nips/nip01/helpers.dart';
-import 'package:very_good_games/nostr/signing/signing.dart';
+import 'package:nostr_identity/src/signing/local_nostr_signer.dart';
+import 'package:nostr_identity/src/signing/nostr_signer.dart';
 
 /// Repository managing Nostr identity (key pair) lifecycle.
 ///

@@ -1,6 +1,6 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
+import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
 
 part 'nostr_identity_state.dart';
@@ -13,12 +13,15 @@ class NostrIdentityCubit extends Cubit<NostrIdentityState> {
   NostrIdentityCubit({
     required NostrIdentityRepository identityRepository,
     required NostrDeletionRepository deletionRepository,
+    NostrProfileRepository? profileRepository,
   }) : _identityRepository = identityRepository,
        _deletionRepository = deletionRepository,
+       _profileRepository = profileRepository,
        super(const NostrIdentityState());
 
   final NostrIdentityRepository _identityRepository;
   final NostrDeletionRepository _deletionRepository;
+  final NostrProfileRepository? _profileRepository;
 
   /// Loads the current identity from secure storage.
   Future<void> loadIdentity() async {
@@ -83,6 +86,12 @@ class NostrIdentityCubit extends Cubit<NostrIdentityState> {
     try {
       final npub = await _identityRepository.importKey(nsec);
       emit(state.copyWith(status: NostrIdentityStatus.ready, npub: () => npub));
+
+      // Best-effort: fetch existing profile from relays.
+      final pubkeyHex = await _identityRepository.getPublicKeyHex();
+      if (pubkeyHex != null) {
+        await _profileRepository?.getProfile(pubkeyHex);
+      }
     } on FormatException {
       emit(
         state.copyWith(
@@ -138,6 +147,10 @@ class NostrIdentityCubit extends Cubit<NostrIdentityState> {
             pubKeyHex: pubKeyHex,
           );
         }
+      }
+      // Clear cached profile.
+      if (pubKeyHex != null) {
+        await _profileRepository?.deleteProfile(pubKeyHex);
       }
     } on StateError {
       // getSigner() throws StateError when no identity exists.

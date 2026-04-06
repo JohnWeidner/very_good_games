@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/nostr/identity/cubit/nostr_identity_cubit.dart';
-import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
 import 'package:very_good_games/nostr/identity/view/identity_explainer_flow.dart';
 import 'package:very_good_games/nostr/identity/view/identity_setup_page.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
@@ -30,6 +30,7 @@ class IdentitySetupLauncher {
           create: (_) => NostrIdentityCubit(
             identityRepository: context.read<NostrIdentityRepository>(),
             deletionRepository: context.read<NostrDeletionRepository>(),
+            profileRepository: context.read<NostrProfileRepository>(),
           ),
           child: const IdentitySetupPage(),
         ),

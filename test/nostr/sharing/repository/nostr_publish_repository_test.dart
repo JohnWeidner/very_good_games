@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:ndk/domain_layer/entities/broadcast_state.dart';
 import 'package:ndk/ndk.dart';
-import 'package:very_good_games/nostr/relay/ndk_provider.dart';
+import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
 
 class _MockNdk extends Mock implements Ndk {}

@@ -1,6 +1,5 @@
 import 'package:ndk/ndk.dart';
-import 'package:very_good_games/nostr/relay/ndk_provider.dart';
-import 'package:very_good_games/nostr/relay/relay_config.dart';
+import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/nostr/stats/models/community_stats.dart';
 import 'package:very_good_games/nostr/stats/models/leaderboard.dart';
 

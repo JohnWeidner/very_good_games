@@ -1,5 +1,5 @@
 import 'package:ndk/ndk.dart';
-import 'package:very_good_games/nostr/signing/nostr_signer.dart';
+import 'package:nostr_identity/src/signing/nostr_signer.dart';
 
 /// A [NostrSigner] that signs events locally using [Bip340EventSigner].
 ///

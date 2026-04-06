@@ -1,7 +1,5 @@
 import 'package:ndk/ndk.dart';
-import 'package:very_good_games/nostr/relay/ndk_provider.dart';
-import 'package:very_good_games/nostr/relay/relay_config.dart';
-import 'package:very_good_games/nostr/signing/signing.dart';
+import 'package:nostr_identity/nostr_identity.dart';
 
 /// Repository wrapping Ndk relay operations for querying and deleting
 /// user events via NIP-09 (kind 5 deletion events).

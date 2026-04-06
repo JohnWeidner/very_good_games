@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/core/core.dart';
-import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
 import 'package:very_good_games/nostr/stats/repository/community_stats_repository.dart';
@@ -18,6 +18,7 @@ class App extends StatelessWidget {
     required NostrPublishRepository nostrPublishRepository,
     required NostrDeletionRepository nostrDeletionRepository,
     required CommunityStatsRepository communityStatsRepository,
+    required NostrProfileRepository nostrProfileRepository,
     super.key,
   }) : _router = router,
        _gameRegistry = gameRegistry,
@@ -25,7 +26,8 @@ class App extends StatelessWidget {
        _nostrIdentityRepository = nostrIdentityRepository,
        _nostrPublishRepository = nostrPublishRepository,
        _nostrDeletionRepository = nostrDeletionRepository,
-       _communityStatsRepository = communityStatsRepository;
+       _communityStatsRepository = communityStatsRepository,
+       _nostrProfileRepository = nostrProfileRepository;
 
   final GoRouter _router;
   final GameRegistry _gameRegistry;
@@ -34,6 +36,7 @@ class App extends StatelessWidget {
   final NostrPublishRepository _nostrPublishRepository;
   final NostrDeletionRepository _nostrDeletionRepository;
   final CommunityStatsRepository _communityStatsRepository;
+  final NostrProfileRepository _nostrProfileRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +48,7 @@ class App extends StatelessWidget {
         RepositoryProvider.value(value: _nostrPublishRepository),
         RepositoryProvider.value(value: _nostrDeletionRepository),
         RepositoryProvider.value(value: _communityStatsRepository),
+        RepositoryProvider.value(value: _nostrProfileRepository),
       ],
       child: MaterialApp.router(
         title: 'Very Good Games',

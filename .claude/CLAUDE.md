@@ -13,11 +13,17 @@ A Flutter app featuring daily puzzle games with Nostr social sharing. Built with
   - `view/` — Flutter widgets (page, grid, overlays)
   - `theme/` — game-specific colors
   - `<name>_game.dart` — `GameDefinition` implementation
-- `lib/nostr/` — Nostr protocol integration:
-  - `identity/` — key management, signing
+- `packages/nostr_identity/` — reusable Nostr identity package:
+  - `identity/` — key management (generate, import, delete)
+  - `signing/` — signer abstraction + `LocalNostrSigner`
+  - `relay/` — `NdkProvider` (injectable relays) + relay config
+  - `profile/` — `NostrProfile` model, `NostrProfileRepository` (kind-0 read/write + Drift cache)
+  - `database/` — Drift database (schema v1, profile table)
+- `lib/nostr/` — app-level Nostr integration:
+  - `identity/` — `NostrIdentityCubit`, identity setup views
+  - `profile/` — `ProfileCubit` for leaderboard + settings
   - `sharing/` — event building, publishing, result sharing UI
   - `stats/` — community stats from relays
-  - `relay/` — relay config, shared NdkProvider
 
 ### Conventions
 - **State management**: Bloc/Cubit with `part of` state files
@@ -25,7 +31,8 @@ A Flutter app featuring daily puzzle games with Nostr social sharing. Built with
 - **Barrel files**: every directory has one, export alphabetically
 - **Imports**: use barrel files; never import across layer boundaries (view -> data)
 - **copyWith pattern**: use `Type? Function()?` wrapper for nullable fields that need explicit null-setting
-- **Nostr repositories**: all share a single `NdkProvider` (one WebSocket pool)
+- **Nostr repositories**: all share a single `NdkProvider` (one WebSocket pool) — identity/signing/relay/profile are in `packages/nostr_identity/`, app imports via `package:nostr_identity/nostr_identity.dart`
+- **Profile conventions**: kind-0 read-then-merge preserves unknown fields; Drift cache with 24h staleness; field validation (name 100 chars, about 500 chars, picture URL https + 2048 chars)
 - **Game registration**: implement `GameDefinition`, add to `GameRegistry` in `main.dart`
 - **Shared UI**: `ResultSharingListener`, `ShareResultButton`, `CommunityStatsSection`, `StarRating` — don't duplicate per game
 - **Identity setup**: use `IdentitySetupLauncher.launch(context)` — don't copy the navigation flow

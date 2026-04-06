@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
+import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
 import 'package:very_good_games/settings/settings.dart';
 
@@ -11,6 +11,9 @@ class _MockNostrIdentityRepository extends Mock
 
 class _MockNostrDeletionRepository extends Mock
     implements NostrDeletionRepository {}
+
+class _MockNostrProfileRepository extends Mock
+    implements NostrProfileRepository {}
 
 extension on WidgetTester {
   Future<void> pumpSettingsPage() {
@@ -26,6 +29,9 @@ extension on WidgetTester {
           ),
           RepositoryProvider<NostrDeletionRepository>(
             create: (_) => _MockNostrDeletionRepository(),
+          ),
+          RepositoryProvider<NostrProfileRepository>(
+            create: (_) => _MockNostrProfileRepository(),
           ),
         ],
         child: const MaterialApp(home: SettingsPage()),

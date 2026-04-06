@@ -516,15 +516,14 @@ void main() {
       });
 
       test('saves session after confirmQuestion', () {
-        final cubit = GameCubit(
-          targetNumber: target,
-          dailySeed: 42,
-          storageRepository: storage,
-        );
-
-        cubit
-          ..selectQuestion(QuestionType.isOdd)
-          ..confirmQuestion();
+        final cubit =
+            GameCubit(
+                targetNumber: target,
+                dailySeed: 42,
+                storageRepository: storage,
+              )
+              ..selectQuestion(QuestionType.isOdd)
+              ..confirmQuestion();
 
         final session = storage.getSession('guess_the_number');
         expect(session, isNotNull);
@@ -608,14 +607,14 @@ void main() {
 
       test('restore returns null when dailySeed does not match', () async {
         // Save a session with seed 42.
-        final cubit = GameCubit(
-          targetNumber: target,
-          dailySeed: 42,
-          storageRepository: storage,
-        );
-        cubit
-          ..selectQuestion(QuestionType.isOdd)
-          ..confirmQuestion();
+        final cubit =
+            GameCubit(
+                targetNumber: target,
+                dailySeed: 42,
+                storageRepository: storage,
+              )
+              ..selectQuestion(QuestionType.isOdd)
+              ..confirmQuestion();
         cubit.close();
 
         // Try to restore with a different seed.

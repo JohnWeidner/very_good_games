@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:nostr_identity/nostr_identity.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:very_good_games/app/app.dart';
 import 'package:very_good_games/app/routes/routes.dart';
 import 'package:very_good_games/core/core.dart';
-import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
 import 'package:very_good_games/nostr/stats/repository/community_stats_repository.dart';
@@ -23,6 +23,9 @@ class _MockNostrDeletionRepository extends Mock
 class _MockCommunityStatsRepository extends Mock
     implements CommunityStatsRepository {}
 
+class _MockNostrProfileRepository extends Mock
+    implements NostrProfileRepository {}
+
 void main() {
   group('App', () {
     late GoRouter router;
@@ -32,6 +35,7 @@ void main() {
     late NostrPublishRepository nostrPublishRepository;
     late NostrDeletionRepository nostrDeletionRepository;
     late CommunityStatsRepository communityStatsRepository;
+    late NostrProfileRepository nostrProfileRepository;
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
@@ -43,6 +47,7 @@ void main() {
       nostrPublishRepository = _MockNostrPublishRepository();
       nostrDeletionRepository = _MockNostrDeletionRepository();
       communityStatsRepository = _MockCommunityStatsRepository();
+      nostrProfileRepository = _MockNostrProfileRepository();
     });
 
     testWidgets('renders MaterialApp.router', (tester) async {
@@ -55,6 +60,7 @@ void main() {
           nostrPublishRepository: nostrPublishRepository,
           nostrDeletionRepository: nostrDeletionRepository,
           communityStatsRepository: communityStatsRepository,
+          nostrProfileRepository: nostrProfileRepository,
         ),
       );
 
@@ -71,6 +77,7 @@ void main() {
           nostrPublishRepository: nostrPublishRepository,
           nostrDeletionRepository: nostrDeletionRepository,
           communityStatsRepository: communityStatsRepository,
+          nostrProfileRepository: nostrProfileRepository,
         ),
       );
       await tester.pumpAndSettle();
