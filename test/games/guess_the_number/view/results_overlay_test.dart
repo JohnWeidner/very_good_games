@@ -9,6 +9,7 @@ import 'package:very_good_games/games/guess_the_number/models/models.dart';
 import 'package:very_good_games/games/guess_the_number/view/widgets/results_overlay.dart';
 import 'package:very_good_games/nostr/sharing/cubit/result_sharing_cubit.dart';
 import 'package:very_good_games/nostr/stats/cubit/community_stats_cubit.dart';
+import 'package:very_good_games/nostr/stats/cubit/leaderboard_cubit.dart';
 import 'package:very_good_games/nostr/stats/models/community_stats.dart';
 
 class _MockResultSharingCubit extends MockCubit<ResultSharingState>
@@ -17,16 +18,25 @@ class _MockResultSharingCubit extends MockCubit<ResultSharingState>
 class _MockCommunityStatsCubit extends MockCubit<CommunityStatsState>
     implements CommunityStatsCubit {}
 
+class _MockLeaderboardCubit extends MockCubit<LeaderboardState>
+    implements LeaderboardCubit {}
+
 void main() {
   group('ResultsOverlay', () {
     late ResultSharingCubit sharingCubit;
     late CommunityStatsCubit statsCubit;
+    late LeaderboardCubit leaderboardCubit;
 
     setUp(() {
       sharingCubit = _MockResultSharingCubit();
       when(() => sharingCubit.state).thenReturn(const ResultSharingState());
       statsCubit = _MockCommunityStatsCubit();
       when(() => statsCubit.state).thenReturn(const CommunityStatsState());
+      leaderboardCubit = _MockLeaderboardCubit();
+      when(() => leaderboardCubit.state).thenReturn(const LeaderboardState());
+      when(
+        () => leaderboardCubit.fetchLeaderboard(any()),
+      ).thenAnswer((_) async {});
     });
 
     Widget buildSubject(GameState state) {
@@ -38,6 +48,7 @@ void main() {
               providers: [
                 BlocProvider<ResultSharingCubit>.value(value: sharingCubit),
                 BlocProvider<CommunityStatsCubit>.value(value: statsCubit),
+                BlocProvider<LeaderboardCubit>.value(value: leaderboardCubit),
               ],
               child: Scaffold(body: ResultsOverlay(state: state)),
             ),

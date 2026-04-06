@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:very_good_games/core/daily_seed/date_key.dart';
 import 'package:very_good_games/core/view/widgets/star_rating.dart';
 import 'package:very_good_games/games/guess_the_number/cubit/game_cubit.dart';
 import 'package:very_good_games/games/guess_the_number/logic/logic.dart';
@@ -9,6 +10,7 @@ import 'package:very_good_games/nostr/sharing/event_builder.dart';
 import 'package:very_good_games/nostr/sharing/view/community_stats_section.dart';
 import 'package:very_good_games/nostr/sharing/view/result_sharing_listener.dart';
 import 'package:very_good_games/nostr/sharing/view/share_result_button.dart';
+import 'package:very_good_games/nostr/stats/view/leaderboard_section.dart';
 
 /// Overlay displayed when the game ends, showing score and stats.
 class ResultsOverlay extends StatelessWidget {
@@ -87,6 +89,9 @@ class ResultsOverlay extends StatelessWidget {
                       const SizedBox(height: 16),
                       ShareResultButton(onShare: () => _share(context)),
                       const CommunityStatsSection(),
+                      LeaderboardSection(
+                        dTag: 'guess-the-number:${utcDateKey()}',
+                      ),
                     ] else ...[
                       Text(
                         'Score reached zero',
@@ -102,6 +107,9 @@ class ResultsOverlay extends StatelessWidget {
                         style: theme.textTheme.bodyMedium,
                       ),
                       const CommunityStatsSection(),
+                      LeaderboardSection(
+                        dTag: 'guess-the-number:${utcDateKey()}',
+                      ),
                     ],
                     const SizedBox(height: 24),
                     FilledButton(

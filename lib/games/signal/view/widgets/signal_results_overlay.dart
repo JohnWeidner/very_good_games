@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:very_good_games/core/daily_seed/date_key.dart';
 import 'package:very_good_games/core/view/widgets/star_rating.dart';
 import 'package:very_good_games/games/signal/cubit/signal_cubit.dart';
 import 'package:very_good_games/games/signal/logic/logic.dart';
@@ -9,6 +10,7 @@ import 'package:very_good_games/nostr/sharing/event_builder.dart';
 import 'package:very_good_games/nostr/sharing/view/community_stats_section.dart';
 import 'package:very_good_games/nostr/sharing/view/result_sharing_listener.dart';
 import 'package:very_good_games/nostr/sharing/view/share_result_button.dart';
+import 'package:very_good_games/nostr/stats/view/leaderboard_section.dart';
 
 /// Results overlay displayed when the Signal puzzle is solved.
 class SignalResultsOverlay extends StatelessWidget {
@@ -75,6 +77,7 @@ class SignalResultsOverlay extends StatelessWidget {
                     const SizedBox(height: 16),
                     ShareResultButton(onShare: () => _share(context)),
                     const CommunityStatsSection(),
+                    LeaderboardSection(dTag: 'signal:${utcDateKey()}'),
                     const SizedBox(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,

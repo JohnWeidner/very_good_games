@@ -11,6 +11,7 @@ import 'package:very_good_games/nostr/identity/repository/nostr_identity_reposit
 import 'package:very_good_games/nostr/sharing/cubit/result_sharing_cubit.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
 import 'package:very_good_games/nostr/stats/cubit/community_stats_cubit.dart';
+import 'package:very_good_games/nostr/stats/cubit/leaderboard_cubit.dart';
 import 'package:very_good_games/nostr/stats/repository/community_stats_repository.dart';
 
 /// The top-level page for a Guess the Number game session.
@@ -59,6 +60,12 @@ class GamePage extends StatelessWidget {
         BlocProvider(
           create: (context) => CommunityStatsCubit(
             statsRepository: context.read<CommunityStatsRepository>(),
+          ),
+        ),
+        BlocProvider(
+          create: (context) => LeaderboardCubit(
+            statsRepository: context.read<CommunityStatsRepository>(),
+            identityRepository: context.read<NostrIdentityRepository>(),
           ),
         ),
       ],

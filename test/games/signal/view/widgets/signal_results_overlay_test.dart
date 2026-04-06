@@ -8,6 +8,7 @@ import 'package:very_good_games/games/signal/logic/logic.dart';
 import 'package:very_good_games/games/signal/view/widgets/signal_results_overlay.dart';
 import 'package:very_good_games/nostr/sharing/cubit/result_sharing_cubit.dart';
 import 'package:very_good_games/nostr/stats/cubit/community_stats_cubit.dart';
+import 'package:very_good_games/nostr/stats/cubit/leaderboard_cubit.dart';
 
 class _MockResultSharingCubit extends MockCubit<ResultSharingState>
     implements ResultSharingCubit {}
@@ -15,16 +16,25 @@ class _MockResultSharingCubit extends MockCubit<ResultSharingState>
 class _MockCommunityStatsCubit extends MockCubit<CommunityStatsState>
     implements CommunityStatsCubit {}
 
+class _MockLeaderboardCubit extends MockCubit<LeaderboardState>
+    implements LeaderboardCubit {}
+
 void main() {
   group('SignalResultsOverlay', () {
     late ResultSharingCubit sharingCubit;
     late CommunityStatsCubit statsCubit;
+    late LeaderboardCubit leaderboardCubit;
 
     setUp(() {
       sharingCubit = _MockResultSharingCubit();
       statsCubit = _MockCommunityStatsCubit();
+      leaderboardCubit = _MockLeaderboardCubit();
       when(() => sharingCubit.state).thenReturn(const ResultSharingState());
       when(() => statsCubit.state).thenReturn(const CommunityStatsState());
+      when(() => leaderboardCubit.state).thenReturn(const LeaderboardState());
+      when(
+        () => leaderboardCubit.fetchLeaderboard(any()),
+      ).thenAnswer((_) async {});
     });
 
     SignalState winState({int score = 400, int moveCount = 5}) {
@@ -47,6 +57,7 @@ void main() {
             providers: [
               BlocProvider<ResultSharingCubit>.value(value: sharingCubit),
               BlocProvider<CommunityStatsCubit>.value(value: statsCubit),
+              BlocProvider<LeaderboardCubit>.value(value: leaderboardCubit),
             ],
             child: SignalResultsOverlay(state: state),
           ),
