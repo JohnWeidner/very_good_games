@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:ndk/ndk.dart';
+import 'package:very_good_games/nostr/relay/ndk_provider.dart';
 import 'package:very_good_games/nostr/stats/repository/community_stats_repository.dart';
 
 class _MockNdk extends Mock implements Ndk {}
@@ -17,7 +18,7 @@ void main() {
       ndk = _MockNdk();
       requests = _MockRequests();
       when(() => ndk.requests).thenReturn(requests);
-      repository = CommunityStatsRepository(ndk: ndk);
+      repository = CommunityStatsRepository(ndkProvider: NdkProvider(ndk: ndk));
     });
 
     Nip01Event makeEvent({
