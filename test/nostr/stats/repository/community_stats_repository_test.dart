@@ -198,4 +198,152 @@ void main() {
       ).called(1);
     });
   });
+
+  group('CommunityStatsRepository.fetchLeaderboard', () {
+    late Ndk ndk;
+    late Requests requests;
+    late CommunityStatsRepository repository;
+
+    setUp(() {
+      ndk = _MockNdk();
+      requests = _MockRequests();
+      when(() => ndk.requests).thenReturn(requests);
+      repository = CommunityStatsRepository(ndkProvider: NdkProvider(ndk: ndk));
+    });
+
+    Nip01Event makeEvent({
+      required String pubKey,
+      required int score,
+      int createdAt = 1000,
+    }) {
+      return Nip01Event(
+        pubKey: pubKey,
+        kind: 30042,
+        tags: [
+          ['d', 'guess-the-number:2026-04-06'],
+          ['l', 'score-$score', 'games.vgg.score'],
+        ],
+        content: 'test',
+        createdAt: createdAt,
+      );
+    }
+
+    test('returns top entries sorted by score DESC', () async {
+      when(
+        () => requests.query(
+          filter: any(named: 'filter'),
+          explicitRelays: any(named: 'explicitRelays'),
+          cacheRead: any(named: 'cacheRead'),
+          cacheWrite: any(named: 'cacheWrite'),
+        ),
+      ).thenReturn(
+        NdkResponse(
+          'test-id',
+          Stream.fromIterable([
+            makeEvent(
+              pubKey:
+                  'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              score: 100,
+            ),
+            makeEvent(
+              pubKey:
+                  'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+              score: 90,
+            ),
+            makeEvent(
+              pubKey:
+                  'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+              score: 110,
+            ),
+          ]),
+        ),
+      );
+
+      final leaderboard = await repository.fetchLeaderboard(
+        'guess-the-number:2026-04-06',
+      );
+
+      expect(leaderboard, isNotNull);
+      expect(leaderboard!.entries, hasLength(3));
+      expect(leaderboard.entries[0].score, equals(110)); // Highest
+      expect(leaderboard.entries[0].rank, equals(1));
+      expect(leaderboard.entries[1].score, equals(100));
+      expect(leaderboard.entries[1].rank, equals(2));
+      expect(leaderboard.entries[2].score, equals(90)); // Lowest
+      expect(leaderboard.entries[2].rank, equals(3));
+    });
+
+    test('returns null when no events found', () async {
+      when(
+        () => requests.query(
+          filter: any(named: 'filter'),
+          explicitRelays: any(named: 'explicitRelays'),
+          cacheRead: any(named: 'cacheRead'),
+          cacheWrite: any(named: 'cacheWrite'),
+        ),
+      ).thenReturn(NdkResponse('test-id', const Stream.empty()));
+
+      final leaderboard = await repository.fetchLeaderboard(
+        'guess-the-number:2026-04-06',
+      );
+
+      expect(leaderboard, isNull);
+    });
+
+    test('returns null on exception', () async {
+      when(
+        () => requests.query(
+          filter: any(named: 'filter'),
+          explicitRelays: any(named: 'explicitRelays'),
+          cacheRead: any(named: 'cacheRead'),
+          cacheWrite: any(named: 'cacheWrite'),
+        ),
+      ).thenThrow(Exception('relay error'));
+
+      final leaderboard = await repository.fetchLeaderboard(
+        'guess-the-number:2026-04-06',
+      );
+
+      expect(leaderboard, isNull);
+    });
+
+    test('returns null when all entries lack valid scores', () async {
+      when(
+        () => requests.query(
+          filter: any(named: 'filter'),
+          explicitRelays: any(named: 'explicitRelays'),
+          cacheRead: any(named: 'cacheRead'),
+          cacheWrite: any(named: 'cacheWrite'),
+        ),
+      ).thenReturn(
+        NdkResponse(
+          'test-id',
+          Stream.fromIterable([
+            Nip01Event(
+              pubKey: 'alice',
+              kind: 30042,
+              tags: [
+                ['d', 'guess-the-number:2026-04-06'],
+              ],
+              content: 'test',
+            ),
+            Nip01Event(
+              pubKey: 'bob',
+              kind: 30042,
+              tags: [
+                ['d', 'guess-the-number:2026-04-06'],
+              ],
+              content: 'test',
+            ),
+          ]),
+        ),
+      );
+
+      final leaderboard = await repository.fetchLeaderboard(
+        'guess-the-number:2026-04-06',
+      );
+
+      expect(leaderboard, isNull);
+    });
+  });
 }
