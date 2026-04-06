@@ -1,45 +1,23 @@
 import 'package:ndk/ndk.dart';
+import 'package:very_good_games/nostr/relay/ndk_provider.dart';
 import 'package:very_good_games/nostr/relay/relay_config.dart';
 import 'package:very_good_games/nostr/signing/signing.dart';
 
 /// Repository wrapping Ndk relay operations for querying and deleting
 /// user events via NIP-09 (kind 5 deletion events).
 class NostrDeletionRepository {
-  /// Creates a [NostrDeletionRepository] with an existing [Ndk] instance.
-  NostrDeletionRepository({required Ndk ndk}) : _ndkFactory = null, _ndk = ndk;
+  /// Creates a [NostrDeletionRepository] with an [NdkProvider].
+  NostrDeletionRepository({required NdkProvider ndkProvider})
+    : _ndkProvider = ndkProvider;
 
-  /// Creates a [NostrDeletionRepository] that lazily initializes [Ndk]
-  /// on first use to avoid opening WebSocket connections at app startup.
-  NostrDeletionRepository.lazy() : _ndkFactory = _createNdk, _ndk = null;
-
-  static Ndk _createNdk() {
-    return Ndk(
-      NdkConfig(
-        eventVerifier: Bip340EventVerifier(),
-        cache: MemCacheManager(),
-        bootstrapRelays: defaultRelayUrls,
-      ),
-    );
-  }
-
-  final Ndk Function()? _ndkFactory;
-  Ndk? _ndk;
-
-  Ndk get _resolvedNdk {
-    assert(
-      _ndk != null || _ndkFactory != null,
-      'NostrDeletionRepository must be created with either ndk or lazy()',
-    );
-    _ndk ??= _ndkFactory!();
-    return _ndk!;
-  }
+  final NdkProvider _ndkProvider;
 
   /// Queries relays for the user's kind 30042 events.
   ///
   /// Returns a list of event IDs. Returns an empty list on failure or timeout.
   Future<List<String>> queryUserEvents(String pubKeyHex) async {
     try {
-      final response = _resolvedNdk.requests.query(
+      final response = _ndkProvider.ndk.requests.query(
         filter: Filter(authors: [pubKeyHex], kinds: [30042], limit: 1000),
         explicitRelays: defaultRelayUrls,
         cacheRead: false,
@@ -79,7 +57,7 @@ class NostrDeletionRepository {
 
       event = await signer.sign(event);
 
-      final response = _resolvedNdk.broadcast.broadcast(
+      final response = _ndkProvider.ndk.broadcast.broadcast(
         nostrEvent: event,
         specificRelays: defaultRelayUrls,
       );

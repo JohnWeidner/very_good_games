@@ -6,7 +6,7 @@ void main() {
     test('is equatable', () {
       const a = CommunityStats(playerCount: 10, avgScore: 2.5);
       const b = CommunityStats(playerCount: 10, avgScore: 2.5);
-      const c = CommunityStats(playerCount: 5, avgScore: 1.0);
+      const c = CommunityStats(playerCount: 5, avgScore: 1);
 
       expect(a, equals(b));
       expect(a, isNot(equals(c)));

@@ -1,40 +1,18 @@
 import 'package:ndk/ndk.dart';
+import 'package:very_good_games/nostr/relay/ndk_provider.dart';
 import 'package:very_good_games/nostr/relay/relay_config.dart';
 import 'package:very_good_games/nostr/stats/models/community_stats.dart';
 
 /// Repository wrapping Ndk relay read operations for community stats.
 ///
 /// Fetches kind 30042 events for a given `d` tag, deduplicates by pubkey,
-/// extracts star counts from NIP-32 labels, and returns aggregate stats.
+/// extracts scores from NIP-32 labels, and returns aggregate stats.
 class CommunityStatsRepository {
-  /// Creates a [CommunityStatsRepository] with an existing [Ndk] instance.
-  CommunityStatsRepository({required Ndk ndk}) : _ndkFactory = null, _ndk = ndk;
+  /// Creates a [CommunityStatsRepository] with an [NdkProvider].
+  CommunityStatsRepository({required NdkProvider ndkProvider})
+    : _ndkProvider = ndkProvider;
 
-  /// Creates a [CommunityStatsRepository] that lazily initializes [Ndk]
-  /// on first query to avoid opening WebSocket connections at app startup.
-  CommunityStatsRepository.lazy() : _ndkFactory = _createNdk, _ndk = null;
-
-  static Ndk _createNdk() {
-    return Ndk(
-      NdkConfig(
-        eventVerifier: Bip340EventVerifier(),
-        cache: MemCacheManager(),
-        bootstrapRelays: defaultRelayUrls,
-      ),
-    );
-  }
-
-  final Ndk Function()? _ndkFactory;
-  Ndk? _ndk;
-
-  Ndk get _resolvedNdk {
-    assert(
-      _ndk != null || _ndkFactory != null,
-      'CommunityStatsRepository must be created with either ndk or lazy()',
-    );
-    _ndk ??= _ndkFactory!();
-    return _ndk!;
-  }
+  final NdkProvider _ndkProvider;
 
   /// In-memory cache keyed by `d` tag.
   final _cache = <String, CommunityStats>{};
@@ -47,7 +25,7 @@ class CommunityStatsRepository {
     if (_cache.containsKey(dTag)) return _cache[dTag];
 
     try {
-      final response = _resolvedNdk.requests.query(
+      final response = _ndkProvider.ndk.requests.query(
         filter: Filter(kinds: [30042], dTags: [dTag], limit: 100),
         explicitRelays: defaultRelayUrls,
         cacheRead: false,

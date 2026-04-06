@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/games/signal/cubit/signal_cubit.dart';
 import 'package:very_good_games/games/signal/view/widgets/widgets.dart';
@@ -22,11 +21,7 @@ class SignalPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now().toUtc();
-    final dateKey =
-        '${now.year}-'
-        '${now.month.toString().padLeft(2, '0')}-'
-        '${now.day.toString().padLeft(2, '0')}';
+    final dateKey = utcDateKey();
 
     return MultiBlocProvider(
       providers: [
@@ -64,7 +59,6 @@ class _SignalView extends StatefulWidget {
 }
 
 class _SignalViewState extends State<_SignalView> {
-  static const _seenInstructionsKey = 'signal_seen_instructions';
   bool _showResults = true;
 
   @override
@@ -73,12 +67,14 @@ class _SignalViewState extends State<_SignalView> {
     _showInstructionsIfFirstTime();
   }
 
-  Future<void> _showInstructionsIfFirstTime() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool(_seenInstructionsKey) ?? false) return;
-    if (!mounted) return;
-    await SignalInstructionsDialog.show(context);
-    await prefs.setBool(_seenInstructionsKey, true);
+  void _showInstructionsIfFirstTime() {
+    final repo = context.read<GameStorageRepository>();
+    if (repo.hasSeenInstructions('signal')) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await SignalInstructionsDialog.show(context);
+      await repo.markInstructionsSeen('signal');
+    });
   }
 
   void _persistStreak(BuildContext context) {

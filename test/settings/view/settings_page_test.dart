@@ -15,8 +15,8 @@ class _MockNostrDeletionRepository extends Mock
 extension on WidgetTester {
   Future<void> pumpSettingsPage() {
     final repository = _MockNostrIdentityRepository();
-    when(() => repository.getPublicKey()).thenAnswer((_) async => null);
-    when(() => repository.hasIdentity()).thenAnswer((_) async => false);
+    when(repository.getPublicKey).thenAnswer((_) async => null);
+    when(repository.hasIdentity).thenAnswer((_) async => false);
 
     return pumpWidget(
       MultiRepositoryProvider(

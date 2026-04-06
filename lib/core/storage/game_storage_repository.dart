@@ -66,4 +66,14 @@ class GameStorageRepository {
     if (raw == null) return null;
     return jsonDecode(raw) as Map<String, dynamic>;
   }
+
+  /// Whether the user has seen the instructions for the game with [gameId].
+  bool hasSeenInstructions(String gameId) {
+    return _preferences.getBool('${gameId}_seen_instructions') ?? false;
+  }
+
+  /// Marks the instructions as seen for the game with [gameId].
+  Future<void> markInstructionsSeen(String gameId) async {
+    await _preferences.setBool('${gameId}_seen_instructions', true);
+  }
 }

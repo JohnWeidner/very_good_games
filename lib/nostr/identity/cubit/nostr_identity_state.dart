@@ -48,24 +48,23 @@ class NostrIdentityState extends Equatable {
 
   /// Creates a copy with the given fields replaced.
   ///
-  /// Pass [clearNpub] to explicitly set npub to null (e.g. after deletion).
+  /// Use nullable-function wrappers to explicitly set fields to null,
+  /// e.g. `copyWith(npub: () => null)`.
   NostrIdentityState copyWith({
     NostrIdentityStatus? status,
-    String? npub,
-    bool clearNpub = false,
+    String? Function()? npub,
     String? nsec,
     String? errorMessage,
-    String? deletionProgress,
-    bool clearDeletionProgress = false,
+    String? Function()? deletionProgress,
   }) {
     return NostrIdentityState(
       status: status ?? this.status,
-      npub: clearNpub ? null : (npub ?? this.npub),
+      npub: npub != null ? npub() : this.npub,
       nsec: nsec,
       errorMessage: errorMessage,
-      deletionProgress: clearDeletionProgress
-          ? null
-          : (deletionProgress ?? this.deletionProgress),
+      deletionProgress: deletionProgress != null
+          ? deletionProgress()
+          : this.deletionProgress,
     );
   }
 

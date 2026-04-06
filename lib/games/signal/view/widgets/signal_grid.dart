@@ -38,8 +38,7 @@ class SignalGrid extends StatelessWidget {
               }
 
               return GestureDetector(
-                onTap: () =>
-                    context.read<SignalCubit>().toggleCell(row, col),
+                onTap: () => context.read<SignalCubit>().toggleCell(row, col),
                 child: SignalCell(
                   cell: cell,
                   signalCount: signalCount,

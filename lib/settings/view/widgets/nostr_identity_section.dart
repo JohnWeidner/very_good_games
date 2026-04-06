@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:very_good_games/nostr/identity/cubit/nostr_identity_cubit.dart';
-import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
-import 'package:very_good_games/nostr/identity/view/identity_explainer_flow.dart';
-import 'package:very_good_games/nostr/identity/view/identity_setup_page.dart';
-import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
+import 'package:very_good_games/nostr/identity/view/identity_setup_launcher.dart';
 
 /// Settings section for managing Nostr identity.
 ///
@@ -46,29 +43,9 @@ class NostrIdentitySection extends StatelessWidget {
   }
 
   Future<void> _startExplainerFlow(BuildContext context) async {
-    final proceed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => const IdentityExplainerFlow(),
-      ),
-    );
-
-    if ((proceed ?? false) && context.mounted) {
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute(
-          builder: (_) => BlocProvider(
-            create: (_) => NostrIdentityCubit(
-              identityRepository: context.read<NostrIdentityRepository>(),
-              deletionRepository: context.read<NostrDeletionRepository>(),
-            ),
-            child: const IdentitySetupPage(),
-          ),
-        ),
-      );
-
-      if (context.mounted) {
-        await context.read<NostrIdentityCubit>().loadIdentity();
-      }
+    final completed = await IdentitySetupLauncher.launch(context);
+    if (completed) {
+      await context.read<NostrIdentityCubit>().loadIdentity();
     }
   }
 

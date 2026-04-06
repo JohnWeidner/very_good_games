@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:ndk/domain_layer/entities/broadcast_state.dart';
 import 'package:ndk/ndk.dart';
+import 'package:very_good_games/nostr/relay/ndk_provider.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
 
 class _MockNdk extends Mock implements Ndk {}
@@ -38,7 +39,7 @@ void main() {
       ndk = _MockNdk();
       broadcast = _MockBroadcast();
       when(() => ndk.broadcast).thenReturn(broadcast);
-      repository = NostrPublishRepository(ndk: ndk);
+      repository = NostrPublishRepository(ndkProvider: NdkProvider(ndk: ndk));
       event = _FakeNip01Event();
     });
 
@@ -54,14 +55,8 @@ void main() {
             relayUrl: 'wss://relay.damus.io',
             okReceived: true,
             broadcastSuccessful: true,
-            msg: '',
           ),
-          RelayBroadcastResponse(
-            relayUrl: 'wss://nos.lol',
-            okReceived: false,
-            broadcastSuccessful: false,
-            msg: 'timeout',
-          ),
+          RelayBroadcastResponse(relayUrl: 'wss://nos.lol', msg: 'timeout'),
         ]),
       );
 
@@ -79,8 +74,6 @@ void main() {
         _buildResponse(event, [
           RelayBroadcastResponse(
             relayUrl: 'wss://relay.damus.io',
-            okReceived: false,
-            broadcastSuccessful: false,
             msg: 'blocked',
           ),
         ]),

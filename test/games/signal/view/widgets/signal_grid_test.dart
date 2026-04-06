@@ -14,7 +14,7 @@ void main() {
   group('SignalGrid', () {
     late SignalCubit cubit;
 
-    SignalState _stateForSeed(int seed) {
+    SignalState stateForSeed(int seed) {
       final result = PuzzleGenerator.generate(seed);
       final signals = SignalCalculator.calculate(result.puzzle);
       return SignalState(
@@ -29,7 +29,7 @@ void main() {
     });
 
     Widget buildSubject({int seed = 42}) {
-      when(() => cubit.state).thenReturn(_stateForSeed(seed));
+      when(() => cubit.state).thenReturn(stateForSeed(seed));
 
       return MaterialApp(
         home: Scaffold(
@@ -49,7 +49,7 @@ void main() {
     });
 
     testWidgets('renders correct number of cells for 6x6', (tester) async {
-      await tester.pumpWidget(buildSubject(seed: 42));
+      await tester.pumpWidget(buildSubject());
 
       expect(find.byType(SignalCell), findsNWidgets(36));
     });

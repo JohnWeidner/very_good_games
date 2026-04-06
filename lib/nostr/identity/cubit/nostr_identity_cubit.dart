@@ -27,9 +27,13 @@ class NostrIdentityCubit extends Cubit<NostrIdentityState> {
     try {
       final npub = await _identityRepository.getPublicKey();
       if (npub != null) {
-        emit(state.copyWith(status: NostrIdentityStatus.ready, npub: npub));
+        emit(
+          state.copyWith(status: NostrIdentityStatus.ready, npub: () => npub),
+        );
       } else {
-        emit(state.copyWith(status: NostrIdentityStatus.none, clearNpub: true));
+        emit(
+          state.copyWith(status: NostrIdentityStatus.none, npub: () => null),
+        );
       }
     } on Exception catch (e) {
       emit(
@@ -53,7 +57,7 @@ class NostrIdentityCubit extends Cubit<NostrIdentityState> {
       emit(
         state.copyWith(
           status: NostrIdentityStatus.ready,
-          npub: result.npub,
+          npub: () => result.npub,
           nsec: result.nsec,
         ),
       );
@@ -67,13 +71,18 @@ class NostrIdentityCubit extends Cubit<NostrIdentityState> {
     }
   }
 
+  /// Clears the nsec from state after the user has backed it up.
+  void clearNsec() {
+    emit(state.copyWith());
+  }
+
   /// Imports a key from a bech32-encoded nsec string.
   Future<void> importKey(String nsec) async {
     emit(state.copyWith(status: NostrIdentityStatus.loading));
 
     try {
       final npub = await _identityRepository.importKey(nsec);
-      emit(state.copyWith(status: NostrIdentityStatus.ready, npub: npub));
+      emit(state.copyWith(status: NostrIdentityStatus.ready, npub: () => npub));
     } on FormatException {
       emit(
         state.copyWith(
@@ -107,7 +116,7 @@ class NostrIdentityCubit extends Cubit<NostrIdentityState> {
       if (pubKeyHex != null) {
         emit(
           state.copyWith(
-            deletionProgress: 'Searching for published results...',
+            deletionProgress: () => 'Searching for published results...',
           ),
         );
 
@@ -116,7 +125,7 @@ class NostrIdentityCubit extends Cubit<NostrIdentityState> {
         if (eventIds.isNotEmpty) {
           emit(
             state.copyWith(
-              deletionProgress:
+              deletionProgress: () =>
                   'Deleting ${eventIds.length} '
                   '${eventIds.length == 1 ? 'result' : 'results'} '
                   'from relays...',
@@ -144,7 +153,7 @@ class NostrIdentityCubit extends Cubit<NostrIdentityState> {
         state.copyWith(
           status: NostrIdentityStatus.error,
           errorMessage: e.toString(),
-          clearDeletionProgress: true,
+          deletionProgress: () => null,
         ),
       );
     }

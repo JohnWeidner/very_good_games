@@ -33,8 +33,9 @@ class PuzzleGenerator {
     final towerIndices = positions.take(towerCount).toSet();
 
     // Step 2: Place walls on remaining positions.
-    final availableForWalls =
-        positions.where((i) => !towerIndices.contains(i)).toList();
+    final availableForWalls = positions
+        .where((i) => !towerIndices.contains(i))
+        .toList();
     final wallIndices = availableForWalls.take(wallCount).toSet();
 
     // Step 3: Build the solution grid.
@@ -102,9 +103,7 @@ class _MinWallSolver {
   }
 
   List<int> _computeAllSignals() {
-    return [
-      for (final t in _towers) _computeSignal(t.row, t.col),
-    ];
+    return [for (final t in _towers) _computeSignal(t.row, t.col)];
   }
 
   int _computeSignal(int tRow, int tCol) {
@@ -222,10 +221,7 @@ class _MinWallSolver {
         for (final ti in affectedTowers) _currentSignals[ti],
       ];
       for (final ti in affectedTowers) {
-        _currentSignals[ti] = _computeSignal(
-          _towers[ti].row,
-          _towers[ti].col,
-        );
+        _currentSignals[ti] = _computeSignal(_towers[ti].row, _towers[ti].col);
       }
 
       if (_search(target, placed + 1, i + 1)) {

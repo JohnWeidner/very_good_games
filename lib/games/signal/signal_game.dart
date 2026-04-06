@@ -6,10 +6,7 @@ import 'package:very_good_games/games/signal/view/view.dart';
 /// [GameDefinition] for the Signal grid puzzle game.
 class SignalGame extends GameDefinition {
   /// Creates a [SignalGame].
-  SignalGame({required GameStorageRepository storageRepository})
-    : _storageRepository = storageRepository;
-
-  final GameStorageRepository _storageRepository;
+  SignalGame({required super.storageRepository});
 
   @override
   String get id => 'signal';
@@ -36,23 +33,4 @@ class SignalGame extends GameDefinition {
       },
     ),
   ];
-
-  @override
-  Future<DailyGameStatus> getDailyStatus(DateTime date) async {
-    final streak = _storageRepository.getStreak(id);
-    if (streak.lastCompletedDate == null) {
-      return DailyGameStatus.notStarted;
-    }
-
-    final lastUtc = streak.lastCompletedDate!.toUtc();
-    final dateUtc = date.toUtc();
-
-    if (lastUtc.year == dateUtc.year &&
-        lastUtc.month == dateUtc.month &&
-        lastUtc.day == dateUtc.day) {
-      return DailyGameStatus.completed;
-    }
-
-    return DailyGameStatus.notStarted;
-  }
 }

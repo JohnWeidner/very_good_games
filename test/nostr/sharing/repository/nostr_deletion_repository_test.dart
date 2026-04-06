@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:ndk/domain_layer/entities/broadcast_state.dart';
 import 'package:ndk/ndk.dart';
+import 'package:very_good_games/nostr/relay/ndk_provider.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
 import 'package:very_good_games/nostr/signing/signing.dart';
 
@@ -46,7 +47,7 @@ void main() {
       when(() => ndk.requests).thenReturn(requests);
       when(() => ndk.broadcast).thenReturn(broadcast);
 
-      repository = NostrDeletionRepository(ndk: ndk);
+      repository = NostrDeletionRepository(ndkProvider: NdkProvider(ndk: ndk));
     });
 
     group('queryUserEvents', () {
@@ -138,7 +139,6 @@ void main() {
               relayUrl: 'wss://relay.damus.io',
               okReceived: true,
               broadcastSuccessful: true,
-              msg: '',
             ),
           ]),
         );
@@ -174,8 +174,6 @@ void main() {
           _buildBroadcastResponse(signedEvent, [
             RelayBroadcastResponse(
               relayUrl: 'wss://relay.damus.io',
-              okReceived: false,
-              broadcastSuccessful: false,
               msg: 'blocked',
             ),
           ]),
@@ -228,7 +226,6 @@ void main() {
               relayUrl: 'wss://relay.damus.io',
               okReceived: true,
               broadcastSuccessful: true,
-              msg: '',
             ),
           ]),
         );

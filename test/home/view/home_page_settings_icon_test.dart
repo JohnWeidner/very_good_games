@@ -52,8 +52,8 @@ void main() {
             RepositoryProvider<NostrIdentityRepository>(
               create: (_) {
                 final mock = _MockNostrIdentityRepository();
-                when(() => mock.getPublicKey()).thenAnswer((_) async => null);
-                when(() => mock.hasIdentity()).thenAnswer((_) async => false);
+                when(mock.getPublicKey).thenAnswer((_) async => null);
+                when(mock.hasIdentity).thenAnswer((_) async => false);
                 return mock;
               },
             ),

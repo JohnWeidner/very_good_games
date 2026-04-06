@@ -79,7 +79,6 @@ Future<void> _waitForReady(SignalCubit cubit) async {
   throw StateError('No empty cell found');
 }
 
-
 void main() {
   const seed = 42;
   const dateKey = '2026-04-03';

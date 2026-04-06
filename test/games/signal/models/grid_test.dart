@@ -29,7 +29,7 @@ void main() {
     test('setCell returns new grid with replaced cell', () {
       final grid = Grid(
         size: 2,
-        cells: [Cell.empty, Cell.empty, Cell.empty, Cell.empty],
+        cells: const [Cell.empty, Cell.empty, Cell.empty, Cell.empty],
       );
 
       final updated = grid.setCell(0, 1, Cell.wall);
@@ -61,7 +61,7 @@ void main() {
     test('towerPositions returns empty list when no towers', () {
       final grid = Grid(
         size: 2,
-        cells: [Cell.empty, Cell.wall, Cell.empty, Cell.wall],
+        cells: const [Cell.empty, Cell.wall, Cell.empty, Cell.wall],
       );
 
       expect(grid.towerPositions, isEmpty);

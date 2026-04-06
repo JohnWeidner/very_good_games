@@ -1,4 +1,5 @@
 import 'package:bloc/bloc.dart';
+import 'package:very_good_games/core/daily_seed/date_key.dart';
 import 'package:equatable/equatable.dart';
 import 'package:ndk/ndk.dart';
 import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
@@ -69,13 +70,7 @@ class ResultSharingCubit extends Cubit<ResultSharingState> {
         return;
       }
 
-      final now = DateTime.now().toUtc();
-      final date =
-          '${now.year}-'
-          '${now.month.toString().padLeft(2, '0')}-'
-          '${now.day.toString().padLeft(2, '0')}';
-
-      final event = eventBuilder(pubKeyHex: pubKeyHex, date: date);
+      final event = eventBuilder(pubKeyHex: pubKeyHex, date: utcDateKey());
       final signedEvent = await signer.sign(event);
       final success = await _publishRepository.publish(signedEvent);
 

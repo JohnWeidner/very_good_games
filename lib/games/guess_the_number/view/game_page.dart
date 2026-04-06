@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/games/guess_the_number/cubit/game_cubit.dart';
 import 'package:very_good_games/games/guess_the_number/view/widgets/widgets.dart';
@@ -77,7 +76,6 @@ class _GameView extends StatefulWidget {
 
 class _GameViewState extends State<_GameView> {
   Timer? _timer;
-  static const _seenInstructionsKey = 'guess_the_number_seen_instructions';
 
   @override
   void initState() {
@@ -89,12 +87,14 @@ class _GameViewState extends State<_GameView> {
     _showInstructionsIfFirstTime();
   }
 
-  Future<void> _showInstructionsIfFirstTime() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool(_seenInstructionsKey) ?? false) return;
-    if (!mounted) return;
-    await InstructionsDialog.show(context);
-    await prefs.setBool(_seenInstructionsKey, true);
+  void _showInstructionsIfFirstTime() {
+    final repo = context.read<GameStorageRepository>();
+    if (repo.hasSeenInstructions('guess_the_number')) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await InstructionsDialog.show(context);
+      await repo.markInstructionsSeen('guess_the_number');
+    });
   }
 
   @override
@@ -112,12 +112,9 @@ class _GameViewState extends State<_GameView> {
   }
 
   void _fetchCommunityStats(BuildContext context) {
-    final now = DateTime.now().toUtc();
-    final date =
-        '${now.year}-'
-        '${now.month.toString().padLeft(2, '0')}-'
-        '${now.day.toString().padLeft(2, '0')}';
-    context.read<CommunityStatsCubit>().fetchStats('guess-the-number:$date');
+    context.read<CommunityStatsCubit>().fetchStats(
+      'guess-the-number:${utcDateKey()}',
+    );
   }
 
   /// Returns the set of cell indices for locked parameters,

@@ -43,9 +43,7 @@ void main() {
       expect(find.text('5'), findsOneWidget);
     });
 
-    testWidgets('tower cell shows check icon when satisfied', (
-      tester,
-    ) async {
+    testWidgets('tower cell shows check icon when satisfied', (tester) async {
       await tester.pumpWidget(buildSubject(Cell.tower(4), signalCount: 4));
 
       expect(find.byIcon(Icons.check_circle), findsOneWidget);
@@ -59,9 +57,7 @@ void main() {
       expect(find.byIcon(Icons.warning), findsOneWidget);
     });
 
-    testWidgets('tower cell shows no icon when under target', (
-      tester,
-    ) async {
+    testWidgets('tower cell shows no icon when under target', (tester) async {
       await tester.pumpWidget(buildSubject(Cell.tower(5), signalCount: 1));
 
       expect(find.byIcon(Icons.check_circle), findsNothing);

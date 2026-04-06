@@ -61,7 +61,7 @@ void main() {
     });
 
     testWidgets('shows score and points label', (tester) async {
-      await tester.pumpWidget(buildSubject(winState(score: 400)));
+      await tester.pumpWidget(buildSubject(winState()));
 
       expect(find.text('400'), findsOneWidget);
       expect(find.text('points'), findsOneWidget);
@@ -74,7 +74,7 @@ void main() {
     });
 
     testWidgets('shows star rating', (tester) async {
-      await tester.pumpWidget(buildSubject(winState(score: 400)));
+      await tester.pumpWidget(buildSubject(winState()));
 
       // 400 → 3 stars.
       expect(find.byIcon(Icons.star), findsNWidgets(3));

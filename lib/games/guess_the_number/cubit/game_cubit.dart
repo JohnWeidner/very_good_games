@@ -86,7 +86,6 @@ class GameCubit extends Cubit<GameState> {
       final restoredState = GameState(
         cells: cells,
         targetNumber: targetNumber,
-        status: GameStatus.playing,
         usedQuestionTypes: usedTypes,
         questionCount: session['questionCount'] as int,
         elapsedSeconds: session['elapsedSeconds'] as int,

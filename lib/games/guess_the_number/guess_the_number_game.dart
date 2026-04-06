@@ -6,10 +6,7 @@ import 'package:very_good_games/games/guess_the_number/view/view.dart';
 /// [GameDefinition] for the Guess the Number game.
 class GuessTheNumberGame extends GameDefinition {
   /// Creates a [GuessTheNumberGame].
-  GuessTheNumberGame({required GameStorageRepository storageRepository})
-    : _storageRepository = storageRepository;
-
-  final GameStorageRepository _storageRepository;
+  GuessTheNumberGame({required super.storageRepository});
 
   @override
   String get id => 'guess_the_number';
@@ -37,23 +34,4 @@ class GuessTheNumberGame extends GameDefinition {
       },
     ),
   ];
-
-  @override
-  Future<DailyGameStatus> getDailyStatus(DateTime date) async {
-    final streak = _storageRepository.getStreak(id);
-    if (streak.lastCompletedDate == null) {
-      return DailyGameStatus.notStarted;
-    }
-
-    final lastUtc = streak.lastCompletedDate!.toUtc();
-    final dateUtc = date.toUtc();
-
-    if (lastUtc.year == dateUtc.year &&
-        lastUtc.month == dateUtc.month &&
-        lastUtc.day == dateUtc.day) {
-      return DailyGameStatus.completed;
-    }
-
-    return DailyGameStatus.notStarted;
-  }
 }

@@ -9,6 +9,7 @@ import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/games/guess_the_number/guess_the_number_game.dart';
 import 'package:very_good_games/games/signal/signal_game.dart';
 import 'package:very_good_games/nostr/identity/repository/nostr_identity_repository.dart';
+import 'package:very_good_games/nostr/relay/ndk_provider.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_deletion_repository.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
 import 'package:very_good_games/nostr/stats/repository/community_stats_repository.dart';
@@ -33,9 +34,16 @@ void main() async {
   final nostrIdentityRepository = NostrIdentityRepository(
     secureStorage: secureStorage,
   );
-  final nostrPublishRepository = NostrPublishRepository.lazy();
-  final nostrDeletionRepository = NostrDeletionRepository.lazy();
-  final communityStatsRepository = CommunityStatsRepository.lazy();
+  final ndkProvider = NdkProvider.lazy();
+  final nostrPublishRepository = NostrPublishRepository(
+    ndkProvider: ndkProvider,
+  );
+  final nostrDeletionRepository = NostrDeletionRepository(
+    ndkProvider: ndkProvider,
+  );
+  final communityStatsRepository = CommunityStatsRepository(
+    ndkProvider: ndkProvider,
+  );
 
   runApp(
     App(

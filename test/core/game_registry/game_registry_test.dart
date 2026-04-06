@@ -1,9 +1,21 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:very_good_games/core/game_registry/game_registry.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:very_good_games/core/core.dart';
+
+class _MockGameStorageRepository extends Mock
+    implements GameStorageRepository {}
 
 class _TestGameDefinition extends GameDefinition {
+  _TestGameDefinition() : super(storageRepository: _mockStorage());
+
+  static GameStorageRepository _mockStorage() {
+    final mock = _MockGameStorageRepository();
+    when(() => mock.getStreak(any())).thenReturn(const StreakData());
+    return mock;
+  }
+
   @override
   String get id => 'test_game';
 
@@ -23,11 +35,6 @@ class _TestGameDefinition extends GameDefinition {
   List<RouteBase> get routes => [
     GoRoute(path: routePath, builder: (_, __) => const SizedBox()),
   ];
-
-  @override
-  Future<DailyGameStatus> getDailyStatus(DateTime date) async {
-    return DailyGameStatus.notStarted;
-  }
 }
 
 void main() {
