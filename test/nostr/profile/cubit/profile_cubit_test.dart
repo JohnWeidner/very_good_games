@@ -15,6 +15,7 @@ class _MockNostrSigner extends Mock implements NostrSigner {}
 void main() {
   setUpAll(() {
     registerFallbackValue(_MockNostrSigner());
+    registerFallbackValue(const NostrProfile(pubkey: ''));
   });
 
   group('ProfileCubit', () {
@@ -116,7 +117,7 @@ void main() {
 
     group('publishProfile', () {
       blocTest<ProfileCubit, ProfileState>(
-        'emits [publishing, published] on success',
+        'emits [publishing, published] with optimistic profile on success',
         setUp: () {
           final signer = _MockNostrSigner();
           when(
@@ -126,6 +127,9 @@ void main() {
             () => identityRepository.getPublicKeyHex(),
           ).thenAnswer((_) async => 'abc123');
           when(
+            () => profileRepository.cacheProfile(any()),
+          ).thenAnswer((_) async {});
+          when(
             () => profileRepository.publishProfile(
               signer: any(named: 'signer'),
               pubkeyHex: any(named: 'pubkeyHex'),
@@ -134,9 +138,6 @@ void main() {
               about: any(named: 'about'),
             ),
           ).thenAnswer((_) async => true);
-          when(() => profileRepository.getProfile('abc123')).thenAnswer(
-            (_) async => const NostrProfile(pubkey: 'abc123', name: 'Alice'),
-          );
         },
         build: buildCubit,
         act: (cubit) => cubit.publishProfile(name: 'Alice'),
@@ -146,6 +147,9 @@ void main() {
               .having((s) => s.status, 'status', ProfileStatus.published)
               .having((s) => s.profiles['abc123']?.name, 'name', 'Alice'),
         ],
+        verify: (_) {
+          verify(() => profileRepository.cacheProfile(any())).called(1);
+        },
       );
 
       blocTest<ProfileCubit, ProfileState>(
@@ -171,7 +175,7 @@ void main() {
       );
 
       blocTest<ProfileCubit, ProfileState>(
-        'emits error when publish fails',
+        'concurrent publish guard prevents duplicate publishes',
         setUp: () {
           final signer = _MockNostrSigner();
           when(
@@ -180,6 +184,50 @@ void main() {
           when(
             () => identityRepository.getPublicKeyHex(),
           ).thenAnswer((_) async => 'abc123');
+          when(
+            () => profileRepository.cacheProfile(any()),
+          ).thenAnswer((_) async {});
+          when(
+            () => profileRepository.publishProfile(
+              signer: any(named: 'signer'),
+              pubkeyHex: any(named: 'pubkeyHex'),
+              name: any(named: 'name'),
+              picture: any(named: 'picture'),
+              about: any(named: 'about'),
+            ),
+          ).thenAnswer(
+            (_) async {
+              // Simulate slow publish.
+              await Future<void>.delayed(const Duration(milliseconds: 50));
+              return true;
+            },
+          );
+        },
+        build: buildCubit,
+        act: (cubit) async {
+          // Fire two publishes rapidly — second should be guarded.
+          await cubit.publishProfile(name: 'Alice');
+          await cubit.publishProfile(name: 'Bob');
+        },
+        verify: (_) {
+          // cacheProfile should only be called once (first publish).
+          verify(() => profileRepository.cacheProfile(any())).called(1);
+        },
+      );
+
+      blocTest<ProfileCubit, ProfileState>(
+        'background failure does not emit error state',
+        setUp: () {
+          final signer = _MockNostrSigner();
+          when(
+            () => identityRepository.getSigner(),
+          ).thenAnswer((_) async => signer);
+          when(
+            () => identityRepository.getPublicKeyHex(),
+          ).thenAnswer((_) async => 'abc123');
+          when(
+            () => profileRepository.cacheProfile(any()),
+          ).thenAnswer((_) async {});
           when(
             () => profileRepository.publishProfile(
               signer: any(named: 'signer'),
@@ -194,11 +242,9 @@ void main() {
         act: (cubit) => cubit.publishProfile(name: 'Alice'),
         expect: () => [
           const ProfileState(status: ProfileStatus.publishing),
-          isA<ProfileState>().having(
-            (s) => s.status,
-            'status',
-            ProfileStatus.error,
-          ),
+          isA<ProfileState>()
+              .having((s) => s.status, 'status', ProfileStatus.published)
+              .having((s) => s.profiles['abc123']?.name, 'name', 'Alice'),
         ],
       );
     });

@@ -171,6 +171,12 @@ class NostrProfileRepository {
     }
   }
 
+  /// Caches a profile in the local Drift database.
+  ///
+  /// Used for optimistic updates — caches the profile immediately
+  /// so subsequent reads return the updated values.
+  Future<void> cacheProfile(NostrProfile profile) => _cacheProfile(profile);
+
   /// Deletes the cached profile for [pubkeyHex].
   Future<void> deleteProfile(String pubkeyHex) async {
     await _database.deleteProfile(pubkeyHex);
