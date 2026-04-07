@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// A cell in the Signal grid puzzle.
 sealed class Cell {
   const Cell();
@@ -13,6 +15,7 @@ sealed class Cell {
 }
 
 /// An empty cell that can receive tower signals.
+@immutable
 final class EmptyCell extends Cell {
   const EmptyCell();
 
@@ -27,6 +30,7 @@ final class EmptyCell extends Cell {
 }
 
 /// A wall that blocks tower signals.
+@immutable
 final class WallCell extends Cell {
   const WallCell();
 
@@ -41,6 +45,7 @@ final class WallCell extends Cell {
 }
 
 /// A tower with a [targetCount] of cells it should signal.
+@immutable
 final class Tower extends Cell {
   /// Creates a [Tower] with the given [targetCount].
   const Tower(this.targetCount);

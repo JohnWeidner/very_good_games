@@ -50,9 +50,10 @@ class ResultSharingListener extends StatelessWidget {
   }
 
   Future<void> _launchIdentitySetup(BuildContext context) async {
+    final cubit = context.read<ResultSharingCubit>();
     final completed = await IdentitySetupLauncher.launch(context);
     if (completed) {
-      await context.read<ResultSharingCubit>().publish();
+      await cubit.publish();
     }
   }
 }
