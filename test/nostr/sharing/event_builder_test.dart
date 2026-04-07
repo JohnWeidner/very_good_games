@@ -82,6 +82,70 @@ void main() {
       });
     });
 
+    group('buildChromixResult', () {
+      late Map<String, dynamic> result;
+
+      setUp(() {
+        final event = EventBuilder.buildChromixResult(
+          pubKeyHex: 'abc123',
+          score: 12,
+          stars: 2,
+          moves: 10,
+          undos: 2,
+          date: '2026-04-07',
+        );
+        result = {
+          'kind': event.kind,
+          'pubKey': event.pubKey,
+          'tags': event.tags,
+          'content': event.content,
+        };
+      });
+
+      test('uses kind 30042', () {
+        expect(result['kind'], equals(30042));
+      });
+
+      test('includes d tag with chromix and date', () {
+        final tags = result['tags'] as List<List<String>>;
+        final dTag = tags.firstWhere((t) => t[0] == 'd');
+        expect(dTag[1], equals('chromix:2026-04-07'));
+      });
+
+      test('includes t tags for vgg and chromix', () {
+        final tags = result['tags'] as List<List<String>>;
+        final tTags = tags.where((t) => t[0] == 't').toList();
+        expect(tTags.length, equals(2));
+        expect(tTags[0][1], equals('vgg'));
+        expect(tTags[1][1], equals('chromix'));
+      });
+
+      test('includes NIP-32 labels for score, stars, moves, undos', () {
+        final tags = result['tags'] as List<List<String>>;
+        final labels = tags.where((t) => t[0] == 'l').toList();
+        expect(labels.length, equals(4));
+        expect(labels[0][1], equals('score-12'));
+        expect(labels[1][1], equals('stars-2'));
+        expect(labels[2][1], equals('moves-10'));
+        expect(labels[3][1], equals('undos-2'));
+      });
+
+      test('content includes Chromix game info', () {
+        final content = result['content'] as String;
+        expect(content, contains('Chromix'));
+        expect(content, contains('2 Stars'));
+        expect(content, contains('12 total'));
+        expect(content, contains('10 moves'));
+        expect(content, contains('2 undos'));
+        expect(content, contains('2026-04-07'));
+      });
+
+      test('content includes star emoji', () {
+        final content = result['content'] as String;
+        expect(content, contains('\u2b50\u2b50'));
+      });
+    });
+
     group('buildSignalResult', () {
       late Map<String, dynamic> result;
 

@@ -47,6 +47,40 @@ class EventBuilder {
     );
   }
 
+  /// Builds an unsigned kind 30042 event for a Chromix puzzle result.
+  static Nip01Event buildChromixResult({
+    required String pubKeyHex,
+    required int score,
+    required int stars,
+    required int moves,
+    required int undos,
+    required String date,
+  }) {
+    final starEmoji = '\u2b50' * stars;
+
+    final content =
+        '\ud83c\udfa8 Very Good Games \u2014 Chromix\n'
+        '\ud83c\udfaf $stars Stars \u00b7 $starEmoji\n'
+        '\ud83e\udde9 $score total '
+        '($moves moves, $undos undos)\n\n$date';
+
+    return Nip01Event(
+      pubKey: pubKeyHex,
+      kind: 30042,
+      tags: [
+        ['d', 'chromix:$date'],
+        ['t', 'vgg'],
+        ['t', 'chromix'],
+        ['L', 'games.vgg.score'],
+        ['l', 'score-$score', 'games.vgg.score'],
+        ['l', 'stars-$stars', 'games.vgg.score'],
+        ['l', 'moves-$moves', 'games.vgg.score'],
+        ['l', 'undos-$undos', 'games.vgg.score'],
+      ],
+      content: content,
+    );
+  }
+
   /// Builds an unsigned kind 30042 event for a Signal puzzle result.
   static Nip01Event buildSignalResult({
     required String pubKeyHex,
