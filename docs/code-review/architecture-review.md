@@ -1,9 +1,8 @@
-# Architecture Review: Leaderboard Feature
+# Architecture Review: feat/chromix-contiguity-drag
 
-**Branch**: `main`
-**Date**: 2026-04-06
+**Branch**: `feat/chromix-contiguity-drag` vs `main`
+**Date**: 2026-04-07
 **Reviewer**: Architecture Review Agent
-**Scope**: 8 changed files in `lib/nostr/stats/` for leaderboard feature
 
 ---
 
@@ -11,185 +10,101 @@
 
 ### Layer Separation
 
-**Layers within `lib/nostr/stats/`**:
-- **Models** (`models/`): Data classes -- `LeaderboardEntry`, `Leaderboard`
-- **Repository** (`repository/`): Relay queries and data transformation -- `CommunityStatsRepository`
-- **Cubit** (`cubit/`): State management -- `LeaderboardCubit`, `LeaderboardState`
-- **View** (`view/`): Presentation -- `LeaderboardSection` and private helper widgets
+- Violations found: 0
+- Clean files: all checked files clean
 
-**Import scan results**:
-
-| File | Imports | Status |
-|------|---------|--------|
-| `models/leaderboard.dart` | `equatable`, `ndk` | Clean |
-| `models/models.dart` | (barrel) | Clean |
-| `repository/community_stats_repository.dart` | `ndk`, `nostr/relay/*`, `nostr/stats/models/*` | Clean |
-| `cubit/leaderboard_cubit.dart` | `bloc`, `equatable`, `nostr/identity/repository/*`, `nostr/stats/models/*`, `nostr/stats/repository/*` | Clean |
-| `cubit/leaderboard_state.dart` | (part of cubit) | Clean |
-| `view/leaderboard_section.dart` | `flutter`, `flutter_bloc`, `ndk/shared/nips/nip01/helpers.dart`, `nostr/identity/view/*`, `nostr/stats/cubit/*`, `nostr/stats/models/*` | **Violation** |
-| `view/view.dart` | (barrel) | Clean |
-| `stats.dart` | (barrel) | Clean |
-
-- **Violations found: 1**
-  - `lib/nostr/stats/view/leaderboard_section.dart:3` -- View layer imports `package:ndk/shared/nips/nip01/helpers.dart` directly. The `_LeaderboardTable._isUserEntry()` method (lines 192-203) performs bech32 decoding via `Helpers.decodeBech32()`, which is a data/protocol-layer operation leaking into a presentation widget.
-
-- **Clean files**: All other 7 files have correct layer-respecting imports.
-
-**Recommended fix**: The `Leaderboard` model already provides `containsUser(String userPubKeyHex)` (line 69) and `findUserEntry(String userPubKeyHex)` (line 75) which perform the same hex-to-npub conversion internally. The view's `_isUserEntry` duplicates this logic in reverse (npub-to-hex). Replace it with:
-
-```dart
-bool _isUserEntry(LeaderboardEntry entry) {
-  if (userPubKeyHex == null) return false;
-  return leaderboard.findUserEntry(userPubKeyHex!) == entry;
-}
-```
-
-This eliminates the ndk import from the view entirely and reuses existing model logic.
-
----
+**Analysis**: All changed files respect the project's layer boundaries:
+- `lib/games/chromix/logic/` files import only from `models/` -- no Flutter, no cubit, no view imports.
+- `lib/games/chromix/cubit/` imports from `logic/` and `models/` only (plus `core/` for storage). Does not import from `view/`.
+- `lib/games/chromix/view/` files import from `cubit/`, `models/`, and `theme/` -- all permitted downward dependencies.
+- `lib/core/view/widgets/win_celebration.dart` imports only `package:confetti` and `package:flutter` -- no game-specific dependencies.
 
 ### State Management Assessment
 
-#### LeaderboardCubit: Correct
+**ChromixCubit**: Correct -- with important observations
 
-- Uses `Cubit` with `part of` state file -- follows VGV convention.
-- State class (`LeaderboardState`) extends `Equatable` with all-`final` immutable fields.
-- `copyWith` pattern present on state.
-- Business logic (identity check, relay fetch, error handling) lives in the cubit, not the view.
-- Both `CommunityStatsRepository` and `NostrIdentityRepository` injected via constructor -- testable.
-- Status enum (`LeaderboardStatus`) covers all states: `initial`, `loading`, `loaded`, `unavailable` -- complete state machine.
-- Exception handling wraps relay calls and emits `unavailable` on failure -- correct resilience pattern.
+- Follows VGV Cubit + `part of` state pattern (`chromix_cubit.dart` + `chromix_state.dart`). **Correct**.
+- State is immutable with Equatable, `copyWith` uses `Type? Function()?` wrapper for nullable fields (`dragOrigin`, `dragColor`, `score`). **Correct per project conventions**.
+- Business logic (drag handling, mixing, overpower timer, undo, win detection, contiguity checking) is entirely in the cubit, not in views. **Correct**.
+- Data access goes through `GameStorageRepository` injected via constructor. **Correct**.
+- Naming is descriptive and domain-specific. **Correct**.
 
-#### LeaderboardState: Correct
+**Issues found**:
 
-- All fields are `final` -- immutable.
-- `props` includes all three fields (`status`, `leaderboard`, `hasIdentity`) -- Equatable will detect all changes.
-- Nullable `Leaderboard?` field is appropriate (only present when loaded).
-- Default values are sensible: `status = initial`, `hasIdentity = true`.
+1. **[Important] Duplicated contiguity BFS logic -- 3 copies exist in the cubit**
+   - `chromix_cubit.dart:352-386` -- `_isColorContiguous()` (instance method, used during gameplay)
+   - `chromix_cubit.dart:467-512` -- `_computeContiguityViolation()` (static method, used during deserialization)
+   - `contiguity_checker.dart:7-44` -- `allGroupsContiguous()` (standalone function in logic layer)
 
-#### Minor Observation
+   All three implement the same BFS flood-fill algorithm for checking orthogonal contiguity of same-color cells. The cubit should delegate to `contiguity_checker.dart` instead of reimplementing the algorithm internally. The cubit already imports `logic/logic.dart` and calls `allGroupsContiguous` at line 392 for win checking, but then uses its own private copies for the violation feedback path.
 
-`leaderboard_section.dart:32-37`: The view triggers `fetchLeaderboard` inside `BlocBuilder` using `addPostFrameCallback` when status is `initial`. The `initial` check prevents duplicate fetches on rebuild, which is good. However, triggering data loading from within a builder is borderline. Ideally, the cubit would receive the `dTag` at construction time and fetch automatically. This is a style observation, not a violation.
+   - `lib/games/chromix/cubit/chromix_cubit.dart:352` -- cubit reimplements BFS from `contiguity_checker.dart`
+   - `lib/games/chromix/cubit/chromix_cubit.dart:467` -- cubit reimplements BFS again as static method
 
----
+2. **[Suggestion] `_recomputeContiguity()` could delegate to logic layer**
+   The method at `chromix_cubit.dart:329-349` that checks per-color contiguity when counts match targets is a reusable piece of game logic. It could live in `logic/contiguity_checker.dart` as a pure function (taking grid + target map, returning bool), keeping the cubit thinner and the logic testable in isolation.
+
+**WinCelebration (core widget)**: Correct pattern
+
+- Pure presentation widget with no business logic dependencies. **Correct**.
+- Uses `findAncestorStateOfType` pattern for imperative control (`trigger`/`reset`). This is an acceptable Flutter pattern for animation orchestration, though an alternative would be a dedicated controller object.
 
 ### Dependency Direction
 
-**Direction violations: 0** (excluding the view-layer ndk import covered under Layer Separation)
+- Direction violations: 0
+- Clean dependencies: all packages and modules
 
-```
-stats.dart (barrel)
-  |
-  +---> models/leaderboard.dart
-  |       +---> equatable, ndk (external only)
-  |
-  +---> repository/community_stats_repository.dart
-  |       +---> ndk, nostr/relay/*, models/*
-  |
-  +---> cubit/leaderboard_cubit.dart
-  |       +---> bloc, equatable
-  |       +---> nostr/identity/repository/* (sibling module)
-  |       +---> models/*, repository/*
-  |
-  +---> view/leaderboard_section.dart
-          +---> flutter, flutter_bloc
-          +---> nostr/identity/view/* (sibling module)
-          +---> cubit/*, models/*
-```
-
+**Analysis**:
+- `logic/` depends on `models/` only. No reverse.
+- `cubit/` depends on `logic/` and `models/`. No reverse.
+- `view/` depends on `cubit/`, `models/`, `theme/`. No reverse.
+- `core/view/widgets/` depends on Flutter + `confetti` package only. No game-specific imports.
 - No circular dependencies detected.
-- No reverse dependencies (models do not import cubit, repository does not import view, etc.).
-- Cross-module dependencies (`nostr/identity/`) flow at appropriate layers: cubit imports identity repository, view imports identity view. Both are lateral dependencies within the `nostr/` module, not upward violations.
-
-**Minor note**: The cubit imports `nostr/identity/repository/nostr_identity_repository.dart` directly rather than through the `nostr/identity/identity.dart` barrel file. Per CLAUDE.md conventions ("use barrel files"), the import should be `package:very_good_games/nostr/identity/identity.dart` or the repository's barrel. Not a blocking issue.
-
----
 
 ### Package Structure
 
-#### Barrel Files: Complete
+**lib/core/view/widgets/win_celebration.dart** (NEW):
 
-- `lib/nostr/stats/models/models.dart` -- exports `community_stats.dart` and `leaderboard.dart`.
-- `lib/nostr/stats/view/view.dart` -- exports `leaderboard_section.dart`.
-- `lib/nostr/stats/stats.dart` -- exports cubits, models, and repository.
-- Exports are alphabetically ordered -- matches VGV convention.
+- [x] Correct location in shared `core/view/widgets/`
+- [x] Single clear responsibility (confetti celebration sequence)
+- [x] No game-specific dependencies
+- [ ] **[Important] Not exported via barrel file** -- `lib/core/core.dart` does not export `view/widgets/`. All three game pages (`chromix_page.dart:7`, `game_page.dart:9`, `signal_page.dart:7`) import the file directly as `package:very_good_games/core/view/widgets/win_celebration.dart` instead of through `package:very_good_games/core/core.dart`. Per project conventions ("Imports: use barrel files"), a `widgets.dart` barrel should be created in `lib/core/view/widgets/` and re-exported through `core.dart`.
 
-#### Test Coverage: Complete
+**lib/games/chromix/logic/contiguity_checker.dart** (NEW):
 
-All four layers have corresponding test files:
-- `test/nostr/stats/models/leaderboard_test.dart`
-- `test/nostr/stats/repository/community_stats_repository_test.dart`
-- `test/nostr/stats/cubit/leaderboard_cubit_test.dart`
-- `test/nostr/stats/view/leaderboard_section_test.dart`
+- [x] Correct location in `logic/` layer
+- [x] Pure Dart, no Flutter dependencies
+- [x] Single responsibility (contiguity checking)
+- [x] Exported in `logic/logic.dart` barrel file
 
-#### Single Responsibility: Good
+**lib/games/chromix/view/widgets/widgets.dart** (barrel):
 
-The leaderboard feature extends the existing `lib/nostr/stats/` module rather than creating a new top-level directory. This is correct since it shares the relay infrastructure (`CommunityStatsRepository`) and the same Nostr event type (kind 30042).
+- [x] Exports are alphabetically ordered
+- [x] Deleted `color_palette.dart` is no longer exported
+- [x] All widget files are accounted for
 
-#### Naming: Consistent
+**Duplicate `_colorFor` helper**:
 
-All names are descriptive and follow Dart/VGV conventions: `LeaderboardCubit`, `LeaderboardState`, `LeaderboardStatus`, `LeaderboardEntry`, `Leaderboard`, `LeaderboardSection`.
+- **[Suggestion]** `chromix_cell_widget.dart:98` and `color_bar.dart:97` both define identical `static Color _colorFor(ChromixColor color)` switch expressions mapping `ChromixColor` to `Color`. This could be a single utility in `theme/` (e.g., an extension on `ChromixColor` or a static method on `ChromixColors`), reducing duplication and ensuring color mappings stay in sync.
 
----
+### Cross-Game Consistency
 
-### Additional Observations
+The three game pages (`chromix_page.dart`, `signal_page.dart`, `game_page.dart`) all use the same `WinCelebration` widget and follow the same MultiBlocProvider pattern with identical Nostr-related cubit wiring. This is good consistency, though the amount of identical boilerplate across game pages (ResultSharingCubit, CommunityStatsCubit, LeaderboardCubit, ProfileCubit creation) is a future candidate for extraction into a shared `GamePageShell` widget.
 
-#### Duplicate Deduplication Logic in Repository
+### Summary of Findings
 
-`community_stats_repository.dart` contains identical "deduplicate by pubkey, keeping latest" logic in both `fetchStats` (lines 41-47) and `fetchLeaderboard` (lines 93-99). Extracting a shared private helper would reduce duplication:
-
-```dart
-Map<String, Nip01Event> _deduplicateByPubkey(Iterable<Nip01Event> events) {
-  final byPubkey = <String, Nip01Event>{};
-  for (final event in events) {
-    final existing = byPubkey[event.pubKey];
-    if (existing == null || event.createdAt > existing.createdAt) {
-      byPubkey[event.pubKey] = event;
-    }
-  }
-  return byPubkey;
-}
-```
-
-#### Identity Setup Pattern: Correct
-
-The view correctly uses `IdentitySetupLauncher.launch(context)` as specified in CLAUDE.md conventions. No custom navigation flow is duplicated.
-
----
-
-### Detailed Findings
-
-#### [I-1] View layer imports ndk data package directly
-
-**File**: `lib/nostr/stats/view/leaderboard_section.dart:3`
-**Severity**: Important
-
-The `_LeaderboardTable._isUserEntry()` method imports `package:ndk/shared/nips/nip01/helpers.dart` to call `Helpers.decodeBech32()` for comparing user identity. This is a protocol-level operation that belongs in the model or repository layer. The `Leaderboard` model already provides equivalent methods (`containsUser`, `findUserEntry`) that encapsulate this logic. The view should use those instead.
-
-#### [S-1] Extract deduplication helper in repository
-
-**File**: `lib/nostr/stats/repository/community_stats_repository.dart:41-47, 93-99`
-**Severity**: Suggestion
-
-Identical pubkey deduplication logic is duplicated between `fetchStats` and `fetchLeaderboard`. Extract to a shared private method.
-
-#### [S-2] Use barrel file for identity repository import
-
-**File**: `lib/nostr/stats/cubit/leaderboard_cubit.dart:3`
-**Severity**: Suggestion
-
-Direct file import `nostr/identity/repository/nostr_identity_repository.dart` should use the barrel file per project convention.
-
----
+| # | Severity | Description | Location |
+|---|----------|-------------|----------|
+| 1 | Important | Contiguity BFS logic duplicated 3 times (cubit has 2 private copies of what `contiguity_checker.dart` already provides) | `chromix_cubit.dart:352-386`, `chromix_cubit.dart:467-512` |
+| 2 | Important | `win_celebration.dart` not exported via barrel files; imported directly bypassing `core.dart` | `chromix_page.dart:7`, `game_page.dart:9`, `signal_page.dart:7` |
+| 3 | Suggestion | `_colorFor` helper duplicated in `chromix_cell_widget.dart` and `color_bar.dart` -- extract to `theme/` | `chromix_cell_widget.dart:98`, `color_bar.dart:97` |
+| 4 | Suggestion | Per-color contiguity violation check in cubit could be extracted to `logic/contiguity_checker.dart` as a pure function | `chromix_cubit.dart:329-349` |
+| 5 | Suggestion | MultiBlocProvider boilerplate (5 Nostr cubits) is identical across all 3 game pages -- future extraction candidate | `chromix_page.dart:29-69`, `signal_page.dart:29-64`, `game_page.dart:39-82` |
 
 ### Verdict
 
-**Ready to merge after fixing 1 important issue.**
+**Ready to merge with minor fixes.** Fix 2 important issues before merging:
+1. Eliminate the duplicated BFS implementations in the cubit by delegating to `contiguity_checker.dart`.
+2. Add barrel file exports for `win_celebration.dart` and update imports across all game pages.
 
-| Severity | Count | Summary |
-|----------|-------|---------|
-| Critical | 0 | -- |
-| Important | 1 | View imports ndk data-layer package directly; should use existing `Leaderboard` model methods instead |
-| Suggestion | 2 | Extract deduplication helper in repository; use barrel file for identity repository import |
-
-The leaderboard feature demonstrates clean architecture overall: proper Cubit/state separation with `part of`, Equatable models with immutable fields, constructor-based dependency injection, complete barrel exports, and test files for every layer. The one important issue is a straightforward fix that eliminates a data-layer import from the view by using model methods that already exist.
+No layer separation violations, no dependency direction violations, and state management follows VGV conventions correctly. The suggestions are improvements that can be addressed in a follow-up.

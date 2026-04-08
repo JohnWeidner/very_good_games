@@ -1,7 +1,7 @@
-# Code Simplicity Review: Leaderboard Feature
+# Code Simplicity Review: Chromix Contiguity + Drag Interaction
 
-**Date**: 2026-04-06
-**Scope**: 12 files (6 source, 6 test) -- leaderboard feature implementation
+**Date**: 2026-04-07
+**Scope**: 22 files (12 source, 10 test) -- drag interaction, contiguity constraint, overpower mechanic, win celebration, puzzle generator rewrite
 **Reviewer**: Code Simplicity Agent
 
 ---
@@ -10,90 +10,109 @@
 
 ### Core Purpose
 
-Display a ranked top-10 leaderboard for each daily game by querying Nostr relay events, deduplicating by pubkey, sorting by score, and rendering a simple table. Handle the case where the user has no Nostr identity by prompting for setup.
+Convert Chromix from a tap-to-place interaction to drag-based interaction, add a contiguity constraint (each color must form one connected group), introduce an overpower mechanic (hold after mix to replace with dragged color), add a shared WinCelebration widget with confetti across all games, and rewrite puzzle generation to use forward simulation guaranteeing reachability via drag moves.
 
 ### Unnecessary Complexity Found
 
-#### 1. [Important] `containsUser` and `findUserEntry` are dead code
-**File**: `lib/nostr/stats/models/leaderboard.dart:69-83`
+#### 1. [Critical] Duplicate BFS contiguity logic in three places
 
-Neither `containsUser()` nor `findUserEntry()` is called anywhere in the production codebase outside of the model file itself and its tests. The view widget (`_LeaderboardTable`) does its own user-matching directly via `_isUserEntry()` using `Helpers.decodeBech32`. These two methods perform redundant hex-to-npub conversion via `Nip19.encodePubKey` to search entries, but nothing calls them.
+**Files**: `lib/games/chromix/cubit/chromix_cubit.dart` (lines 352-386, 467-512), `lib/games/chromix/logic/contiguity_checker.dart` (lines 7-43)
 
-**Suggestion**: Remove both methods and their corresponding tests (~20 LOC saved in source, ~25 LOC saved in tests).
+The BFS contiguity check is implemented three separate times:
 
----
+- `_isColorContiguous()` in the cubit (instance method, lines 352-386) -- checks a single color via BFS
+- `_computeContiguityViolation()` in the cubit (static method, lines 467-512) -- iterates target colors and runs inline BFS per color
+- `allGroupsContiguous()` in `contiguity_checker.dart` -- iterates all colors via BFS
 
-#### 2. [Important] Duplicated event-fetching and dedup logic in repository
-**File**: `lib/nostr/stats/repository/community_stats_repository.dart:25-72` and `79-136`
+The cubit's `_recomputeContiguity()` calls `_isColorContiguous()`, then `_checkWinAndPersist()` separately calls `allGroupsContiguous()` from the extracted checker, and `_computeContiguityViolation()` is used during deserialization with yet another inline BFS. This is three implementations of the same core algorithm.
 
-`fetchStats()` and `fetchLeaderboard()` both:
-- Build the same `Filter(kinds: [30042], dTags: [dTag], limit: 100)`
-- Await with the same 5-second timeout
-- Deduplicate by pubkey keeping latest `createdAt` (identical loop, lines 41-47 and 93-99)
-- Call `_extractScore()` on each deduplicated event
-
-The dedup-and-fetch portion is duplicated almost verbatim (~15 lines).
-
-**Suggestion**: Extract a private `_fetchDedupedEvents(String dTag)` method that returns `Map<String, Nip01Event>`. Both public methods call it and then diverge for their specific aggregation. Saves ~15 LOC and removes a maintenance hazard where a fix in one copy gets missed in the other.
+**Suggestion**: The cubit should delegate entirely to `contiguity_checker.dart`. Add a `hasViolationForTargets(ChromixGrid grid, Map<ChromixColor, int> target)` function there. Delete `_isColorContiguous` and `_computeContiguityViolation` from the cubit. Estimated savings: ~80 lines.
 
 ---
 
-#### 3. [Important] `_isUserEntry` in the view decodes bech32 on every row render
-**File**: `lib/nostr/stats/view/leaderboard_section.dart:192-204`
+#### 2. [Important] Blob label centroid computation is over-engineered
 
-`_isUserEntry` calls `Helpers.decodeBech32(entry.npub)` for every row during every build. The conversion direction is also backwards from the model methods: the model converts hex->npub while the view converts npub->hex. Pick one direction and stick to it.
+**File**: `lib/games/chromix/view/widgets/chromix_grid.dart` (lines 115-178)
 
-**Suggestion**: Since entries store npub (bech32), the simplest approach is to convert `userPubKeyHex` to npub once at the top of `_LeaderboardTable.build()` and compare strings directly. This eliminates the try/catch and repeated decode calls:
+`_buildBlobLabel` computes the "most interior cells" by finding cells with the highest same-blob neighbor count, then averages their centroids. On a 4x4 grid with at most 12 non-blocker cells and blobs of at most ~6 cells, this interior-detection algorithm adds 30 lines of logic that produces visually identical results to a simple centroid of all blob cells.
 
+**Suggestion**: Replace with a plain centroid:
 ```dart
-@override
-Widget build(BuildContext context) {
-  final userNpub = userPubKeyHex != null
-      ? Nip19.encodePubKey(userPubKeyHex!)
-      : null;
-  // ...
-  // In the row builder:
-  color: entry.npub == userNpub
-      ? theme.colorScheme.primaryContainer
-      : null,
+var cx = 0.0, cy = 0.0;
+for (final idx in blob.cells) {
+  cx += (idx % size + 0.5) * cellSize;
+  cy += (idx ~/ size + 0.5) * cellSize;
 }
+cx /= blob.cells.length;
+cy /= blob.cells.length;
 ```
-
-This removes the `_isUserEntry` method entirely and the `nip01/helpers.dart` import (~13 LOC).
-
----
-
-#### 4. [Suggestion] `LeaderboardEntry.copyWith` is only used internally for rank assignment
-**File**: `lib/nostr/stats/models/leaderboard.dart:36-48`
-
-`copyWith` on `LeaderboardEntry` is only called in the repository to assign ranks after sorting (line 129 of the repository). No other production code calls it. It copies all four fields for a single-field override.
-
-**Suggestion**: This follows project convention so keeping it is reasonable. However, an alternative is to construct entries with the correct rank inline during the take-and-assign loop, eliminating `copyWith` entirely. Low priority.
+Estimated savings: ~25 lines.
 
 ---
 
-#### 5. [Suggestion] `LeaderboardState.copyWith` cannot clear `leaderboard` to null
-**File**: `lib/nostr/stats/cubit/leaderboard_state.dart:41-51`
+#### 3. [Important] Repeated win-celebration boilerplate across three game pages
 
-The `copyWith` uses `leaderboard ?? this.leaderboard`, which means once a leaderboard is set, it cannot be explicitly cleared back to null. The cubit works around this by constructing new `LeaderboardState(...)` instances directly (lines 43, 47-50, 53, 56 of the cubit). This means `copyWith` is only used once (line 36, for `hasIdentity`), and that single use could construct a new state directly.
+**Files**: `lib/games/chromix/view/chromix_page.dart`, `lib/games/signal/view/signal_page.dart`, `lib/games/guess_the_number/view/game_page.dart`
 
-**Suggestion**: Either use the project's `Type? Function()?` nullable copyWith pattern (documented in CLAUDE.md conventions) for the `leaderboard` field, or remove `copyWith` from `LeaderboardState` entirely since the cubit barely uses it. The simpler option: remove `copyWith` and always construct states directly. Saves ~10 LOC in source and ~33 LOC in tests.
+Each game page has nearly identical code:
+- `_showResults = false` with `addPostFrameCallback` to restore won state on rebuild (~8 lines each)
+- `_onWin` / `_onGameOver` method calling `WinCelebration.of(context)?.trigger(...)` (~8 lines each)
+- Reset handler calling `WinCelebration.of(context)?.reset()` (1 line each)
+- Wrapping `body` with `WinCelebration(child: ...)` (structural change)
 
----
+The pattern is copied three times with only the cubit type and status enum name differing.
 
-#### 6. [Suggestion] `fetchLeaderboard` does not cache (inconsistent with `fetchStats`)
-**File**: `lib/nostr/stats/repository/community_stats_repository.dart:79-136`
-
-`fetchStats` caches results in `_cache`, but `fetchLeaderboard` does not. For a daily leaderboard that changes infrequently, the user pays a relay query (up to 5-second timeout) every time the cubit calls `fetchLeaderboard`.
-
-**Suggestion**: Either add a simple cache (like `fetchStats` has) or add a comment explaining why caching is intentionally omitted for leaderboard.
+**Suggestion**: Either create a `WinCelebrationMixin` that provides `showResults`, `onWin()`, and `resetCelebration()`, or make `WinCelebration` itself manage the `showResults` boolean and expose it via its state (e.g., `WinCelebration.of(context)?.showResults`). Estimated savings: ~40 lines across three files, and easier onboarding when adding future games.
 
 ---
 
-#### 7. [Suggestion] `Leaderboard.isEmpty` is a trivial wrapper
-**File**: `lib/nostr/stats/models/leaderboard.dart:66`
+#### 4. [Important] `_allPrimariesCanGrow` adds ~50 lines of defensive validation
 
-`isEmpty` delegates to `entries.isEmpty`. It is used once in the view. Callers could use `leaderboard.entries.isEmpty` directly without any clarity loss. Minor -- keep for readability if preferred.
+**File**: `lib/games/chromix/logic/puzzle_generator.dart` (new code, `_allPrimariesCanGrow` method)
+
+This method runs a BFS from every primary cell to verify it can reach an empty cell or same-color cell. However, `_simulateMoves` already handles stuck states by returning null (the simulation collects all valid actions and returns null if none exist). The uniqueness solver then rejects unsolvable puzzles. `_allPrimariesCanGrow` is a fail-fast optimization that duplicates what the simulation already guarantees.
+
+**Suggestion**: Try removing `_allPrimariesCanGrow` and rely on `_simulateMoves` returning null for stuck grids. If generation time regresses noticeably (measure it), add it back with a comment explaining the performance justification. Estimated savings: ~50 lines.
+
+---
+
+#### 5. [Important] Trivial fallback puzzle silently serves a degenerate game
+
+**File**: `lib/games/chromix/logic/puzzle_generator.dart` (new code, last-resort in `_generateFallback`)
+
+After 50 fallback attempts, the generator creates a "1-blocker, 15-cell all-red puzzle." This puzzle is unsolvable in any meaningful way and would be a terrible player experience. If this code path is reachable, there is a bug in the generator. Silently serving garbage hides bugs.
+
+**Suggestion**: Replace the trivial fallback with `throw StateError('Puzzle generation failed after all retries')`. In a correctly working generator, this should never trigger. If it does, you want a crash report, not a confused player.
+
+---
+
+#### 6. [Suggestion] Unused `mixedColor` parameter in `_startOverpowerTimer`
+
+**File**: `lib/games/chromix/cubit/chromix_cubit.dart` (line 222)
+
+`_startOverpowerTimer` accepts `ChromixColor mixedColor` but never reads it. This is a leftover from an earlier design.
+
+**Suggestion**: Remove the parameter. Update the call site at line 200.
+
+---
+
+#### 7. [Suggestion] Neighbor-finding helper duplicated in three files
+
+**Files**: `puzzle_generator.dart` (`_neighbors`), `chromix_grid.dart` (`_neighborsOf`), `contiguity_checker.dart` (`_orthogonalNeighbors`)
+
+Three private implementations of identical "get orthogonal neighbors for a grid index" logic.
+
+**Suggestion**: Add a static `ChromixGrid.neighborsOf(int row, int col)` method in the model layer and use it everywhere. Estimated savings: ~20 lines.
+
+---
+
+#### 8. [Suggestion] `CellEdges.all` constant is never used
+
+**File**: `lib/games/chromix/view/widgets/chromix_cell_widget.dart` (lines 18-24)
+
+`CellEdges.all` is defined but never referenced in the codebase. `CellEdges.none` is used as a default parameter value (appropriate), but `.all` is speculative.
+
+**Suggestion**: Remove it. Estimated savings: 6 lines.
 
 ---
 
@@ -101,57 +120,60 @@ The `copyWith` uses `leaderboard ?? this.leaderboard`, which means once a leader
 
 | Location | Reason | LOC |
 |---|---|---|
-| `leaderboard.dart:69-83` | `containsUser` + `findUserEntry` unused in prod | ~15 |
-| `leaderboard_test.dart:111-135` | Tests for dead methods | ~25 |
-| `leaderboard_section.dart:192-204` | `_isUserEntry` method (replace with inline npub comparison) | ~13 |
-
-**Estimated total removable LOC**: ~53 lines (source + test)
-**With optional removals** (state copyWith, entry copyWith): ~96 lines
+| `chromix_cubit.dart:352-386` | `_isColorContiguous` duplicates `contiguity_checker.dart` | ~35 |
+| `chromix_cubit.dart:467-512` | `_computeContiguityViolation` duplicates checker + inline BFS | ~45 |
+| `chromix_cell_widget.dart:18-24` | `CellEdges.all` unused constant | 6 |
+| `chromix_cubit.dart:225` | `mixedColor` param unused | 1 |
+| `puzzle_generator.dart` | `_allPrimariesCanGrow` if simulation handles it | ~50 |
+| Estimated total removable | | ~137 |
 
 ### Simplification Recommendations
 
-1. **Extract shared fetch+dedup logic in repository** (Important)
-   - Current: 15 lines of identical relay-query + dedup code in both `fetchStats` and `fetchLeaderboard`
-   - Proposed: Single `_fetchDedupedEvents(String dTag)` returning `Map<String, Nip01Event>`
-   - Impact: ~15 LOC saved, eliminates copy-paste maintenance risk
+1. **Consolidate contiguity checking into `contiguity_checker.dart`** (Most impactful)
+   - Current: Three separate BFS implementations across two files
+   - Proposed: Single `contiguity_checker.dart` with `allGroupsContiguous()` and `hasViolationForTargets(grid, target)`; cubit delegates to both
+   - Impact: ~80 LOC saved, single source of truth for a core game rule
 
-2. **Remove dead `containsUser`/`findUserEntry` methods** (Important)
-   - Current: Two methods in `Leaderboard` that no production code calls
-   - Proposed: Delete them and their tests
-   - Impact: ~40 LOC removed (source + test), reduced API surface
+2. **Simplify blob label placement**
+   - Current: Interior-cell detection with best-neighbor-count algorithm (~30 lines)
+   - Proposed: Simple centroid of all blob cells (~5 lines)
+   - Impact: ~25 LOC saved, no visual difference on a 4x4 grid
 
-3. **Simplify user-highlight logic in view** (Important)
-   - Current: `_isUserEntry` decodes bech32 per row with try/catch
-   - Proposed: Convert `userPubKeyHex` to npub once, compare strings
-   - Impact: ~13 LOC saved, cleaner code, removes `nip01/helpers.dart` import
+3. **Extract win celebration pattern to reduce cross-game duplication**
+   - Current: ~30 lines of identical boilerplate in each game page
+   - Proposed: Mixin or richer WinCelebration widget that manages showResults state
+   - Impact: ~40 LOC saved across 3 files, easier to add new games
 
-4. **Remove or fix `LeaderboardState.copyWith`** (Suggestion)
-   - Current: `copyWith` used once; cannot null-clear `leaderboard`; violates project's nullable copyWith convention
-   - Proposed: Remove it; construct states directly (cubit already does this for 3 of 4 emits)
-   - Impact: ~10 LOC saved in source, ~33 in tests
+4. **Unify neighbor-finding helpers**
+   - Current: Three private copies of the same function
+   - Proposed: One shared static method on `ChromixGrid`
+   - Impact: ~20 LOC saved
 
 ### YAGNI Violations
 
-1. **`containsUser` and `findUserEntry` on `Leaderboard`**
-   - These methods anticipate future callers that do not exist today.
-   - The view solves user-matching independently.
-   - Remove them; add back if/when a caller needs them.
+1. **`CellEdges.all` constant** -- Defined but never referenced. Speculative convenience.
 
-2. **Full `copyWith` on `LeaderboardEntry`**
-   - Only the `rank` field override is ever used (in the repository's rank-assignment loop).
-   - A four-field `copyWith` anticipates future mutations that do not exist.
-   - Low severity since it follows project convention.
+2. **`_allPrimariesCanGrow` validation in generator** -- Defensive check that duplicates what `_simulateMoves` already handles by returning null. Added complexity without proven performance benefit.
+
+3. **Trivial fallback puzzle** -- A degenerate all-red puzzle is worse than failing loudly. No player should see this; if they do, something is seriously wrong.
 
 ### Additional Observations
 
-- **Test quality is solid**: Good coverage of edge cases (malformed scores, dedup, caching, exception handling, multiple calls). Tests are well-structured with appropriate use of `bloc_test`.
-- **Barrel files are correct**: `models.dart`, `view.dart`, `stats.dart` all export appropriately.
-- **State machine is clean**: The `LeaderboardStatus` enum and state transitions are straightforward.
-- **View widget decomposition is good**: Private widgets for each state (`_IdentitySetupPrompt`, `_LoadingPlaceholder`, `_NoScoresYetMessage`, `_UnavailableMessage`, `_LeaderboardTable`) keep `LeaderboardSection.build` readable.
-- **Triggering fetch via `addPostFrameCallback` in build**: This is a common Flutter pattern but can fire multiple times if the widget rebuilds while still in `initial` state. Consider whether the fetch should be triggered from the parent or via cubit constructor/`BlocProvider.create` instead.
+**Well done aspects of this changeset:**
+- Clean removal of `ColorPalette` (tap-to-select) and its test, replaced with drag semantics
+- The overpower timer mechanic is well-isolated with proper cleanup in `close()`, `endDrag()`, `undo()`, and `resetWithSeed()`
+- Good test coverage for drag interactions, including edge cases (non-adjacent, blocker, secondary, overpower timer, undo of overpower)
+- `WinCelebration` is a reasonable shared widget with clean timer management
+- Session deserialization now validates blocker positions match the generated puzzle, preventing stale data bugs
+- Forward generation strategy is sound and well-documented
+- `_DragAction` / `_ActionType` classes in generator are appropriately scoped as private implementation details
+- CellEdges + blob rendering is a nice visual improvement
+
+**Potential concern:**
+- The overpower tests use `Future<void>.delayed(const Duration(milliseconds: 600))` to wait for the 500ms timer. These are real-time waits in tests. If the timer duration changes, the tests silently become flaky or slow. Consider using `fakeAsync` from `package:clock` to control time in tests.
 
 ### Final Assessment
 
-**Total potential LOC reduction**: ~53-96 lines (~10-15% of reviewed code)
-**Complexity score**: Low -- the code is generally well-structured and follows project conventions
-**Recommended action**: Proceed with simplifications -- focus on the three Important items (extract shared dedup, remove dead methods, simplify user-highlight). The suggestions are lower priority and can be deferred.
+**Total potential LOC reduction**: ~170 lines (~12% of changed code)
+**Complexity score**: Medium
+**Recommended action**: Proceed with simplifications -- the triplicated BFS logic (Critical) should be consolidated before merging. The important items (blob centroid, win-celebration boilerplate, generator defensiveness) are worth addressing but not blockers. Suggestions are polish.

@@ -182,24 +182,27 @@ class _ChromixViewState extends State<_ChromixView> {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      ColorBar(
-                        distribution: state.target,
-                        label: 'Target',
+                      Row(
+                        mainAxisAlignment:
+                            MainAxisAlignment.spaceEvenly,
+                        children: [
+                          BlocBuilder<ChromixCubit, ChromixState>(
+                            buildWhen: (prev, curr) =>
+                                prev.grid != curr.grid,
+                            builder: (context, state) {
+                              return ColorPieChart.fromGrid(
+                                grid: state.grid,
+                                label: 'Current',
+                              );
+                            },
+                          ),
+                          ColorPieChart.fromDistribution(
+                            distribution: state.target,
+                            label: 'Target',
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
-                      BlocBuilder<ChromixCubit, ChromixState>(
-                        buildWhen: (prev, curr) =>
-                            prev.currentDistribution !=
-                            curr.currentDistribution,
-                        builder: (context, state) {
-                          return ColorBar(
-                            distribution:
-                                state.currentDistribution,
-                            label: 'Current',
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 16),
                       const Expanded(child: ChromixGrid()),
                       const SizedBox(height: 12),
                       if (state.hasContiguityViolation)
@@ -259,16 +262,15 @@ class _UndoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
       children: [
-        IconButton(
-          icon: const Icon(Icons.undo),
+        TextButton.icon(
           onPressed: state.moveHistory.isNotEmpty
               ? () => context.read<ChromixCubit>().undo()
               : null,
+          icon: const Icon(Icons.undo),
+          label: const Text('UNDO'),
         ),
-        const SizedBox(width: 8),
         Text(
           '${state.moveCount} moves · '
           '${state.undoCount} undos',

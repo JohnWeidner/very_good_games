@@ -93,6 +93,8 @@ Future<void> _waitForReady(ChromixCubit cubit) async {
 
 void main() {
   const seed = 42;
+  // Seed with adjacent different primaries (for mixing/overpower tests).
+  const mixSeed = 1;
   const dateKey = '2026-04-07';
 
   group('ChromixCubit', () {
@@ -149,7 +151,7 @@ void main() {
 
       blocTest<ChromixCubit, ChromixState>(
         'no-op for secondary cell',
-        build: () => ChromixCubit(dailySeed: seed, dateKey: dateKey),
+        build: () => ChromixCubit(dailySeed: mixSeed, dateKey: dateKey),
         act: (cubit) async {
           await _waitForReady(cubit);
           // First create a secondary by mixing via drag.
@@ -309,7 +311,7 @@ void main() {
     group('overpower', () {
       test('mix then timer fires overpowers to dragged primary',
           () async {
-        final cubit = ChromixCubit(dailySeed: seed, dateKey: dateKey);
+        final cubit = ChromixCubit(dailySeed: mixSeed, dateKey: dateKey);
         await _waitForReady(cubit);
 
         final pair = _adjacentDifferentPrimaries(cubit.state.grid);
@@ -354,7 +356,7 @@ void main() {
       });
 
       test('lifting finger before timer keeps mix result', () async {
-        final cubit = ChromixCubit(dailySeed: seed, dateKey: dateKey);
+        final cubit = ChromixCubit(dailySeed: mixSeed, dateKey: dateKey);
         await _waitForReady(cubit);
 
         final pair = _adjacentDifferentPrimaries(cubit.state.grid);
@@ -391,7 +393,7 @@ void main() {
 
       test('overpower undo restores mix then restores original',
           () async {
-        final cubit = ChromixCubit(dailySeed: seed, dateKey: dateKey);
+        final cubit = ChromixCubit(dailySeed: mixSeed, dateKey: dateKey);
         await _waitForReady(cubit);
 
         final pair = _adjacentDifferentPrimaries(cubit.state.grid);
@@ -436,7 +438,7 @@ void main() {
       });
 
       test('drag onto secondary cell is no-op (locked)', () async {
-        final cubit = ChromixCubit(dailySeed: seed, dateKey: dateKey);
+        final cubit = ChromixCubit(dailySeed: mixSeed, dateKey: dateKey);
         await _waitForReady(cubit);
 
         // Create a secondary by mixing two adjacent primaries.

@@ -1,112 +1,80 @@
-## VGV Code Review -- Leaderboard Feature
+## VGV Code Review -- Chromix Contiguity Drag Interaction
 
 ### Summary
 
-The leaderboard feature is well-structured and follows VGV conventions closely: proper layer separation (models / repository / cubit / view), Equatable models, `part of` state files, barrel exports, and comprehensive test coverage with `bloc_test` and `mocktail`. The code is clean and readable. There are a few issues that should be addressed before merge -- a bare `catch` that will fail the linter, an unhandled exception path in the cubit that can crash the app, a `copyWith` that cannot clear a nullable field (violating the project's documented convention), and duplicated relay query logic in the repository. Test coverage is solid overall but has gaps around positive-path tests for user lookup methods and the user-highlighting widget test asserts nothing meaningful. Overall assessment: **needs work** -- the three critical issues should be addressed before merging.
+This branch adds contiguity constraint enforcement and drag-based interaction to the Chromix game, replacing the old tap-to-select color palette with a drag-from-primary mechanic. It also extracts a shared `WinCelebration` widget to `lib/core/view/widgets/` and updates Signal and Guess the Number pages to use it. The code is generally well-structured and follows VGV conventions for Bloc/Cubit state management with `part of` state files, Equatable models, and barrel exports. The contiguity checker logic and puzzle solver updates are solid. However, there are several issues that should be addressed before merging: duplicated BFS logic across three locations in the cubit, a new shared widget that bypasses the barrel file and lacks tests, cubit tests with silent-skip guards that can mask regressions, and the win detection test that does not actually test winning. Overall assessment: **needs work** -- the critical issues should be addressed before merging.
 
 ### Critical -- Must Fix Before Merge
 
-- **lib/nostr/stats/view/leaderboard_section.dart:200** -- Bare `catch (e)` instead of `on Exception catch`
-  - Why: `very_good_analysis` enforces `avoid_catches_without_on_clauses`. A bare `catch` catches `Error` types (assertion errors, stack overflows) which should propagate, not be silently swallowed. This will fail the linter.
-  - Fix: Change `} catch (e) {` to `} on Exception catch (_) {` (the exception variable is unused anyway).
+- **lib/core/view/widgets/win_celebration.dart** -- Not exported from any barrel file; imported via direct path.
+  - Why: The project conventions state "Imports: use barrel files; never import across layer boundaries." All three consumers (`chromix_page.dart`, `signal_page.dart`, `game_page.dart`) import `win_celebration.dart` directly via `package:very_good_games/core/view/widgets/win_celebration.dart` instead of through `core.dart`. The `lib/core/core.dart` barrel does not export this widget, so it is invisible to consumers following barrel-file conventions.
+  - Fix: Add `export 'view/widgets/win_celebration.dart';` to `lib/core/core.dart`. Update all three game page imports to use `package:very_good_games/core/core.dart`.
 
-- **lib/nostr/stats/cubit/leaderboard_cubit.dart:32** -- Identity check exception is unhandled, will crash the app
-  - Why: The comment says "let exceptions bubble up as critical failures," but unhandled exceptions in a Cubit method invoked from `addPostFrameCallback` surface as uncaught async errors, potentially crashing the app. The cubit test at line 148 confirms this -- the exception propagates unhandled. The existing `CommunityStatsCubit` does not have this pattern; it wraps all async work. An exception from `SharedPreferences` or `FlutterSecureStorage` is a plausible runtime failure, not a "critical" failure worth crashing over.
-  - Fix: Wrap the `hasIdentity` call in the same try/catch block as the fetch, or emit an error/unavailable state on failure. At minimum, catch `Exception` and emit `unavailable` so the UI degrades gracefully instead of crashing:
-    ```dart
-    Future<void> fetchLeaderboard(String dTag) async {
-      try {
-        final hasIdentity = await _identityRepository.hasIdentity();
-        if (!hasIdentity) {
-          emit(state.copyWith(hasIdentity: false));
-          return;
-        }
-        emit(const LeaderboardState(status: LeaderboardStatus.loading));
-        final leaderboard = await _statsRepository.fetchLeaderboard(dTag);
-        // ... rest of logic
-      } on Exception {
-        emit(const LeaderboardState(status: LeaderboardStatus.unavailable));
-      }
-    }
-    ```
+- **lib/core/view/widgets/win_celebration.dart** -- No unit or widget tests for a new shared widget.
+  - Why: This widget is used by all three game pages (Chromix, Signal, Guess the Number). It manages timers, confetti controllers, and callback sequencing. A bug here breaks every game's win experience. No `test/core/view/widgets/win_celebration_test.dart` exists. Untested shared infrastructure is a liability -- this is the VGV standard: "Untested code is unfinished code."
+  - Fix: Add `test/core/view/widgets/win_celebration_test.dart` covering: `trigger` fires confetti after 200ms delay, results callback fires after ~1.2s, `reset` cancels timers and hides confetti, `dispose` cleans up timers, `of()` returns state from ancestor.
 
-- **lib/nostr/stats/cubit/leaderboard_state.dart:41-50** -- `copyWith` cannot set `leaderboard` back to `null`
-  - Why: Because `leaderboard` is nullable and `copyWith` uses `??`, once a leaderboard is loaded, calling `copyWith(status: LeaderboardStatus.loading)` preserves the stale leaderboard object. The cubit works around this by constructing new `LeaderboardState(...)` instances directly (lines 43, 47, 53, 57), which is inconsistent with how `CommunityStatsCubit` uses `state.copyWith(...)`. More importantly, if future code calls `copyWith` expecting to reset to null, it silently keeps stale data. The project's CLAUDE.md explicitly documents the convention: "use `Type? Function()?` wrapper for nullable fields that need explicit null-setting."
-  - Fix:
-    ```dart
-    LeaderboardState copyWith({
-      LeaderboardStatus? status,
-      Leaderboard? Function()? leaderboard,
-      bool? hasIdentity,
-    }) {
-      return LeaderboardState(
-        status: status ?? this.status,
-        leaderboard: leaderboard != null ? leaderboard() : this.leaderboard,
-        hasIdentity: hasIdentity ?? this.hasIdentity,
-      );
-    }
-    ```
-    Then update the cubit to use `state.copyWith(...)` consistently instead of constructing new instances. This aligns with the project's established pattern.
+- **lib/games/chromix/cubit/chromix_cubit.dart:352-386 and :467-512** -- Duplicated BFS contiguity logic in three places.
+  - Why: The `_isColorContiguous` instance method (line 352), the static `_computeContiguityViolation` method (line 467), and the standalone `allGroupsContiguous` function in `contiguity_checker.dart` all implement the same BFS flood-fill algorithm for checking color group connectivity. Three copies of the same algorithm is a maintenance hazard -- a bug fix in one will be missed in the others.
+  - Fix: Extract a `bool isColorGroupContiguous(ChromixGrid grid, ChromixColor color)` function to `contiguity_checker.dart`. Replace `_isColorContiguous` and the inline BFS in `_computeContiguityViolation` with calls to this function. The cubit should delegate contiguity checking entirely to the logic layer.
 
 ### Important -- Should Fix
 
-- **lib/nostr/stats/repository/community_stats_repository.dart:79-136** -- Duplicated relay query and deduplication logic between `fetchStats` and `fetchLeaderboard`
-  - Why: Both methods query kind 30042 events with the same filter, deduplicate by pubkey keeping latest `createdAt`, and extract scores via `_extractScore`. The query + dedup + score extraction logic is repeated almost verbatim (~30 lines). A bug fix in one method could easily be missed in the other. For example, if the deduplication strategy changes or a new NIP-32 label format is added, both methods must be updated in lockstep.
-  - Fix: Extract a private method like `Future<Map<String, Nip01Event>?> _fetchDedupedEvents(String dTag)` that handles the query, timeout, and deduplication. Both `fetchStats` and `fetchLeaderboard` call it and then do their own aggregation.
+- **test/games/chromix/cubit/chromix_cubit_test.dart** -- Multiple tests silently skip when preconditions are not met.
+  - Why: Tests like `startDrag no-op for secondary cell` (line 160), all three overpower tests (lines 319, 362, 450), and `immediate overpower on secondary cell` have `if (pair == null) return;` guards that silently skip the entire test body. If the puzzle generator changes and these preconditions are never met for seed 42, the tests pass while testing nothing. This is a false-confidence anti-pattern.
+  - Fix: Either use `fail('Expected to find adjacent different primaries for seed $seed')` to catch when preconditions are not met, or use a known seed that guarantees the precondition, or construct a cubit with a known grid state directly by mocking/injecting the generated result.
 
-- **lib/nostr/stats/stats.dart** -- Missing `view/view.dart` export from barrel file
-  - Why: The barrel file exports cubit, models, and repository, but does not export `view/view.dart`. Currently nothing imports `LeaderboardSection` via the barrel, which means consumers must use a direct file import. VGV convention is that barrel files export the public API for a directory. The existing `CommunityStatsSection` view (if one exists) should also be exported from this barrel or from a view barrel.
-  - Fix: Add `export 'view/view.dart';` to `lib/nostr/stats/stats.dart`.
+- **test/games/chromix/cubit/chromix_cubit_test.dart:547-575** -- Win detection test does not actually test winning.
+  - Why: The test is named "emits won when grid matches target and is contiguous" but never drives the cubit to a won state. It does a single move and asserts `status == playing`. The actual `ChromixStatus.won` transition is never tested anywhere in the cubit test file.
+  - Fix: Construct a nearly-complete grid (e.g., all cells filled except one, with distribution one short of target) and perform the final move to verify the transition to `ChromixStatus.won` and that `score` is computed. Alternatively, rename the test to reflect what it actually tests.
 
-- **lib/nostr/stats/view/leaderboard_section.dart:32-38** -- Side effect (data fetch) triggered inside `BlocBuilder.builder`
-  - Why: Triggering `fetchLeaderboard` from inside `BlocBuilder.builder` using `addPostFrameCallback` is fragile. It runs on every rebuild where `status == initial`, and relies on `context.mounted` to guard against stale context. This mixes presentation concerns with data fetching. The builder should be pure -- it should only render state, not trigger state changes.
-  - Fix: Move the `fetchLeaderboard` call to the point where the cubit is created. If the cubit is provided via `BlocProvider(create: ...)`, the create callback can trigger the fetch. Alternatively, convert to a `StatefulWidget` and call `fetchLeaderboard` in `initState`. This keeps the builder pure and ensures the fetch happens exactly once.
+- **test/games/chromix/cubit/chromix_cubit_test.dart:577-587** -- Contiguity violation test is trivial.
+  - Why: The `hasContiguityViolation` group contains only one test that checks the initial state is `false`. It never tests the case where a violation IS present or that it toggles back to `false` after an undo. The test name "recomputed after move and undo" does not match the test body.
+  - Fix: Add a test that constructs a state where a color at its target count is non-contiguous, verifies `hasContiguityViolation` is true, then performs an undo or correction and verifies it toggles back to false.
 
-- **lib/nostr/stats/repository/community_stats_repository.dart:79-136** -- `fetchLeaderboard` does not use the cache
-  - Why: `fetchStats` caches results in `_cache`, but `fetchLeaderboard` always hits the relay. If both are called for the same `dTag`, the same relay query runs twice. Repeated calls to `fetchLeaderboard` (e.g., on widget rebuild or cubit re-creation) also re-fetch every time.
-  - Fix: Either share a common event cache between both methods, or add a separate `_leaderboardCache` for `fetchLeaderboard`. At minimum, document why caching is intentionally omitted for leaderboard if freshness is required.
+- **lib/games/chromix/view/chromix_page.dart** -- No page-level widget test.
+  - Why: `ChromixPage` orchestrates 5 BlocProviders, win celebration, result overlay toggling, streak persistence, instructions dialog, and debug shuffle. This is the integration point for the entire Chromix feature with zero test coverage. While the individual widgets have tests, the page-level wiring is untested.
+  - Fix: Add `test/games/chromix/view/chromix_page_test.dart` covering at minimum: renders loading state, renders grid after loading, shows contiguity violation message, undo button disabled when history empty, results overlay appears on win.
 
-- **test/nostr/stats/models/leaderboard_test.dart** -- Missing positive-path tests for `containsUser` and `findUserEntry`
-  - Why: Both methods are only tested with a non-matching pubkey (negative case). There is no test verifying that `containsUser` returns `true` or that `findUserEntry` returns the correct entry when the user IS in the leaderboard. These are the primary use cases for the methods. Testing only the "not found" path gives false confidence.
-  - Fix: Add tests using `Nip19.encodePubKey(hexKey)` to construct an npub that matches an entry, then verify `containsUser` returns `true` and `findUserEntry` returns the expected `LeaderboardEntry`.
+- **lib/games/chromix/cubit/chromix_cubit.dart:59** -- Bare `on Object` catch without explanation.
+  - Why: Catching `Object` is extremely broad and can swallow programming errors (assertion errors, type errors). The CLAUDE.md notes the only pre-existing `avoid_catching_errors` hint is in the identity cubit (which is intentional). This catch silently clears the session and falls through to generate a new puzzle, which could mask real deserialization bugs during development.
+  - Fix: Narrow the catch to specific expected types (e.g., `on FormatException` or `on TypeError`), or add an explicit comment explaining why `Object` is necessary and add the appropriate lint ignore annotation.
 
-- **test/nostr/stats/view/leaderboard_section_test.dart:140-176** -- User highlight test does not actually verify highlighting
-  - Why: The test comment says "Verify the highlighted row has the primaryContainer color" but then only checks `expect(find.text('100'), findsOneWidget)`. It does not assert that any `BoxDecoration` has the `primaryContainer` color. The test passes regardless of whether highlighting works -- it is testing that the entry renders, not that it is highlighted.
-  - Fix: Find the `TableRow` with the user's entry and verify its `BoxDecoration.color` matches `Theme.of(context).colorScheme.primaryContainer`. For example:
-    ```dart
-    final table = tester.widget<Table>(find.byType(Table));
-    final userRow = table.children[1]; // First data row
-    final decoration = userRow.decoration as BoxDecoration?;
-    expect(decoration?.color, isNotNull);
-    ```
+- **lib/games/chromix/view/widgets/chromix_grid.dart:6** -- Direct import of `chromix_cell_widget.dart` instead of barrel.
+  - Why: Convention is to import via barrel files. The grid widget imports `chromix_cell_widget.dart` directly rather than through the `widgets.dart` barrel.
+  - Fix: Change to `import 'package:very_good_games/games/chromix/view/widgets/widgets.dart';` or accept this as an intra-directory import (depending on team convention for sibling files).
 
 ### Suggestions -- Nice to Have
 
-- **lib/nostr/stats/models/leaderboard.dart:69-83** -- `containsUser` and `findUserEntry` both encode hex to npub on every call
-  - Suggestion: These two methods both call `Nip19.encodePubKey(userPubKeyHex)` which involves bech32 encoding. If called in sequence (check then get entry), the encoding runs twice. Consider having `containsUser` delegate to `findUserEntry != null`, or combining into a single method.
+- **lib/games/chromix/view/widgets/color_bar.dart:97-104 and chromix_cell_widget.dart:98-105** -- Duplicated `_colorFor` mapping.
+  - Suggestion: Both files contain identical `ChromixColor -> Color` switch statements. Extract a shared `ChromixColor` extension method or a utility function in the theme package to avoid maintaining two identical mappings.
 
-- **lib/nostr/stats/view/leaderboard_section.dart:192-204** -- `_isUserEntry` decodes bech32 on every row during every rebuild
-  - Suggestion: The method calls `Helpers.decodeBech32(entry.npub)` for every table row. For a 10-entry leaderboard this is minor, but it would be cleaner to encode `userPubKeyHex` to npub once in the `build` method and compare strings directly, avoiding repeated bech32 decoding and the need for a try/catch.
+- **lib/games/chromix/cubit/chromix_cubit.dart:45** -- `await Future<void>.delayed(Duration.zero)` as initialization pattern.
+  - Suggestion: Using `Future.delayed(Duration.zero)` to defer initialization works but makes the code harder to reason about. Consider documenting why this pattern is necessary (presumably to let the constructor complete before emitting via `compute`), or using a factory method that returns `Future<ChromixCubit>`.
 
-- **test/nostr/stats/repository/community_stats_repository_test.dart:24-39 and 214-229** -- `makeEvent` helper is duplicated between the two test groups
-  - Suggestion: Extract `makeEvent` to a shared helper at the top of the file with a `dTag` parameter. Both groups define nearly identical helpers with only the default `dTag` value differing.
+- **lib/games/chromix/cubit/chromix_cubit.dart:300** -- `List<MoveRecord>.of(state.moveHistory)` for undo creates mutable copy.
+  - Suggestion: This creates a mutable copy just to call `removeLast()`. Consider `state.moveHistory.sublist(0, state.moveHistory.length - 1)` and `state.moveHistory.last` to keep everything immutable.
 
-- **test/nostr/stats/view/leaderboard_section_test.dart** -- Missing test for identity setup button tap behavior
-  - Suggestion: The test verifies the button renders but does not tap it to verify `IdentitySetupLauncher.launch` is called. A test that taps the "Set Up Identity" button and verifies the navigation/launcher behavior would increase confidence in the integration.
+- **lib/games/chromix/logic/puzzle_generator.dart:423-436** -- Last-resort fallback generates a trivial all-red puzzle.
+  - Suggestion: Good defensive programming. Consider logging when the fallback is hit so it can be investigated -- a trivial puzzle is a bad user experience.
 
-- **lib/nostr/stats/repository/community_stats_repository.dart:119-124** -- Sort comparator is correct but could benefit from a comment about tie-breaking rationale
-  - Suggestion: The sort uses `createdAt ASC` for tie-breaking (earlier submission wins). This is a reasonable and fair policy, but it is a product decision embedded in code. A brief comment like `// Ties broken by earliest submission (rewards speed)` makes the intent explicit.
+- **lib/games/chromix/cubit/chromix_state.dart:33-44** -- `ChromixState.loading()` allocates a new grid every time.
+  - Suggestion: The loading factory constructor creates `List.filled(16, const EmptyCell())` on every call. Consider a `static final` constant for the loading grid.
+
+- **test/games/chromix/cubit/chromix_cubit_test.dart:697-718** -- `_RealStorageHelper` uses `noSuchMethod` fallback.
+  - Suggestion: This partial implementation silently returns null for any unimplemented method via `noSuchMethod`. If `GameStorageRepository` adds a new method that `ChromixCubit` calls, the test will silently do nothing instead of failing. Consider implementing all required methods explicitly.
+
+- **lib/games/chromix/view/chromix_page.dart:191-202** -- Nested `BlocBuilder` inside `BlocConsumer` builder.
+  - Suggestion: There is a `BlocBuilder<ChromixCubit, ChromixState>` nested inside the `BlocConsumer<ChromixCubit, ChromixState>` builder for the "Current" color bar. The outer builder already provides the state. Consider using `buildWhen` on the outer `BlocConsumer` or selecting only what the Current bar needs via `BlocSelector` to avoid the nesting.
 
 ### Simplicity Assessment
-
-- Lines that could be removed: ~25 (by extracting shared relay query logic in the repository)
-- Unnecessary abstractions: None -- the layer separation (model / repository / cubit / view) is appropriate for this feature's complexity
-- YAGNI violations: None identified -- `copyWith`, `containsUser`, and `findUserEntry` all have clear immediate use cases in the view layer
-- Complexity verdict: Minor tweaks needed -- the duplicated relay logic in the repository is the main simplification opportunity
+- Lines that could be removed: ~80 (duplicated BFS in cubit could be replaced with calls to `contiguity_checker.dart`)
+- Unnecessary abstractions: None identified -- the layer separation is appropriate for the feature's complexity.
+- YAGNI violations: None -- the contiguity checker, drag interaction, overpower timer, and win celebration are all required by the feature spec.
+- Complexity verdict: Minor tweaks needed -- the main simplification is deduplicating the three copies of BFS contiguity logic into the logic layer.
 
 ### Testing Assessment
-
-- New code with tests: Partial -- all new files have corresponding test files, but positive-path tests for `containsUser`/`findUserEntry` are missing, and the highlight widget test asserts nothing meaningful
-- Test quality: Meaningful -- tests cover success, failure, edge cases (malformed scores, dedup, caching verification), and state transitions including sequential fetches and exception propagation
-- State management test coverage: Complete -- all cubit states and transitions tested including identity-absent, success, null-result, exception, and sequential-fetch paths
-- UI component test coverage: Partial -- all visual states tested (identity prompt, loading, empty, loaded, unavailable), but user highlight assertion is a no-op and identity setup button tap is not tested
+- New code with tests: Partial -- Missing for: `WinCelebration` widget (shared, new), `ChromixPage` (page-level integration), win state transition in cubit, contiguity violation positive case.
+- Test quality: Mostly meaningful -- logic tests (contiguity checker, puzzle generator, puzzle solver) are thorough with good edge cases. Cubit tests cover key interactions but have silent-skip guards that could mask regressions, and the win detection test does not actually test winning.
+- State management test coverage: Partial -- drag, undo, persistence, and overpower are well-tested. Win transition and contiguity violation toggle are undertested.
+- UI component test coverage: Partial -- cell widget, grid, instructions dialog, and color bar are tested. Page-level integration is missing. Results overlay has a separate test file (not in diff but exists).

@@ -166,6 +166,8 @@ class ChromixCubit extends Cubit<ChromixState> {
         grid: newGrid,
         moveCount: state.moveCount + 1,
         moveHistory: [...state.moveHistory, record],
+        dragOrigin: () => null,
+        dragColor: () => null,
       ),
     );
 
@@ -199,6 +201,8 @@ class ChromixCubit extends Cubit<ChromixState> {
           grid: newGrid,
           moveCount: state.moveCount + 1,
           moveHistory: [...state.moveHistory, record],
+          dragOrigin: () => null,
+          dragColor: () => null,
         ),
       );
 
@@ -221,6 +225,8 @@ class ChromixCubit extends Cubit<ChromixState> {
           grid: newGrid,
           moveCount: state.moveCount + 1,
           moveHistory: [...state.moveHistory, record],
+          dragOrigin: () => null,
+          dragColor: () => null,
         ),
       );
 

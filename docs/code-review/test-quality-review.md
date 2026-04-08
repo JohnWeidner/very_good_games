@@ -1,117 +1,188 @@
-# Test Quality Review
+# Test Quality Review: feat/chromix-contiguity-drag
 
-**Branch**: `main` (leaderboard feature)
-**Date**: 2026-04-06
-**Reviewer**: Claude (automated)
+**Date**: 2026-04-07
+**Branch**: `feat/chromix-contiguity-drag` vs `main`
+**Reviewer**: Automated Test Quality Agent
 **Stack**: Flutter, flutter_bloc, bloc_test, mocktail, very_good_analysis
 
 ---
 
 ## Coverage Summary
 
-- **Test run**: Pass (46/46 tests green in `test/nostr/stats/`)
-- **Coverage**: Not measured (no `--coverage` flag; see Recommendation 7)
-- **Files with tests**: 5/5 (all implementation files have corresponding test files)
-- **Missing test files**: None
+- **Test run**: Pass (125/125 chromix tests green)
+- **Files with tests**: 10/13 changed source files have corresponding tests
+- **Missing test files**:
+  - `lib/core/view/widgets/win_celebration.dart` (NEW) -- No corresponding test file
+  - `lib/games/chromix/view/chromix_page.dart` -- No corresponding test file
 
-| Implementation file | Test file | Status |
-|---|---|---|
-| `lib/nostr/stats/models/leaderboard.dart` | `test/nostr/stats/models/leaderboard_test.dart` | Present |
-| `lib/nostr/stats/repository/community_stats_repository.dart` | `test/nostr/stats/repository/community_stats_repository_test.dart` | Present |
-| `lib/nostr/stats/cubit/leaderboard_cubit.dart` | `test/nostr/stats/cubit/leaderboard_cubit_test.dart` | Present |
-| `lib/nostr/stats/cubit/leaderboard_state.dart` | Tested inside `leaderboard_cubit_test.dart` | Covered |
-| `lib/nostr/stats/view/leaderboard_section.dart` | `test/nostr/stats/view/leaderboard_section_test.dart` | Present |
+### Deleted Files
 
----
+- `lib/games/chromix/view/widgets/color_palette.dart` and its test `test/games/chromix/view/widgets/color_palette_test.dart` were properly deleted together. No orphaned tests.
 
-## Data Model Test Quality
+### Non-Chromix Changed Files (Low Risk)
 
-### `leaderboard_test.dart`: Issues found
-
-**LeaderboardEntry group**: Good coverage of `displayName` truncation (long and short npub), `copyWith` (partial override and no-op), and Equatable equality/inequality. Well structured.
-
-**Leaderboard group**: Covers `isEmpty` (both paths), equality, and `props`. However:
-
-- **[Important] `containsUser` only tests the negative case.** There is no test where the hex pubkey actually matches an entry's npub. The positive path -- which exercises the `Nip19.encodePubKey` conversion -- is completely untested.
-
-- **[Important] `findUserEntry` only tests the negative case.** Same gap: no test verifies that a matching hex pubkey returns the correct `LeaderboardEntry`.
-
-- **[Suggestion] `displayName` boundary at exactly length 12.** The `_truncateNpub` implementation uses `npub.length < 12` as the threshold. There is a test for a short string (length 5) and a long string, but no test for the boundary value (length 11 vs 12) to confirm where truncation kicks in.
-
----
-
-## Repository Test Quality
-
-### `community_stats_repository_test.dart`: Issues found
-
-**`fetchStats` group**: Excellent. Covers happy path, deduplication by pubkey, empty events, exceptions, malformed score labels, and caching with `verify(...).called(1)`.
-
-**`fetchLeaderboard` group**: Good coverage of happy path (sorted DESC), null on empty events, null on exception, and null when all scores are invalid. However:
-
-- **[Important] No test for deduplication by pubkey in `fetchLeaderboard`.** The `fetchStats` group tests deduplication, but `fetchLeaderboard` has its own independent deduplication loop. A bug could be introduced in the leaderboard-specific dedup code without any test catching it.
-
-- **[Important] No test for tie-breaking by `createdAt` ASC.** The sort comparator has two branches -- score DESC and createdAt ASC for ties. Only score DESC is tested. Two entries with the same score but different `createdAt` values should be tested to verify the earlier submission ranks higher.
-
-- **[Important] No test for the `limit` parameter.** `fetchLeaderboard` accepts `{int limit = 10}`. No test verifies that passing a custom limit (e.g., `limit: 2`) truncates the result, nor that the default of 10 works correctly with more than 10 entries.
-
-- **[Suggestion] `makeEvent` helper is duplicated.** The same `makeEvent` factory exists in both the `fetchStats` and `fetchLeaderboard` groups. Extract it to a top-level helper within the test file.
+- `lib/games/guess_the_number/view/game_page.dart` -- Changed to integrate `WinCelebration`. Additive UI wiring only.
+- `lib/games/signal/view/signal_page.dart` -- Same `WinCelebration` integration. Same assessment.
 
 ---
 
 ## State Management Test Quality
 
-### `leaderboard_cubit_test.dart`: Pass (minor suggestions)
+### chromix_cubit_test.dart: Issues Found
 
-- Uses `bloc_test` correctly throughout -- VGV convention.
-- Uses `mocktail` for `CommunityStatsRepository` and `NostrIdentityRepository` -- VGV convention.
-- Mocks are created in `setUp` -- VGV convention.
-- Tests cover: initial state, no-identity path, loading->loaded, loading->unavailable (null return), exception handling, identity check exception bubbling, and multiple sequential calls.
-- Test names are descriptive and read like specifications.
+**Strengths**:
+- Uses `bloc_test` with `blocTest` for most state transitions (VGV convention).
+- Uses `mocktail` for `GameStorageRepository` mocking.
+- Good coverage of drag lifecycle: startDrag, dragTo, endDrag.
+- Overpower timer tests cover mix-then-timeout, cancel-on-lift, and undo-restores-mix-then-original.
+- Persistence round-trip test with `_RealStorageHelper` is well-designed.
+- Corrupted session graceful recovery is tested.
 
-- **[Suggestion]** The "handles identity check exception gracefully" test name says "gracefully" but the test expects the exception to bubble up (`errors: () => [isA<Exception>()]`). The name is slightly misleading -- it is testing that exceptions propagate, which is intentional per the cubit comment "let exceptions bubble up as critical failures". Consider renaming to "propagates identity check exception as unhandled error".
+**Issues**:
 
-### `LeaderboardState` (tested in cubit test file): Pass
+1. **[Critical] Win detection test does not actually verify the won state** (line 548-575).
+   The test titled "emits won when grid matches target and is contiguous" does not drive the cubit to a won state. It verifies the solver confirms uniqueness and that a single drag produces `playing` status -- but never tests the `ChromixStatus.won` transition. This is the most critical state transition in the game and it has no direct test. The `score` field being set on win, and `stars` computed from score, are also untested.
+   - **Fix**: Create a test that constructs a cubit one move from winning (using a known seed or direct state manipulation), performs the winning move, and asserts `status == ChromixStatus.won`, `score != null`, and `stars > 0`.
 
-- `copyWith` with overrides, `copyWith` preserving unchanged fields, Equatable equality, and `props` are all tested.
+2. **[Important] hasContiguityViolation test is trivial** (line 577-587).
+   The test only verifies the initial state has no violation. It never creates a state with a violation and verifies `hasContiguityViolation == true`, nor does it verify the violation clears after undo. The group name says "recomputed after move and undo" but only checks initial state.
+   - **Fix**: Create a test with a known grid layout where placing a color creates a disconnected group matching the target count. Assert `hasContiguityViolation == true`. Then undo and assert it returns to `false`.
+
+3. **[Important] Multiple tests silently skip on null helpers** (lines 319, 367, 456, etc.).
+   Tests in the overpower group use `if (pair == null) { cubit.close(); return; }` which means the test passes without executing any assertions. Since seed 42 is deterministic, these helpers should always return valid cells. If they do not, the test should fail rather than silently skip. This creates false confidence about coverage.
+   - **Fix**: Replace with `final pair = _adjacentDifferentPrimaries(cubit.state.grid)!;` or add `expect(pair, isNotNull, reason: 'seed 42 must have adjacent different primaries');`.
+
+4. **[Suggestion] Persistence test does not verify serialized data structure**.
+   The test (line 596-625) only verifies `saveSession` was called with any `Map<String, dynamic>`. It does not verify the map contains expected keys (`cells`, `moveCount`, `undoCount`, `moveHistory`).
+   - **Fix**: Use `captureAny()` or a custom matcher to verify the saved map structure.
+
+5. **[Suggestion] dragTo same-color primary is not tested**.
+   The cubit has an explicit `if (targetCell.color == dragColor) return;` guard, but no test covers dragging a primary onto the same primary color (should be a no-op).
+
+6. **[Suggestion] No test for `startDrag`/`undo` when status is `won`**.
+   Both methods have early returns when `status != ChromixStatus.playing`, but this guard is never tested.
+
+7. **[Suggestion] `resetWithSeed` has no direct unit test**.
+   It is only used implicitly. A test could verify it re-initializes state with a new seed.
+
+---
+
+## Logic Test Quality
+
+### contiguity_checker_test.dart: Pass
+
+Well-structured with 7 test cases covering:
+- Fully contiguous grid (true)
+- Disconnected same-color group (false)
+- Single-color grid (true)
+- Single-cell colors -- trivially contiguous (true)
+- Blockers separating colors (true)
+- Empty cells breaking contiguity (false)
+- Grid with only empty and blocker cells (true)
+
+No issues found. Good edge case coverage.
+
+### puzzle_generator_test.dart: Pass
+
+Good coverage with 8 tests:
+- Determinism (same seed = same puzzle)
+- Different seeds produce different puzzles
+- Generated puzzles have unique solutions
+- Blocker count in valid range (tested across 20 seeds)
+- Pre-filled count > 0 (tested across 20 seeds)
+- Target distribution matches non-blocker count
+- Optimal moves is positive
+- At least 5 colors in target (tested across 15 seeds)
+- Max blocker edge case
+
+No issues found.
+
+### puzzle_solver_test.dart: Pass
+
+Good coverage with 5 test cases:
+- Unique contiguous solution returns `isUnique: true`
+- Matching distribution but non-contiguous returns `isUnique: false`
+- No solution returns `isUnique: false` with `optimalMoves: 0`
+- Pre-filled primary layering explored (red + yellow = orange)
+- Pre-filled primary left as-is
+- Two valid contiguous arrangements yield `isUnique: false`
+
+Clean, well-documented, meaningful assertions.
 
 ---
 
 ## UI Component Test Quality
 
-### `leaderboard_section_test.dart`: Issues found
+### chromix_cell_widget_test.dart: Pass
 
-- Uses `BlocProvider.value` with mock cubit -- VGV convention.
-- Uses `MaterialApp` wrapper -- correct for widget tests.
-- Uses `setUp`/`tearDown` for mock lifecycle -- good practice.
-- Covers all five visual states: identity prompt, loading, empty leaderboard, populated table, and unavailable.
-- Tests `fetchLeaderboard` is called on initial build.
+5 test cases covering:
+- Empty cell rendering
+- Blocker cell rendering
+- Color cell rendering
+- Highlight border when `isHighlighted: true`
+- Corner rounding based on shared edges
 
-- **[Critical] User highlight test does not actually verify highlighting.** The test at line 138-176 is titled "highlights user entry when pubkey matches" but the only assertion is `expect(find.text('100'), findsOneWidget)`. This verifies the entry renders, not that it is highlighted. The test should find the `TableRow` `BoxDecoration` and assert `color == theme.colorScheme.primaryContainer`. As written, this test would pass even if highlighting were completely removed.
+Uses `MaterialApp` wrapper correctly. Assertions check `BoxDecoration` properties -- verifies visual behavior.
 
-  Additionally, the test uses a fake npub (`npub1aaa...58 chars`) that is not a valid bech32 encoding. The `_isUserEntry` method calls `Helpers.decodeBech32` which throws on an invalid npub (the test output confirms: `WARNING: decodeBech32 error: Checksum verification failed`). This means the catch block returns `false`, so highlighting is never actually applied in this test. The test passes vacuously.
+### chromix_grid_test.dart: Minor Issues
 
-- **[Important] No test for `status=loaded` with `leaderboard=null` fallback.** The `BlocBuilder` has a default branch that renders `_UnavailableMessage`. When `status == LeaderboardStatus.loaded` but `leaderboard` is null (an edge case), the widget falls through to the default unavailable message. This path has no dedicated test.
+**Strengths**:
+- Uses `MockCubit` with `bloc_test`/`mocktail` (VGV convention).
+- Tests render count (16 cells), gesture callbacks, and edge sharing.
 
-- **[Suggestion]** The `buildTestWidget` helper calls `mockCubit.emitState(initialState)` which adds an event to the stream before the widget is built. This is unnecessary since `when(() => mockCubit.state).thenReturn(initialState)` is sufficient for `BlocBuilder` to use the initial state. The extra `emitState` call could mask issues where the cubit's `state` getter and stream disagree.
+**Issues**:
+
+1. **[Suggestion] No test for drag origin highlight**.
+   The grid applies `isHighlighted: true` to the cell at `state.dragOrigin`. No test verifies this visual state.
+
+2. **[Suggestion] Blob labels are not tested**.
+   The grid renders floating text labels (R, Y, B, O, G, P) at blob centroids. No test verifies these labels appear.
+
+### color_bar_test.dart: Pass
+
+4 tests covering label rendering, empty distribution, segments with count labels, and all six colors present. Clean and well-organized.
+
+### instructions_dialog_test.dart: Pass
+
+Verifies dialog opens with expected sections (Goal, Color Mixing, Drag to Spread Color, Contiguity Rule, Score) and dismisses on "Got it!" button. Appropriate for a static informational dialog.
 
 ---
 
 ## Anti-Patterns Found
 
-### 1. `leaderboard_section_test.dart:175` -- No meaningful assertion (highlight test)
+### 1. chromix_cubit_test.dart: Silent skip on null helpers
 
-- **Issue**: The test "highlights user entry when pubkey matches" only asserts `find.text('100')`, which verifies rendering but not highlighting. This is effectively a no-assertion test for its stated purpose.
-- **Fix**: Use valid bech32-encoded npub values in test data. Find the `TableRow`'s `BoxDecoration` and assert `color` equals `Theme.of(context).colorScheme.primaryContainer`. Alternatively, use a `tester.widget<DecoratedBox>()` finder to inspect the decoration.
+- **Location**: Lines 319, 367, 456 and similar patterns
+- **Issue**: `if (pair == null) { cubit.close(); return; }` causes the test to pass without executing any assertions. With deterministic seed 42, these helpers should always return values.
+- **Fix**: Use non-null assertion (`pair!`) or add `expect(pair, isNotNull)` before proceeding.
 
-### 2. `leaderboard_section_test.dart:152-154` -- Invalid test data causes silent failure
+### 2. chromix_cubit_test.dart:549-574: Test name does not match behavior
 
-- **Issue**: The npub string `npub1aaa...` is not a valid bech32-encoded public key. `Helpers.decodeBech32` throws, causing `_isUserEntry` to always return `false`. The test passes but tests nothing about highlighting.
-- **Fix**: Generate a valid npub from a known 64-char hex pubkey using `Nip19.encodePubKey(hexKey)` in the test, then use that npub in the `LeaderboardEntry` and the corresponding hex as `userPubKeyHex`.
+- **Location**: "emits won when grid matches target and is contiguous"
+- **Issue**: The test never reaches the won state. It verifies solver uniqueness and a single drag, but the win transition is never tested. The name creates false expectations.
+- **Fix**: Either rename to match actual behavior ("solver confirms generated puzzle is solvable") or implement the actual win detection test.
 
-### 3. `leaderboard_test.dart:111-135` -- Missing positive path for user lookup methods
+---
 
-- **Issue**: `containsUser` and `findUserEntry` are only tested for the negative case. The happy path where a user IS found is never exercised.
-- **Fix**: Create a `LeaderboardEntry` with an npub generated from a known hex pubkey via `Nip19.encodePubKey`, then call `containsUser`/`findUserEntry` with that hex key and assert the positive result.
+## Missing Test Coverage
+
+### Missing Test Files
+
+| Source File | Priority | Reason |
+|---|---|---|
+| `lib/core/view/widgets/win_celebration.dart` (NEW) | Important | Shared widget used by 3 game pages. Timer-based celebration sequence with confetti + callback. Should test trigger/reset lifecycle. |
+| `lib/games/chromix/view/chromix_page.dart` | Important | Top-level page with BlocConsumer wiring, win celebration trigger, streak persistence, instructions dialog gating. |
+
+### Missing Behavioral Coverage (Within Existing Test Files)
+
+| Area | What Is Missing |
+|---|---|
+| Cubit: Won state transition | No test drives the cubit to `ChromixStatus.won` |
+| Cubit: Score calculation on win | No test verifies `state.score` is set correctly |
+| Cubit: Star rating from score | No test verifies `state.stars` property |
+| Cubit: Contiguity violation = true | No test creates an actual violation state |
+| Cubit: Drag/undo rejected when won | No test for early-return guards on won status |
+| Cubit: `resetWithSeed` | No direct unit test |
 
 ---
 
@@ -119,38 +190,39 @@
 
 | Pattern | Status | Notes |
 |---|---|---|
-| bloc_test for cubits | Pass | LeaderboardCubit uses blocTest correctly |
+| bloc_test for cubits | Pass | ChromixCubit uses blocTest correctly |
 | mocktail for mocks | Pass | All mocks use mocktail |
 | UI tests with MaterialApp wrapper | Pass | All widget tests wrap in MaterialApp |
-| Seeded initial states | Pass | Cubit tests use setUp for non-initial state dependencies |
-| setUp/tearDown | Pass | Shared setup in setUp, cubit mock close in tearDown |
+| Seeded initial states | Pass | Cubit tests use async `_waitForReady` for non-initial state |
+| setUp/tearDown | Partial | Used in persistence group but not in overpower group (some duplication) |
 | Group organization | Pass | All tests use group() for logical organization |
-| MockCubit for UI tests | Pass | Uses custom mock with StreamController -- acceptable pattern |
+| MockCubit for UI tests | Pass | Uses `MockCubit<ChromixState>` from bloc_test |
 
 ---
 
 ## Recommendations
 
-1. **[Critical] Fix the highlight test with valid bech32 npub data and real decoration assertions.** This is the highest priority -- the test currently provides false confidence that user highlighting works. Use `Nip19.encodePubKey` to create valid test npubs from known hex keys, and assert on the `BoxDecoration.color` of the highlighted `TableRow`.
+1. **[Most impactful] Add a win detection integration test for ChromixCubit.** This is the core game mechanic and the most critical untested path. Find or construct a seed where one move away from winning is achievable, drive the cubit to completion, and verify `status == won`, `score != null`, and `stars > 0`.
 
-2. **[Important] Add positive-path tests for `containsUser` and `findUserEntry`.** These methods involve `Nip19.encodePubKey` conversion and are only tested for the "not found" case. A regression in the encoding logic would go undetected.
+2. **[High impact] Replace silent null returns with assertions in cubit tests.** The `if (pair == null) return` pattern silently skips test logic. With seed 42, all helpers should return valid values. Make them fail loudly if they do not.
 
-3. **[Important] Add repository test for `fetchLeaderboard` deduplication.** Submit two events with the same pubkey but different timestamps/scores, and verify only the latest is kept.
+3. **[High impact] Add a WinCelebration widget test.** This is a new shared widget used across all three games. Test that `trigger()` starts the confetti and fires the callback after the delay, and `reset()` cleans up state.
 
-4. **[Important] Add repository test for tie-breaking by `createdAt`.** Submit two events with equal scores but different `createdAt` values and verify the earlier submission ranks higher.
+4. **[Medium impact] Add a ChromixPage widget test.** Test that loading state shows progress indicator, playing state shows grid + color bars + undo row, won state shows results overlay, and contiguity violation text appears when `hasContiguityViolation == true`.
 
-5. **[Important] Add repository test for the `limit` parameter.** Verify that `fetchLeaderboard(dTag, limit: 2)` returns only 2 entries when more are available, and that ranks are correctly assigned (1 and 2, not 1-N).
+5. **[Medium impact] Add a hasContiguityViolation positive test.** Construct a grid where a color has its target count met but cells are disconnected, verify the flag is set, then undo to clear.
 
-6. **[Suggestion] Rename the "handles identity check exception gracefully" cubit test** to clarify that the exception is intentionally propagated, not swallowed.
-
-7. **[Suggestion] Run tests with `--coverage` and verify line coverage for the changed files** to confirm no dead code paths exist.
-
-8. **[Suggestion] Extract the duplicated `makeEvent` helper** in the repository test to a single top-level function.
+6. **[Lower impact] Test blob labels and drag highlight in ChromixGrid widget test.** These are player-facing visual feedback mechanisms.
 
 ---
 
 ## Verdict
 
-**Fix 1 critical and 5 important issues before merging.**
+**Needs work before merging.** Fix 1 critical and 3 important issues.
 
-The test suite has good structural coverage -- every file has tests, VGV conventions (bloc_test, mocktail, proper grouping) are followed correctly, and the cubit tests are particularly well done. However, the user-highlight widget test provides false confidence due to invalid test data and a missing assertion, and several important behavioral paths in the model and repository layers are untested (positive-path user lookup, deduplication in leaderboard, tie-breaking, limit parameter). These gaps could allow regressions to ship undetected.
+The logic layer (contiguity checker, puzzle generator, puzzle solver) is well-tested with strong edge case coverage. The widget tests follow VGV conventions correctly. However, the cubit tests have a significant gap: the most critical state transition (winning the game) is not actually verified, and the contiguity violation flag is only tested in its trivial initial state. The silent null-return pattern in several tests creates false confidence about coverage. The new `WinCelebration` shared widget has no tests.
+
+**Issue counts**:
+- **Critical**: 1 (win state transition untested)
+- **Important**: 3 (contiguity violation untested, silent null skips create false confidence, WinCelebration missing test file)
+- **Suggestions**: 5 (persistence data verification, same-color drag no-op, drag/undo rejection when won, grid visual feedback, test name mismatch)

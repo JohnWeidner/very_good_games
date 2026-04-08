@@ -178,7 +178,43 @@ class PuzzleGenerator {
 
     if (secondariesCreated < 2) return null;
 
-    return ChromixGrid(cells: cells);
+    final grid = ChromixGrid(cells: cells);
+
+    // Reject if any pre-filled cell is completely trapped — no adjacent
+    // empty or same-color cell. Such a cell can never participate in a
+    // drag (can't spread to or from it), making it permanently isolated.
+    if (_hasTrappedCell(grid)) return null;
+
+    return grid;
+  }
+
+  /// Returns true if any pre-filled cell has no orthogonal neighbor
+  /// that is empty or the same color.
+  static bool _hasTrappedCell(ChromixGrid grid) {
+    const size = ChromixGrid.size;
+    for (var i = 0; i < grid.cells.length; i++) {
+      final cell = grid.cells[i];
+      if (cell is! ColorCell || !cell.isPreFilled) continue;
+
+      final row = i ~/ size;
+      final col = i % size;
+      var hasOpenNeighbor = false;
+
+      for (final n in _neighbors(row, col, size)) {
+        final neighbor = grid.cells[n];
+        if (neighbor is EmptyCell) {
+          hasOpenNeighbor = true;
+          break;
+        }
+        if (neighbor is ColorCell && neighbor.color == cell.color) {
+          hasOpenNeighbor = true;
+          break;
+        }
+      }
+
+      if (!hasOpenNeighbor) return true;
+    }
+    return false;
   }
 
   /// Simulates random valid drag moves from [grid] until fully filled.
