@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/core/core.dart';
-import 'package:very_good_games/core/view/widgets/win_celebration.dart';
 import 'package:very_good_games/games/signal/cubit/signal_cubit.dart';
 import 'package:very_good_games/games/signal/view/widgets/widgets.dart';
 import 'package:very_good_games/nostr/profile/profile.dart';

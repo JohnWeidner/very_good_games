@@ -12,14 +12,6 @@ class CellEdges {
     this.right = false,
   });
 
-  /// All edges shared (cell is interior to a blob).
-  static const all = CellEdges(
-    top: true,
-    bottom: true,
-    left: true,
-    right: true,
-  );
-
   /// No edges shared (cell is isolated).
   static const none = CellEdges();
 

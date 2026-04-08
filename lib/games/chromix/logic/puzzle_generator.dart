@@ -178,85 +178,7 @@ class PuzzleGenerator {
 
     if (secondariesCreated < 2) return null;
 
-    final grid = ChromixGrid(cells: cells);
-
-    // Verify no primary is stranded. Every primary cell must be able
-    // to reach at least one empty cell or another cell of the same
-    // color via orthogonal steps through empty or same-primary cells.
-    // A primary surrounded entirely by blockers, secondaries, and
-    // different primaries with no empty neighbor can never grow or
-    // connect, making the puzzle unsolvable.
-    if (!_allPrimariesCanGrow(grid)) return null;
-
-    return grid;
-  }
-
-  /// Returns false if any primary color with multiple cells on the
-  /// grid has an instance that is completely isolated — unable to
-  /// reach an empty cell or another cell of the same color.
-  ///
-  /// A primary that is the only instance of its color is allowed
-  /// to be isolated, since the target can just need exactly one.
-  static bool _allPrimariesCanGrow(ChromixGrid grid) {
-    const size = ChromixGrid.size;
-
-    // Count how many cells of each primary color exist.
-    final colorCounts = <ChromixColor, int>{};
-    for (final cell in grid.cells) {
-      if (cell is ColorCell && cell.color.isPrimary) {
-        colorCounts[cell.color] = (colorCounts[cell.color] ?? 0) + 1;
-      }
-    }
-
-    for (var i = 0; i < grid.cells.length; i++) {
-      final cell = grid.cells[i];
-      if (cell is! ColorCell || !cell.color.isPrimary) continue;
-
-      // If this is the only cell of its color, isolation is fine.
-      if ((colorCounts[cell.color] ?? 0) <= 1) continue;
-
-      final color = cell.color;
-
-      // BFS: can this cell reach an empty cell or another same-color
-      // cell via adjacent empty cells?
-      var canGrow = false;
-      final visited = <int>{i};
-      final queue = [i];
-
-      while (queue.isNotEmpty) {
-        final current = queue.removeLast();
-        final r = current ~/ size;
-        final c = current % size;
-
-        for (final n in _neighbors(r, c, size)) {
-          if (visited.contains(n)) continue;
-          final nc = grid.cells[n];
-          if (nc is EmptyCell) {
-            canGrow = true;
-            break;
-          }
-          if (nc is ColorCell && nc.color == color) {
-            canGrow = true;
-            break;
-          }
-        }
-        if (canGrow) break;
-
-        // Expand through empty cells (reachable path).
-        for (final n in _neighbors(r, c, size)) {
-          if (visited.contains(n)) continue;
-          final nc = grid.cells[n];
-          if (nc is EmptyCell) {
-            visited.add(n);
-            queue.add(n);
-          }
-        }
-      }
-
-      if (!canGrow) return false;
-    }
-
-    return true;
+    return ChromixGrid(cells: cells);
   }
 
   /// Simulates random valid drag moves from [grid] until fully filled.
@@ -419,19 +341,12 @@ class PuzzleGenerator {
       );
     }
 
-    // Last resort: a trivial 1-blocker, 15-cell all-red puzzle.
-    final cells = [
-      const BlockerCell(),
-      ...List.filled(
-        15,
-        const ColorCell(ChromixColor.red, isPreFilled: true),
-      ),
-    ];
-    final grid = ChromixGrid(cells: cells);
-    return (
-      puzzle: grid,
-      target: grid.colorDistribution,
-      optimalMoves: 0,
+    // If we exhausted all fallback attempts, something is fundamentally
+    // wrong with the generation parameters. Throw so the issue surfaces
+    // during development rather than silently serving a degenerate puzzle.
+    throw StateError(
+      'PuzzleGenerator: fallback exhausted after 50 attempts '
+      '(seed=$seed). This should not happen in production.',
     );
   }
 }

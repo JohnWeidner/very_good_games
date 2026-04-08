@@ -3,3 +3,4 @@ export 'daily_seed/date_key.dart';
 export 'game_registry/game_registry.dart';
 export 'storage/storage.dart';
 export 'theme/app_theme.dart';
+export 'view/widgets/win_celebration.dart';

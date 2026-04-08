@@ -56,7 +56,13 @@ class ChromixCubit extends Cubit<ChromixState> {
             emit(restoredState);
             return;
           }
-        } on Object {
+        }
+        // Deserialization can fail due to schema changes, corrupted
+        // data, or generator algorithm changes producing incompatible
+        // puzzles. Clear the stale session and fall through to
+        // generate a fresh puzzle.
+        // ignore: avoid_catching_errors
+        on Object {
           unawaited(storage.saveSession('$_storagePrefix$dateKey', null));
         }
       }
@@ -199,7 +205,7 @@ class ChromixCubit extends Cubit<ChromixState> {
       _recomputeContiguityAndCheckWin();
       // Only start overpower timer if the mix didn't already win.
       if (state.status != ChromixStatus.won) {
-        _startOverpowerTimer(cellIndex, dragColor, mixed);
+        _startOverpowerTimer(cellIndex, dragColor);
       }
     } else if (dragColor.isPrimary && targetCell.color.isSecondary) {
       // OVERPOWER immediately: replace secondary with dragged primary.
@@ -225,7 +231,6 @@ class ChromixCubit extends Cubit<ChromixState> {
   void _startOverpowerTimer(
     int cellIndex,
     ChromixColor dragColor,
-    ChromixColor mixedColor,
   ) {
     _cancelOverpowerTimer();
     _overpowerCellIndex = cellIndex;
@@ -326,66 +331,11 @@ class ChromixCubit extends Cubit<ChromixState> {
   }
 
   /// Recomputes `hasContiguityViolation` from the current grid.
-  ///
-  /// Only checks colors whose placed count matches their target count,
-  /// to avoid noisy feedback on partially-filled grids.
   void _recomputeContiguity() {
-    final distribution = state.currentDistribution;
-    var hasViolation = false;
-
-    for (final entry in state.target.entries) {
-      final color = entry.key;
-      final targetCount = entry.value;
-      final currentCount = distribution[color] ?? 0;
-
-      if (currentCount == targetCount && currentCount > 1) {
-        // Check if this color's cells form a single connected group.
-        if (!_isColorContiguous(color)) {
-          hasViolation = true;
-          break;
-        }
-      }
+    final violation = hasContiguityViolation(state.grid, state.target);
+    if (violation != state.hasContiguityViolation) {
+      emit(state.copyWith(hasContiguityViolation: violation));
     }
-
-    if (hasViolation != state.hasContiguityViolation) {
-      emit(state.copyWith(hasContiguityViolation: hasViolation));
-    }
-  }
-
-  bool _isColorContiguous(ChromixColor color) {
-    const size = ChromixGrid.size;
-    final indices = <int>[];
-    for (var i = 0; i < state.grid.cells.length; i++) {
-      final cell = state.grid.cells[i];
-      if (cell is ColorCell && cell.color == color) {
-        indices.add(i);
-      }
-    }
-    if (indices.length <= 1) return true;
-
-    final indexSet = indices.toSet();
-    final visited = <int>{indices.first};
-    final queue = [indices.first];
-    var head = 0;
-
-    while (head < queue.length) {
-      final current = queue[head++];
-      final row = current ~/ size;
-      final col = current % size;
-
-      for (final n in [
-        if (row > 0) (row - 1) * size + col,
-        if (row < size - 1) (row + 1) * size + col,
-        if (col > 0) row * size + (col - 1),
-        if (col < size - 1) row * size + (col + 1),
-      ]) {
-        if (indexSet.contains(n) && visited.add(n)) {
-          queue.add(n);
-        }
-      }
-    }
-
-    return visited.length == indices.length;
   }
 
   void _checkWinAndPersist() {
@@ -451,10 +401,7 @@ class ChromixCubit extends Cubit<ChromixState> {
         historyJsons?.map(MoveRecord.fromJson).toList() ?? const [];
 
     // Recompute hasContiguityViolation from the restored grid.
-    final hasViolation = _computeContiguityViolation(
-      grid,
-      result.target,
-    );
+    final violation = hasContiguityViolation(grid, result.target);
 
     return ChromixState(
       grid: grid,
@@ -463,55 +410,8 @@ class ChromixCubit extends Cubit<ChromixState> {
       moveCount: moveCount,
       undoCount: undoCount,
       moveHistory: moveHistory,
-      hasContiguityViolation: hasViolation,
+      hasContiguityViolation: violation,
     );
-  }
-
-  static bool _computeContiguityViolation(
-    ChromixGrid grid,
-    Map<ChromixColor, int> target,
-  ) {
-    final distribution = grid.colorDistribution;
-    for (final entry in target.entries) {
-      final color = entry.key;
-      final targetCount = entry.value;
-      final currentCount = distribution[color] ?? 0;
-
-      if (currentCount == targetCount && currentCount > 1) {
-        // Check contiguity for this color.
-        const size = ChromixGrid.size;
-        final indices = <int>[];
-        for (var i = 0; i < grid.cells.length; i++) {
-          final cell = grid.cells[i];
-          if (cell is ColorCell && cell.color == color) {
-            indices.add(i);
-          }
-        }
-        if (indices.length <= 1) continue;
-
-        final indexSet = indices.toSet();
-        final visited = <int>{indices.first};
-        final queue = [indices.first];
-        var head = 0;
-        while (head < queue.length) {
-          final current = queue[head++];
-          final row = current ~/ size;
-          final col = current % size;
-          for (final n in [
-            if (row > 0) (row - 1) * size + col,
-            if (row < size - 1) (row + 1) * size + col,
-            if (col > 0) row * size + (col - 1),
-            if (col < size - 1) row * size + (col + 1),
-          ]) {
-            if (indexSet.contains(n) && visited.add(n)) {
-              queue.add(n);
-            }
-          }
-        }
-        if (visited.length != indices.length) return true;
-      }
-    }
-    return false;
   }
 
   @override
