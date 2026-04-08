@@ -23,7 +23,9 @@ class ChromixState extends Equatable {
     this.moveCount = 0,
     this.undoCount = 0,
     this.moveHistory = const [],
-    this.selectedColor = ChromixColor.red,
+    this.dragOrigin,
+    this.dragColor,
+    this.hasContiguityViolation = false,
     this.score,
   });
 
@@ -36,7 +38,9 @@ class ChromixState extends Equatable {
       moveCount = 0,
       undoCount = 0,
       moveHistory = const [],
-      selectedColor = ChromixColor.red,
+      dragOrigin = null,
+      dragColor = null,
+      hasContiguityViolation = false,
       score = null;
 
   /// The current grid with the player's placements.
@@ -60,8 +64,14 @@ class ChromixState extends Equatable {
   /// Undo stack of previous cell states.
   final List<MoveRecord> moveHistory;
 
-  /// Currently selected primary color.
-  final ChromixColor selectedColor;
+  /// The cell the player is currently dragging from (transient, not persisted).
+  final ({int row, int col})? dragOrigin;
+
+  /// The primary color being dragged (transient, not persisted).
+  final ChromixColor? dragColor;
+
+  /// Whether any color whose count matches its target is non-contiguous.
+  final bool hasContiguityViolation;
 
   /// Final score, computed on win.
   final int? score;
@@ -81,7 +91,9 @@ class ChromixState extends Equatable {
     int? moveCount,
     int? undoCount,
     List<MoveRecord>? moveHistory,
-    ChromixColor? selectedColor,
+    ({int row, int col})? Function()? dragOrigin,
+    ChromixColor? Function()? dragColor,
+    bool? hasContiguityViolation,
     int? Function()? score,
   }) {
     return ChromixState(
@@ -92,7 +104,10 @@ class ChromixState extends Equatable {
       moveCount: moveCount ?? this.moveCount,
       undoCount: undoCount ?? this.undoCount,
       moveHistory: moveHistory ?? this.moveHistory,
-      selectedColor: selectedColor ?? this.selectedColor,
+      dragOrigin: dragOrigin != null ? dragOrigin() : this.dragOrigin,
+      dragColor: dragColor != null ? dragColor() : this.dragColor,
+      hasContiguityViolation:
+          hasContiguityViolation ?? this.hasContiguityViolation,
       score: score != null ? score() : this.score,
     );
   }
@@ -106,7 +121,9 @@ class ChromixState extends Equatable {
     moveCount,
     undoCount,
     moveHistory,
-    selectedColor,
+    dragOrigin,
+    dragColor,
+    hasContiguityViolation,
     score,
   ];
 }

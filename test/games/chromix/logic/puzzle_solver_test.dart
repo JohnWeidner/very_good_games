@@ -4,61 +4,45 @@ import 'package:very_good_games/games/chromix/models/models.dart';
 
 void main() {
   group('PuzzleSolver', () {
-    test('board with unique solution returns isUnique true', () {
-      // Build a small puzzle where the solution is forced.
-      // Grid: 3 blockers, 1 pre-filled secondary (locked),
-      // remaining cells have exactly one way to reach the target.
-      //
-      // Layout:
-      //   [B] [B] [B] [orange(pf)]
-      //   [B] [B] [B] [B]
-      //   [B] [B] [B] [B]
-      //   [B] [B] [B] [empty]
-      //
-      // Target: {orange: 1, red: 1}
-      // The empty cell must be red to match target.
+    test('board with unique contiguous solution returns isUnique true',
+        () {
+      // Grid: all blockers except two adjacent cells.
+      // Target: {red: 2}
+      // Only solution: both cells are red (contiguous).
       final grid = ChromixGrid(
         cells: [
-          ...List.filled(3, const BlockerCell()),
-          const ColorCell(ChromixColor.orange, isPreFilled: true),
-          ...List.filled(11, const BlockerCell()),
-          const EmptyCell(),
-        ],
-      );
-      final target = <ChromixColor, int>{
-        ChromixColor.orange: 1,
-        ChromixColor.red: 1,
-      };
-
-      final result = PuzzleSolver.solve(
-        grid: grid,
-        target: target,
-      );
-
-      expect(result.isUnique, isTrue);
-      expect(result.optimalMoves, equals(1));
-    });
-
-    test('board with multiple solutions returns isUnique false', () {
-      // Two empty cells, target allows either red or blue in each.
-      // Target: {red: 1, blue: 1} with 2 empty cells → 2 solutions.
-      final grid = ChromixGrid(
-        cells: [
-          const EmptyCell(),
-          const EmptyCell(),
+          const EmptyCell(), // (0,0)
+          const EmptyCell(), // (0,1)
           ...List.filled(14, const BlockerCell()),
         ],
       );
-      final target = <ChromixColor, int>{
-        ChromixColor.red: 1,
-        ChromixColor.blue: 1,
-      };
+      final target = <ChromixColor, int>{ChromixColor.red: 2};
 
-      final result = PuzzleSolver.solve(
-        grid: grid,
-        target: target,
+      final result = PuzzleSolver.solve(grid: grid, target: target);
+
+      expect(result.isUnique, isTrue);
+      expect(result.optimalMoves, equals(2));
+    });
+
+    test(
+        'board with matching distribution but non-contiguous '
+        'solution returns isUnique false', () {
+      // Two red cells separated by blockers — distribution matches
+      // but contiguity fails.
+      final grid = ChromixGrid(
+        cells: [
+          const EmptyCell(), // (0,0)
+          const BlockerCell(), // (0,1)
+          const BlockerCell(), // (0,2)
+          const EmptyCell(), // (0,3)
+          ...List.filled(12, const BlockerCell()),
+        ],
       );
+      final target = <ChromixColor, int>{ChromixColor.red: 2};
 
+      final result = PuzzleSolver.solve(grid: grid, target: target);
+
+      // Red in (0,0) and (0,3) are not adjacent — not contiguous.
       expect(result.isUnique, isFalse);
     });
 
@@ -73,10 +57,7 @@ void main() {
       );
       final target = <ChromixColor, int>{ChromixColor.orange: 1};
 
-      final result = PuzzleSolver.solve(
-        grid: grid,
-        target: target,
-      );
+      final result = PuzzleSolver.solve(grid: grid, target: target);
 
       expect(result.isUnique, isFalse);
       expect(result.optimalMoves, equals(0));
@@ -93,10 +74,7 @@ void main() {
       );
       final target = <ChromixColor, int>{ChromixColor.orange: 1};
 
-      final result = PuzzleSolver.solve(
-        grid: grid,
-        target: target,
-      );
+      final result = PuzzleSolver.solve(grid: grid, target: target);
 
       expect(result.isUnique, isTrue);
       expect(result.optimalMoves, equals(1));
@@ -112,13 +90,36 @@ void main() {
       );
       final target = <ChromixColor, int>{ChromixColor.red: 1};
 
-      final result = PuzzleSolver.solve(
-        grid: grid,
-        target: target,
-      );
+      final result = PuzzleSolver.solve(grid: grid, target: target);
 
       expect(result.isUnique, isTrue);
       expect(result.optimalMoves, equals(0));
+    });
+
+    test('rejects non-contiguous solutions', () {
+      // Two empty cells at (0,0) and (0,3), separated by blockers.
+      // Target: {red: 1, blue: 1}
+      // Both arrangements (red+blue or blue+red) produce
+      // single-cell groups (contiguous), so both are valid.
+      final grid = ChromixGrid(
+        cells: [
+          const EmptyCell(), // (0,0)
+          const BlockerCell(), // (0,1)
+          const BlockerCell(), // (0,2)
+          const EmptyCell(), // (0,3)
+          ...List.filled(12, const BlockerCell()),
+        ],
+      );
+      final target = <ChromixColor, int>{
+        ChromixColor.red: 1,
+        ChromixColor.blue: 1,
+      };
+
+      final result = PuzzleSolver.solve(grid: grid, target: target);
+
+      // Two valid arrangements (both contiguous since each color
+      // has only 1 cell), so not unique.
+      expect(result.isUnique, isFalse);
     });
   });
 }

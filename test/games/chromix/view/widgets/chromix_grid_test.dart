@@ -49,14 +49,76 @@ void main() {
       expect(find.byType(ChromixCellWidget), findsNWidgets(16));
     });
 
-    testWidgets('tapping a cell calls placeColor', (
-      tester,
-    ) async {
+    testWidgets('pan gesture calls startDrag', (tester) async {
+      when(() => cubit.state).thenReturn(
+        ChromixState(
+          grid: models.ChromixGrid(
+            cells: [
+              const models.ColorCell(models.ChromixColor.red),
+              ...List.generate(15, (_) => const models.EmptyCell()),
+            ],
+          ),
+          target: const {},
+          optimalMoves: 5,
+        ),
+      );
+
       await tester.pumpWidget(buildSubject());
 
-      await tester.tap(find.byType(ChromixCellWidget).first);
+      final gridFinder = find.byType(ChromixGrid);
+      final topLeft = tester.getTopLeft(gridFinder);
+      final startOffset = topLeft + const Offset(10, 10);
 
-      verify(() => cubit.placeColor(0, 0)).called(1);
+      await tester.dragFrom(startOffset, const Offset(50, 0));
+      await tester.pumpAndSettle();
+
+      verify(() => cubit.startDrag(any(), any())).called(1);
+    });
+
+    testWidgets('pan end calls endDrag', (tester) async {
+      await tester.pumpWidget(buildSubject());
+
+      final gridFinder = find.byType(ChromixGrid);
+      final topLeft = tester.getTopLeft(gridFinder);
+      final startOffset = topLeft + const Offset(10, 10);
+
+      await tester.dragFrom(startOffset, const Offset(50, 0));
+      await tester.pumpAndSettle();
+
+      verify(() => cubit.endDrag()).called(1);
+    });
+
+    testWidgets('adjacent same-color cells share edges', (
+      tester,
+    ) async {
+      // Two adjacent red cells should merge visually.
+      when(() => cubit.state).thenReturn(
+        ChromixState(
+          grid: models.ChromixGrid(
+            cells: [
+              const models.ColorCell(models.ChromixColor.red),
+              const models.ColorCell(models.ChromixColor.red),
+              ...List.generate(14, (_) => const models.EmptyCell()),
+            ],
+          ),
+          target: const {},
+          optimalMoves: 5,
+        ),
+      );
+
+      await tester.pumpWidget(buildSubject());
+
+      // Find both red cells — they should have shared right/left edges.
+      final cellWidgets = tester
+          .widgetList<ChromixCellWidget>(
+            find.byType(ChromixCellWidget),
+          )
+          .toList();
+
+      // Cell (0,0) should share right edge.
+      expect(cellWidgets[0].edges.right, isTrue);
+      // Cell (0,1) should share left edge.
+      expect(cellWidgets[1].edges.left, isTrue);
     });
   });
 }

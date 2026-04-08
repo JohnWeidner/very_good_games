@@ -28,6 +28,14 @@ void main() {
         find.textContaining('Red + Yellow = Orange'),
         findsOneWidget,
       );
+      expect(
+        find.text('Drag to Spread Color'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Contiguity Rule'),
+        findsOneWidget,
+      );
 
       await tester.tap(find.text('Got it!'));
       await tester.pumpAndSettle();

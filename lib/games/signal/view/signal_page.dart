@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/core/core.dart';
+import 'package:very_good_games/core/view/widgets/win_celebration.dart';
 import 'package:very_good_games/games/signal/cubit/signal_cubit.dart';
 import 'package:very_good_games/games/signal/view/widgets/widgets.dart';
 import 'package:very_good_games/nostr/profile/profile.dart';
@@ -73,12 +74,21 @@ class _SignalView extends StatefulWidget {
 }
 
 class _SignalViewState extends State<_SignalView> {
-  bool _showResults = true;
+  bool _showResults = false;
 
   @override
   void initState() {
     super.initState();
     _showInstructionsIfFirstTime();
+
+    // If already won on restore, show results immediately.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final state = context.read<SignalCubit>().state;
+      if (state.status == SignalStatus.won) {
+        setState(() => _showResults = true);
+      }
+    });
   }
 
   void _showInstructionsIfFirstTime() {
@@ -103,6 +113,18 @@ class _SignalViewState extends State<_SignalView> {
     context.read<CommunityStatsCubit>().fetchStats('signal:${widget.dateKey}');
   }
 
+  void _onWin(BuildContext context) {
+    _persistStreak(context);
+    _fetchCommunityStats(context);
+
+    WinCelebration.of(context)?.trigger(
+      onShowResults: () {
+        if (!mounted) return;
+        setState(() => _showResults = true);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -118,10 +140,11 @@ class _SignalViewState extends State<_SignalView> {
               icon: const Icon(Icons.shuffle),
               tooltip: 'New Puzzle',
               onPressed: () {
+                WinCelebration.of(context)?.reset();
                 context.read<SignalCubit>().resetWithSeed(
                   DateTime.now().microsecondsSinceEpoch,
                 );
-                setState(() => _showResults = true);
+                setState(() => _showResults = false);
               },
             ),
           IconButton(
@@ -130,62 +153,65 @@ class _SignalViewState extends State<_SignalView> {
           ),
         ],
       ),
-      body: BlocConsumer<SignalCubit, SignalState>(
-        listenWhen: (prev, curr) =>
-            prev.status != curr.status && curr.status == SignalStatus.won,
-        listener: (context, state) {
-          _persistStreak(context);
-          _fetchCommunityStats(context);
-        },
-        builder: (context, state) {
-          if (state.status == SignalStatus.loading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: WinCelebration(
+        child: BlocConsumer<SignalCubit, SignalState>(
+          listenWhen: (prev, curr) =>
+              prev.status != curr.status && curr.status == SignalStatus.won,
+          listener: (context, state) => _onWin(context),
+          builder: (context, state) {
+            if (state.status == SignalStatus.loading) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          return Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Text(
-                      'Walls: ${state.wallCount} / '
-                      '${state.solutionWallCount}',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    Text(
-                      '${state.moveCount} moves',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.6),
+            return Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Walls: ${state.wallCount} / '
+                        '${state.solutionWallCount}',
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
+                      Text(
+                        '${state.moveCount} moves',
+                        style:
+                            Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.6),
+                            ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Expanded(child: SignalGrid()),
+                    ],
+                  ),
+                ),
+                if (state.status == SignalStatus.won && _showResults)
+                  Positioned.fill(
+                    child: SignalResultsOverlay(
+                      state: state,
+                      onViewPuzzle: () =>
+                          setState(() => _showResults = false),
                     ),
-                    const SizedBox(height: 16),
-                    const Expanded(child: SignalGrid()),
-                  ],
-                ),
-              ),
-              if (state.status == SignalStatus.won && _showResults)
-                Positioned.fill(
-                  child: SignalResultsOverlay(
-                    state: state,
-                    onViewPuzzle: () => setState(() => _showResults = false),
                   ),
-                ),
-              if (state.status == SignalStatus.won && !_showResults)
-                Positioned(
-                  bottom: 16,
-                  right: 16,
-                  child: FloatingActionButton.extended(
-                    onPressed: () => setState(() => _showResults = true),
-                    icon: const Icon(Icons.emoji_events),
-                    label: const Text('Results'),
+                if (state.status == SignalStatus.won && !_showResults)
+                  Positioned(
+                    bottom: 16,
+                    right: 16,
+                    child: FloatingActionButton.extended(
+                      onPressed: () =>
+                          setState(() => _showResults = true),
+                      icon: const Icon(Icons.emoji_events),
+                      label: const Text('Results'),
+                    ),
                   ),
-                ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }

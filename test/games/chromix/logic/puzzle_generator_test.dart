@@ -33,7 +33,6 @@ void main() {
     });
 
     test('blocker count is within 1-4 range', () {
-      // Test across multiple seeds.
       for (var seed = 1; seed <= 20; seed++) {
         final result = PuzzleGenerator.generate(seed);
         final blockerCount =
@@ -56,8 +55,6 @@ void main() {
                 .whereType<ColorCell>()
                 .where((c) => c.isPreFilled)
                 .length;
-        // Pre-filled includes both kept cells and peeled-back
-        // secondaries, so total can vary. Should be at least 1.
         expect(
           preFilledCount,
           greaterThan(0),
@@ -78,6 +75,43 @@ void main() {
     test('optimalMoves is a positive value', () {
       final result = PuzzleGenerator.generate(42);
       expect(result.optimalMoves, greaterThan(0));
+    });
+
+    test('generated puzzles have at least 5 colors in target', () {
+      for (var seed = 1; seed <= 15; seed++) {
+        final result = PuzzleGenerator.generate(seed);
+
+        expect(
+          result.target.keys.length,
+          greaterThanOrEqualTo(5),
+          reason: 'seed=$seed had ${result.target.keys.length} colors',
+        );
+      }
+    });
+
+    test('generates valid puzzle with max blockers edge case', () {
+      // Try many seeds to find one that generates 4 blockers.
+      GenerateResult? fourBlockerResult;
+      for (var seed = 1; seed <= 200; seed++) {
+        final result = PuzzleGenerator.generate(seed);
+        final blockerCount =
+            result.puzzle.cells.whereType<BlockerCell>().length;
+        if (blockerCount == 4) {
+          fourBlockerResult = result;
+          break;
+        }
+      }
+
+      if (fourBlockerResult != null) {
+        // Verify the puzzle is consistent: target sum matches
+        // non-blocker count.
+        final targetSum = fourBlockerResult.target.values
+            .fold<int>(0, (a, b) => a + b);
+        expect(
+          targetSum,
+          equals(fourBlockerResult.puzzle.nonBlockerCount),
+        );
+      }
     });
   });
 }

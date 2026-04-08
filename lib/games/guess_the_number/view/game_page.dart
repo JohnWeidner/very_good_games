@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/core/core.dart';
+import 'package:very_good_games/core/view/widgets/win_celebration.dart';
 import 'package:very_good_games/games/guess_the_number/cubit/game_cubit.dart';
 import 'package:very_good_games/games/guess_the_number/view/widgets/widgets.dart';
 import 'package:very_good_games/nostr/profile/profile.dart';
@@ -90,6 +91,7 @@ class _GameView extends StatefulWidget {
 
 class _GameViewState extends State<_GameView> {
   Timer? _timer;
+  bool _showResults = false;
 
   @override
   void initState() {
@@ -99,6 +101,16 @@ class _GameViewState extends State<_GameView> {
       (_) => context.read<GameCubit>().tick(),
     );
     _showInstructionsIfFirstTime();
+
+    // If already finished on restore, show results immediately.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final state = context.read<GameCubit>().state;
+      if (state.status == GameStatus.won ||
+          state.status == GameStatus.lost) {
+        setState(() => _showResults = true);
+      }
+    });
   }
 
   void _showInstructionsIfFirstTime() {
@@ -131,6 +143,24 @@ class _GameViewState extends State<_GameView> {
     );
   }
 
+  void _onGameOver(BuildContext context, GameState state) {
+    _timer?.cancel();
+    _fetchCommunityStats(context);
+
+    if (state.status == GameStatus.won) {
+      _persistStreak(context);
+      WinCelebration.of(context)?.trigger(
+        onShowResults: () {
+          if (!mounted) return;
+          setState(() => _showResults = true);
+        },
+      );
+    } else {
+      // Lost — show results immediately.
+      setState(() => _showResults = true);
+    }
+  }
+
   /// Returns the set of cell indices for locked parameters,
   /// so the grid can draw persistent selection rings.
   Set<int> _selectedCells(GameState state) {
@@ -152,9 +182,18 @@ class _GameViewState extends State<_GameView> {
             IconButton(
               icon: const Icon(Icons.shuffle),
               tooltip: 'New Game',
-              onPressed: () => context.read<GameCubit>().resetWithSeed(
-                DateTime.now().microsecondsSinceEpoch,
-              ),
+              onPressed: () {
+                WinCelebration.of(context)?.reset();
+                _timer?.cancel();
+                _timer = Timer.periodic(
+                  const Duration(seconds: 1),
+                  (_) => context.read<GameCubit>().tick(),
+                );
+                context.read<GameCubit>().resetWithSeed(
+                  DateTime.now().microsecondsSinceEpoch,
+                );
+                setState(() => _showResults = false);
+              },
             ),
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -162,68 +201,66 @@ class _GameViewState extends State<_GameView> {
           ),
         ],
       ),
-      body: BlocConsumer<GameCubit, GameState>(
-        listenWhen: (prev, curr) =>
-            prev.status != curr.status &&
-            (curr.status == GameStatus.won || curr.status == GameStatus.lost),
-        listener: (context, state) {
-          _timer?.cancel();
-          if (state.status == GameStatus.won) {
-            _persistStreak(context);
-          }
-          _fetchCommunityStats(context);
-        },
-        builder: (context, state) {
-          final cubit = context.read<GameCubit>();
-          final isSelecting =
-              state.status == GameStatus.selectingParam ||
-              state.status == GameStatus.readyToConfirm;
-          final isGameOver =
-              state.status == GameStatus.won || state.status == GameStatus.lost;
+      body: WinCelebration(
+        child: BlocConsumer<GameCubit, GameState>(
+          listenWhen: (prev, curr) =>
+              prev.status != curr.status &&
+              (curr.status == GameStatus.won ||
+                  curr.status == GameStatus.lost),
+          listener: (context, state) => _onGameOver(context, state),
+          builder: (context, state) {
+            final cubit = context.read<GameCubit>();
+            final isSelecting =
+                state.status == GameStatus.selectingParam ||
+                state.status == GameStatus.readyToConfirm;
+            final isGameOver =
+                state.status == GameStatus.won ||
+                state.status == GameStatus.lost;
 
-          return Stack(
-            children: [
-              Column(
-                children: [
-                  // Score bar — always visible at the top.
-                  ScoreBar(score: state.currentScore),
-                  // Card tray — above the grid.
-                  CardTray(
-                    usedTypes: state.usedQuestionTypes,
-                    onSelect: cubit.selectQuestion,
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 8, right: 28),
-                      child: NumberGrid(
-                        cells: state.cells,
-                        highlightedCell: state.highlightedCell,
-                        selectedCells: _selectedCells(state),
-                        isSelecting: isSelecting,
-                        onCellHighlighted: cubit.highlightCell,
-                        onCellSelected: (_) => cubit.lockParam(),
+            return Stack(
+              children: [
+                Column(
+                  children: [
+                    // Score bar — always visible at the top.
+                    ScoreBar(score: state.currentScore),
+                    // Card tray — above the grid.
+                    CardTray(
+                      usedTypes: state.usedQuestionTypes,
+                      onSelect: cubit.selectQuestion,
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8, right: 28),
+                        child: NumberGrid(
+                          cells: state.cells,
+                          highlightedCell: state.highlightedCell,
+                          selectedCells: _selectedCells(state),
+                          isSelecting: isSelecting,
+                          onCellHighlighted: cubit.highlightCell,
+                          onCellSelected: (_) => cubit.lockParam(),
+                        ),
                       ),
                     ),
-                  ),
-                  // Stats — below the grid.
-                  GameHeader(state: state),
-                  // Staged question card — below stats.
-                  if (isSelecting)
-                    QuestionCard(
-                      state: state,
-                      onConfirm: cubit.confirmQuestion,
-                      onCancel: cubit.cancelQuestion,
-                      onDigitSelected: cubit.setDigitParam,
-                    ),
-                  const SizedBox(height: 8),
-                ],
-              ),
-              if (isGameOver)
-                Positioned.fill(child: ResultsOverlay(state: state)),
-            ],
-          );
-        },
+                    // Stats — below the grid.
+                    GameHeader(state: state),
+                    // Staged question card — below stats.
+                    if (isSelecting)
+                      QuestionCard(
+                        state: state,
+                        onConfirm: cubit.confirmQuestion,
+                        onCancel: cubit.cancelQuestion,
+                        onDigitSelected: cubit.setDigitParam,
+                      ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+                if (isGameOver && _showResults)
+                  Positioned.fill(child: ResultsOverlay(state: state)),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

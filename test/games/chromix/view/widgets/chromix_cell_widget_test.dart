@@ -5,7 +5,11 @@ import 'package:very_good_games/games/chromix/view/widgets/chromix_cell_widget.d
 
 void main() {
   group('ChromixCellWidget', () {
-    Widget buildSubject(ChromixCell cell, {VoidCallback? onTap}) {
+    Widget buildSubject(
+      ChromixCell cell, {
+      CellEdges edges = CellEdges.none,
+      bool isHighlighted = false,
+    }) {
       return MaterialApp(
         home: Scaffold(
           body: SizedBox(
@@ -13,65 +17,95 @@ void main() {
             height: 50,
             child: ChromixCellWidget(
               cell: cell,
-              onTap: onTap ?? () {},
+              edges: edges,
+              isHighlighted: isHighlighted,
             ),
           ),
         ),
       );
     }
 
-    testWidgets('renders empty cell without label', (tester) async {
+    testWidgets('renders empty cell', (tester) async {
       await tester.pumpWidget(buildSubject(const EmptyCell()));
 
       expect(find.byType(Container), findsWidgets);
-      expect(find.byType(Text), findsNothing);
     });
 
-    testWidgets('renders blocker cell without label', (tester) async {
+    testWidgets('renders blocker cell', (tester) async {
       await tester.pumpWidget(
         buildSubject(const BlockerCell()),
       );
 
-      expect(find.byType(Text), findsNothing);
+      expect(find.byType(Container), findsWidgets);
     });
 
-    testWidgets('renders color cell with letter label', (
+    testWidgets('renders color cell', (tester) async {
+      await tester.pumpWidget(
+        buildSubject(const ColorCell(ChromixColor.red)),
+      );
+
+      expect(find.byType(Container), findsWidgets);
+    });
+
+    testWidgets('renders highlight border when isHighlighted is true',
+        (tester) async {
+      await tester.pumpWidget(
+        buildSubject(
+          const ColorCell(ChromixColor.red),
+          isHighlighted: true,
+        ),
+      );
+
+      final container = tester.widget<Container>(
+        find.byType(Container).last,
+      );
+      final decoration = container.decoration! as BoxDecoration;
+      expect(decoration.border, isNotNull);
+    });
+
+    testWidgets('all corners rounded when no edges shared', (
       tester,
     ) async {
       await tester.pumpWidget(
         buildSubject(const ColorCell(ChromixColor.red)),
       );
 
-      expect(find.text('R'), findsOneWidget);
-    });
-
-    testWidgets('renders yellow cell with Y label', (tester) async {
-      await tester.pumpWidget(
-        buildSubject(const ColorCell(ChromixColor.yellow)),
+      final container = tester.widget<Container>(
+        find.byType(Container).last,
       );
+      final decoration = container.decoration! as BoxDecoration;
+      final br = decoration.borderRadius! as BorderRadius;
 
-      expect(find.text('Y'), findsOneWidget);
+      expect(br.topLeft, isNot(Radius.zero));
+      expect(br.topRight, isNot(Radius.zero));
+      expect(br.bottomLeft, isNot(Radius.zero));
+      expect(br.bottomRight, isNot(Radius.zero));
     });
 
-    testWidgets('renders secondary color labels', (tester) async {
-      await tester.pumpWidget(
-        buildSubject(const ColorCell(ChromixColor.orange)),
-      );
-
-      expect(find.text('O'), findsOneWidget);
-    });
-
-    testWidgets('calls onTap when tapped', (tester) async {
-      var tapped = false;
+    testWidgets('corners flattened where edges are shared', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         buildSubject(
-          const EmptyCell(),
-          onTap: () => tapped = true,
+          const ColorCell(ChromixColor.red),
+          edges: const CellEdges(top: true, right: true),
         ),
       );
 
-      await tester.tap(find.byType(GestureDetector));
-      expect(tapped, isTrue);
+      final container = tester.widget<Container>(
+        find.byType(Container).last,
+      );
+      final decoration = container.decoration! as BoxDecoration;
+      final br = decoration.borderRadius! as BorderRadius;
+
+      // top-left: top shared → flat
+      expect(br.topLeft, Radius.zero);
+      // top-right: both top and right shared → flat
+      expect(br.topRight, Radius.zero);
+      // bottom-left: neither shared → rounded
+      expect(br.bottomLeft, isNot(Radius.zero));
+      // bottom-right: right shared → flat
+      expect(br.bottomRight, Radius.zero);
     });
   });
 }

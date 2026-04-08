@@ -75,8 +75,10 @@ class ColorBar extends StatelessWidget {
                         child: FittedBox(
                           child: Text(
                             '${distribution[color]}',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: color == ChromixColor.yellow
+                                  ? Colors.black
+                                  : Colors.white,
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),

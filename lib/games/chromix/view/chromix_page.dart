@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/core/core.dart';
+import 'package:very_good_games/core/view/widgets/win_celebration.dart';
 import 'package:very_good_games/games/chromix/cubit/chromix_cubit.dart';
 import 'package:very_good_games/games/chromix/view/widgets/widgets.dart';
 import 'package:very_good_games/nostr/profile/profile.dart';
@@ -81,12 +82,21 @@ class _ChromixView extends StatefulWidget {
 }
 
 class _ChromixViewState extends State<_ChromixView> {
-  bool _showResults = true;
+  bool _showResults = false;
 
   @override
   void initState() {
     super.initState();
     _showInstructionsIfFirstTime();
+
+    // If already won on restore, show results immediately.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final state = context.read<ChromixCubit>().state;
+      if (state.status == ChromixStatus.won) {
+        setState(() => _showResults = true);
+      }
+    });
   }
 
   void _showInstructionsIfFirstTime() {
@@ -113,6 +123,18 @@ class _ChromixViewState extends State<_ChromixView> {
         .fetchStats('chromix:${widget.dateKey}');
   }
 
+  void _onWin(BuildContext context) {
+    _persistStreak(context);
+    _fetchCommunityStats(context);
+
+    WinCelebration.of(context)?.trigger(
+      onShowResults: () {
+        if (!mounted) return;
+        setState(() => _showResults = true);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -128,10 +150,11 @@ class _ChromixViewState extends State<_ChromixView> {
               icon: const Icon(Icons.shuffle),
               tooltip: 'New Puzzle',
               onPressed: () {
+                WinCelebration.of(context)?.reset();
                 context.read<ChromixCubit>().resetWithSeed(
                   DateTime.now().microsecondsSinceEpoch,
                 );
-                setState(() => _showResults = true);
+                setState(() => _showResults = false);
               },
             ),
           IconButton(
@@ -141,77 +164,90 @@ class _ChromixViewState extends State<_ChromixView> {
           ),
         ],
       ),
-      body: BlocConsumer<ChromixCubit, ChromixState>(
-        listenWhen: (prev, curr) =>
-            prev.status != curr.status &&
-            curr.status == ChromixStatus.won,
-        listener: (context, state) {
-          _persistStreak(context);
-          _fetchCommunityStats(context);
-        },
-        builder: (context, state) {
-          if (state.status == ChromixStatus.loading) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
+      body: WinCelebration(
+        child: BlocConsumer<ChromixCubit, ChromixState>(
+          listenWhen: (prev, curr) =>
+              prev.status != curr.status &&
+              curr.status == ChromixStatus.won,
+          listener: (context, state) => _onWin(context),
+          builder: (context, state) {
+            if (state.status == ChromixStatus.loading) {
+              return const Center(
+                child: CircularProgressIndicator(),
+              );
+            }
 
-          return Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    ColorBar(
-                      distribution: state.target,
-                      label: 'Target',
-                    ),
-                    const SizedBox(height: 8),
-                    BlocBuilder<ChromixCubit, ChromixState>(
-                      buildWhen: (prev, curr) =>
-                          prev.currentDistribution !=
-                          curr.currentDistribution,
-                      builder: (context, state) {
-                        return ColorBar(
-                          distribution:
-                              state.currentDistribution,
-                          label: 'Current',
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    const Expanded(child: ChromixGrid()),
-                    const SizedBox(height: 16),
-                    const ColorPalette(),
-                    const SizedBox(height: 12),
-                    _UndoRow(state: state),
-                  ],
-                ),
-              ),
-              if (state.status == ChromixStatus.won &&
-                  _showResults)
-                Positioned.fill(
-                  child: ChromixResultsOverlay(
-                    state: state,
-                    onViewPuzzle: () =>
-                        setState(() => _showResults = false),
+            return Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      ColorBar(
+                        distribution: state.target,
+                        label: 'Target',
+                      ),
+                      const SizedBox(height: 8),
+                      BlocBuilder<ChromixCubit, ChromixState>(
+                        buildWhen: (prev, curr) =>
+                            prev.currentDistribution !=
+                            curr.currentDistribution,
+                        builder: (context, state) {
+                          return ColorBar(
+                            distribution:
+                                state.currentDistribution,
+                            label: 'Current',
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      const Expanded(child: ChromixGrid()),
+                      const SizedBox(height: 12),
+                      if (state.hasContiguityViolation)
+                        Padding(
+                          padding:
+                              const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            'Colors must be connected',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .error,
+                                ),
+                          ),
+                        ),
+                      _UndoRow(state: state),
+                    ],
                   ),
                 ),
-              if (state.status == ChromixStatus.won &&
-                  !_showResults)
-                Positioned(
-                  bottom: 16,
-                  right: 16,
-                  child: FloatingActionButton.extended(
-                    onPressed: () =>
-                        setState(() => _showResults = true),
-                    icon: const Icon(Icons.emoji_events),
-                    label: const Text('Results'),
+                if (state.status == ChromixStatus.won &&
+                    _showResults)
+                  Positioned.fill(
+                    child: ChromixResultsOverlay(
+                      state: state,
+                      onViewPuzzle: () =>
+                          setState(() => _showResults = false),
+                    ),
                   ),
-                ),
-            ],
-          );
-        },
+                if (state.status == ChromixStatus.won &&
+                    !_showResults)
+                  Positioned(
+                    bottom: 16,
+                    right: 16,
+                    child: FloatingActionButton.extended(
+                      onPressed: () =>
+                          setState(() => _showResults = true),
+                      icon: const Icon(Icons.emoji_events),
+                      label: const Text('Results'),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

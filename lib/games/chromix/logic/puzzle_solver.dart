@@ -1,4 +1,5 @@
 import 'package:very_good_games/games/chromix/logic/color_mixer.dart';
+import 'package:very_good_games/games/chromix/logic/contiguity_checker.dart';
 import 'package:very_good_games/games/chromix/models/models.dart';
 
 /// Result of solving a Chromix puzzle.
@@ -105,7 +106,8 @@ class _Solver {
     if (solutionCount >= 2) return;
 
     if (decisionIdx == _decisionIndices.length) {
-      if (_matchesTarget()) {
+      if (_matchesTarget() &&
+          allGroupsContiguous(ChromixGrid(cells: _cells))) {
         solutionCount++;
         if (bestMoves == null || moves < bestMoves!) {
           bestMoves = moves;

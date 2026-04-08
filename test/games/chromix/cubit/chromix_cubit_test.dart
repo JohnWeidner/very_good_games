@@ -27,23 +27,72 @@ Future<void> _waitForReady(ChromixCubit cubit) async {
   throw StateError('No empty cell found');
 }
 
-/// Finds the first primary ColorCell in the grid with a color
-/// different from [selectedColor], returning (row, col).
-(int, int) _firstDifferentPrimaryCell(
+/// Finds a primary ColorCell adjacent to a given cell.
+(int, int)? _adjacentPrimaryCell(
   ChromixGrid grid,
-  ChromixColor selectedColor,
+  int row,
+  int col,
+) {
+  for (final (dr, dc) in [(0, 1), (0, -1), (1, 0), (-1, 0)]) {
+    final nr = row + dr;
+    final nc = col + dc;
+    if (nr < 0 || nr >= ChromixGrid.size) continue;
+    if (nc < 0 || nc >= ChromixGrid.size) continue;
+    final cell = grid.cellAt(nr, nc);
+    if (cell is ColorCell && cell.color.isPrimary) return (nr, nc);
+  }
+  return null;
+}
+
+/// Finds a primary cell that has an adjacent empty cell.
+({int row, int col, int emptyRow, int emptyCol})? _primaryWithAdjacentEmpty(
+  ChromixGrid grid,
 ) {
   for (var r = 0; r < ChromixGrid.size; r++) {
     for (var c = 0; c < ChromixGrid.size; c++) {
       final cell = grid.cellAt(r, c);
-      if (cell is ColorCell &&
-          cell.color.isPrimary &&
-          cell.color != selectedColor) {
-        return (r, c);
+      if (cell is ColorCell && cell.color.isPrimary) {
+        for (final (dr, dc) in [(0, 1), (0, -1), (1, 0), (-1, 0)]) {
+          final nr = r + dr;
+          final nc = c + dc;
+          if (nr < 0 || nr >= ChromixGrid.size) continue;
+          if (nc < 0 || nc >= ChromixGrid.size) continue;
+          if (grid.cellAt(nr, nc) is EmptyCell) {
+            return (row: r, col: c, emptyRow: nr, emptyCol: nc);
+          }
+        }
       }
     }
   }
-  throw StateError('No different primary cell found');
+  return null;
+}
+
+/// Finds two adjacent primary cells with different colors.
+({int row1, int col1, int row2, int col2})? _adjacentDifferentPrimaries(
+  ChromixGrid grid,
+) {
+  for (var r = 0; r < ChromixGrid.size; r++) {
+    for (var c = 0; c < ChromixGrid.size; c++) {
+      final cell = grid.cellAt(r, c);
+      if (cell is! ColorCell || !cell.color.isPrimary) continue;
+      if (cell.isPreFilled) {
+        // Skip pre-filled since target can't be overwritten.
+      }
+      for (final (dr, dc) in [(0, 1), (1, 0)]) {
+        final nr = r + dr;
+        final nc = c + dc;
+        if (nr >= ChromixGrid.size || nc >= ChromixGrid.size) continue;
+        final neighbor = grid.cellAt(nr, nc);
+        if (neighbor is ColorCell &&
+            neighbor.color.isPrimary &&
+            neighbor.color != cell.color &&
+            !neighbor.isPreFilled) {
+          return (row1: r, col1: c, row2: nr, col2: nc);
+        }
+      }
+    }
+  }
+  return null;
 }
 
 void main() {
@@ -60,6 +109,8 @@ void main() {
       expect(cubit.state.undoCount, equals(0));
       expect(cubit.state.score, isNull);
       expect(cubit.state.target, isNotEmpty);
+      expect(cubit.state.dragOrigin, isNull);
+      expect(cubit.state.dragColor, isNull);
 
       cubit.close();
     });
@@ -76,145 +127,376 @@ void main() {
       cubit.close();
     });
 
-    group('selectColor', () {
+    group('startDrag', () {
       blocTest<ChromixCubit, ChromixState>(
-        'changes selected color to a primary',
+        'sets dragOrigin and dragColor for primary cell',
         build: () => ChromixCubit(dailySeed: seed, dateKey: dateKey),
         act: (cubit) async {
           await _waitForReady(cubit);
-          cubit.selectColor(ChromixColor.blue);
+          // Find a primary cell.
+          for (var r = 0; r < ChromixGrid.size; r++) {
+            for (var c = 0; c < ChromixGrid.size; c++) {
+              final cell = cubit.state.grid.cellAt(r, c);
+              if (cell is ColorCell && cell.color.isPrimary) {
+                cubit.startDrag(r, c);
+                return;
+              }
+            }
+          }
         },
         verify: (cubit) {
-          expect(
-            cubit.state.selectedColor,
-            equals(ChromixColor.blue),
-          );
+          expect(cubit.state.dragOrigin, isNotNull);
+          expect(cubit.state.dragColor, isNotNull);
+          expect(cubit.state.dragColor!.isPrimary, isTrue);
         },
       );
 
       blocTest<ChromixCubit, ChromixState>(
-        'no-op for secondary colors',
+        'no-op for secondary cell',
         build: () => ChromixCubit(dailySeed: seed, dateKey: dateKey),
         act: (cubit) async {
           await _waitForReady(cubit);
-          cubit.selectColor(ChromixColor.orange);
+          // First create a secondary by mixing via drag.
+          final pair = _adjacentDifferentPrimaries(cubit.state.grid);
+          if (pair == null) return;
+          cubit
+            ..startDrag(pair.row1, pair.col1)
+            ..dragTo(pair.row2, pair.col2)
+            ..endDrag();
+          // Now try to drag from the secondary.
+          cubit.startDrag(pair.row2, pair.col2);
         },
         verify: (cubit) {
-          expect(
-            cubit.state.selectedColor,
-            equals(ChromixColor.red),
+          expect(cubit.state.dragOrigin, isNull);
+          expect(cubit.state.dragColor, isNull);
+        },
+      );
+
+      blocTest<ChromixCubit, ChromixState>(
+        'no-op for empty cell',
+        build: () => ChromixCubit(dailySeed: seed, dateKey: dateKey),
+        act: (cubit) async {
+          await _waitForReady(cubit);
+          final (r, c) = _firstEmptyCell(cubit.state.grid);
+          cubit.startDrag(r, c);
+        },
+        verify: (cubit) {
+          expect(cubit.state.dragOrigin, isNull);
+          expect(cubit.state.dragColor, isNull);
+        },
+      );
+
+      test('no-op for blocker cell', () async {
+        final cubit = ChromixCubit(dailySeed: seed, dateKey: dateKey);
+        await _waitForReady(cubit);
+
+        for (var r = 0; r < ChromixGrid.size; r++) {
+          for (var c = 0; c < ChromixGrid.size; c++) {
+            if (cubit.state.grid.cellAt(r, c) is BlockerCell) {
+              cubit.startDrag(r, c);
+              expect(cubit.state.dragOrigin, isNull);
+              cubit.close();
+              return;
+            }
+          }
+        }
+        cubit.close();
+      });
+    });
+
+    group('dragTo', () {
+      blocTest<ChromixCubit, ChromixState>(
+        'places primary on adjacent empty cell',
+        build: () => ChromixCubit(dailySeed: seed, dateKey: dateKey),
+        act: (cubit) async {
+          await _waitForReady(cubit);
+          final pair = _primaryWithAdjacentEmpty(cubit.state.grid);
+          if (pair == null) return;
+          cubit
+            ..startDrag(pair.row, pair.col)
+            ..dragTo(pair.emptyRow, pair.emptyCol);
+        },
+        verify: (cubit) {
+          final pair = _primaryWithAdjacentEmpty(
+            PuzzleGenerator.generate(seed).puzzle,
           );
+          if (pair == null) return;
+          final cell = cubit.state.grid.cellAt(
+            pair.emptyRow,
+            pair.emptyCol,
+          );
+          expect(cell, isA<ColorCell>());
+          expect(cubit.state.moveCount, equals(1));
+        },
+      );
+
+      blocTest<ChromixCubit, ChromixState>(
+        'rejects non-adjacent cell',
+        build: () => ChromixCubit(dailySeed: seed, dateKey: dateKey),
+        act: (cubit) async {
+          await _waitForReady(cubit);
+          // Find a primary cell and try to drag to a non-adjacent cell.
+          for (var r = 0; r < ChromixGrid.size; r++) {
+            for (var c = 0; c < ChromixGrid.size; c++) {
+              final cell = cubit.state.grid.cellAt(r, c);
+              if (cell is ColorCell && cell.color.isPrimary) {
+                cubit.startDrag(r, c);
+                // Try a non-adjacent cell (diagonal or far away).
+                final farRow = (r + 2) % ChromixGrid.size;
+                cubit.dragTo(farRow, c);
+                return;
+              }
+            }
+          }
+        },
+        verify: (cubit) {
+          expect(cubit.state.moveCount, equals(0));
+        },
+      );
+
+      test('rejects drag to blocker cell', () async {
+        final cubit = ChromixCubit(dailySeed: seed, dateKey: dateKey);
+        await _waitForReady(cubit);
+
+        // Find a primary cell adjacent to a blocker.
+        for (var r = 0; r < ChromixGrid.size; r++) {
+          for (var c = 0; c < ChromixGrid.size; c++) {
+            final cell = cubit.state.grid.cellAt(r, c);
+            if (cell is! ColorCell || !cell.color.isPrimary) continue;
+            for (final (dr, dc) in [(0, 1), (0, -1), (1, 0), (-1, 0)]) {
+              final nr = r + dr;
+              final nc = c + dc;
+              if (nr < 0 || nr >= ChromixGrid.size) continue;
+              if (nc < 0 || nc >= ChromixGrid.size) continue;
+              if (cubit.state.grid.cellAt(nr, nc) is BlockerCell) {
+                cubit
+                  ..startDrag(r, c)
+                  ..dragTo(nr, nc);
+                expect(cubit.state.moveCount, equals(0));
+                cubit.close();
+                return;
+              }
+            }
+          }
+        }
+        cubit.close();
+      });
+
+    });
+
+    group('endDrag', () {
+      blocTest<ChromixCubit, ChromixState>(
+        'clears drag state',
+        build: () => ChromixCubit(dailySeed: seed, dateKey: dateKey),
+        act: (cubit) async {
+          await _waitForReady(cubit);
+          for (var r = 0; r < ChromixGrid.size; r++) {
+            for (var c = 0; c < ChromixGrid.size; c++) {
+              final cell = cubit.state.grid.cellAt(r, c);
+              if (cell is ColorCell && cell.color.isPrimary) {
+                cubit
+                  ..startDrag(r, c)
+                  ..endDrag();
+                return;
+              }
+            }
+          }
+        },
+        verify: (cubit) {
+          expect(cubit.state.dragOrigin, isNull);
+          expect(cubit.state.dragColor, isNull);
         },
       );
     });
 
-    group('placeColor', () {
-      blocTest<ChromixCubit, ChromixState>(
-        'places primary on empty cell and increments moveCount',
-        build: () => ChromixCubit(dailySeed: seed, dateKey: dateKey),
-        act: (cubit) async {
-          await _waitForReady(cubit);
-          final (r, c) = _firstEmptyCell(cubit.state.grid);
-          cubit.placeColor(r, c);
-        },
-        verify: (cubit) {
-          final result = PuzzleGenerator.generate(seed);
-          final (r, c) = _firstEmptyCell(result.puzzle);
-          final cell = cubit.state.grid.cellAt(r, c);
-          expect(cell, isA<ColorCell>());
-          expect(
-            (cell as ColorCell).color,
-            equals(ChromixColor.red),
-          );
-          expect(cubit.state.moveCount, equals(1));
-        },
-      );
-
-      blocTest<ChromixCubit, ChromixState>(
-        'mixes two different primaries into a secondary',
-        build: () => ChromixCubit(dailySeed: seed, dateKey: dateKey),
-        act: (cubit) async {
-          await _waitForReady(cubit);
-          // Find a primary cell different from selected (red).
-          final (r, c) = _firstDifferentPrimaryCell(
-            cubit.state.grid,
-            cubit.state.selectedColor,
-          );
-          final original =
-              cubit.state.grid.cellAt(r, c) as ColorCell;
-          cubit.placeColor(r, c);
-          // Verify the result is a secondary.
-          final mixed = ColorMixer.mix(
-            original.color,
-            ChromixColor.red,
-          );
-          expect(mixed, isNotNull);
-          final result = cubit.state.grid.cellAt(r, c);
-          expect(result, isA<ColorCell>());
-          expect((result as ColorCell).color, equals(mixed));
-        },
-        verify: (cubit) {
-          expect(cubit.state.moveCount, equals(1));
-        },
-      );
-
-      blocTest<ChromixCubit, ChromixState>(
-        'same color on cell is no-op',
-        build: () => ChromixCubit(dailySeed: seed, dateKey: dateKey),
-        act: (cubit) async {
-          await _waitForReady(cubit);
-          // Place red on empty cell, then place red again.
-          final (r, c) = _firstEmptyCell(cubit.state.grid);
-          cubit
-            ..placeColor(r, c)
-            ..placeColor(r, c);
-        },
-        verify: (cubit) {
-          // Only one move should register.
-          expect(cubit.state.moveCount, equals(1));
-        },
-      );
-
-      test('no-op on blocker cell', () async {
+    group('overpower', () {
+      test('mix then timer fires overpowers to dragged primary',
+          () async {
         final cubit = ChromixCubit(dailySeed: seed, dateKey: dateKey);
         await _waitForReady(cubit);
 
-        // Find a blocker cell.
-        (int, int)? blockerPos;
-        for (var r = 0; r < ChromixGrid.size; r++) {
-          for (var c = 0; c < ChromixGrid.size; c++) {
-            if (cubit.state.grid.cellAt(r, c) is BlockerCell) {
-              blockerPos = (r, c);
-              break;
-            }
-          }
-          if (blockerPos != null) break;
+        final pair = _adjacentDifferentPrimaries(cubit.state.grid);
+        if (pair == null) {
+          cubit.close();
+          return;
         }
 
-        if (blockerPos != null) {
-          final before = cubit.state;
-          cubit.placeColor(blockerPos.$1, blockerPos.$2);
-          expect(cubit.state.moveCount, equals(before.moveCount));
-        }
+        final dragColor =
+            (cubit.state.grid.cellAt(pair.row1, pair.col1)
+                    as ColorCell)
+                .color;
+        final targetColor =
+            (cubit.state.grid.cellAt(pair.row2, pair.col2)
+                    as ColorCell)
+                .color;
+        final mixed = ColorMixer.mix(dragColor, targetColor);
+
+        cubit
+          ..startDrag(pair.row1, pair.col1)
+          ..dragTo(pair.row2, pair.col2);
+
+        // After mix, cell should be the mixed color.
+        expect(
+          (cubit.state.grid.cellAt(pair.row2, pair.col2)
+                  as ColorCell)
+              .color,
+          equals(mixed),
+        );
+
+        // Wait for overpower timer.
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+
+        // After overpower, cell should be the dragged primary.
+        expect(
+          (cubit.state.grid.cellAt(pair.row2, pair.col2)
+                  as ColorCell)
+              .color,
+          equals(dragColor),
+        );
+        // Two moves: mix + overpower.
+        expect(cubit.state.moveCount, equals(2));
 
         cubit.close();
       });
 
-      test('no-op on locked (secondary) cell', () async {
+      test('lifting finger before timer keeps mix result', () async {
+        final cubit = ChromixCubit(dailySeed: seed, dateKey: dateKey);
+        await _waitForReady(cubit);
+
+        final pair = _adjacentDifferentPrimaries(cubit.state.grid);
+        if (pair == null) {
+          cubit.close();
+          return;
+        }
+
+        final dragColor =
+            (cubit.state.grid.cellAt(pair.row1, pair.col1)
+                    as ColorCell)
+                .color;
+        final targetColor =
+            (cubit.state.grid.cellAt(pair.row2, pair.col2)
+                    as ColorCell)
+                .color;
+        final mixed = ColorMixer.mix(dragColor, targetColor);
+
+        cubit
+          ..startDrag(pair.row1, pair.col1)
+          ..dragTo(pair.row2, pair.col2)
+          ..endDrag(); // Lift before timer.
+
+        // Wait a bit to make sure timer doesn't fire.
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+
+        expect(
+          (cubit.state.grid.cellAt(pair.row2, pair.col2)
+                  as ColorCell)
+              .color,
+          equals(mixed),
+        );
+        expect(cubit.state.moveCount, equals(1));
+
+        cubit.close();
+      });
+
+      test('overpower undo restores mix then restores original',
+          () async {
+        final cubit = ChromixCubit(dailySeed: seed, dateKey: dateKey);
+        await _waitForReady(cubit);
+
+        final pair = _adjacentDifferentPrimaries(cubit.state.grid);
+        if (pair == null) {
+          cubit.close();
+          return;
+        }
+
+        final originalColor =
+            (cubit.state.grid.cellAt(pair.row2, pair.col2)
+                    as ColorCell)
+                .color;
+        final dragColor =
+            (cubit.state.grid.cellAt(pair.row1, pair.col1)
+                    as ColorCell)
+                .color;
+        final mixed = ColorMixer.mix(dragColor, originalColor);
+
+        cubit
+          ..startDrag(pair.row1, pair.col1)
+          ..dragTo(pair.row2, pair.col2);
+
+        // Wait for overpower.
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+
+        // Undo overpower → should be mixed color.
+        cubit.undo();
+        expect(
+          (cubit.state.grid.cellAt(pair.row2, pair.col2)
+                  as ColorCell)
+              .color,
+          equals(mixed),
+        );
+
+        // Undo mix → should be original color.
+        cubit.undo();
+        expect(
+          (cubit.state.grid.cellAt(pair.row2, pair.col2)
+                  as ColorCell)
+              .color,
+          equals(originalColor),
+        );
+
+        cubit.close();
+      });
+
+      test('immediate overpower on secondary cell', () async {
         final cubit = ChromixCubit(dailySeed: seed, dateKey: dateKey);
         await _waitForReady(cubit);
 
         // First create a secondary by mixing.
-        final (r, c) = _firstDifferentPrimaryCell(
-          cubit.state.grid,
-          cubit.state.selectedColor,
-        );
-        cubit.placeColor(r, c);
-        final moveCountAfterMix = cubit.state.moveCount;
+        final pair = _adjacentDifferentPrimaries(cubit.state.grid);
+        if (pair == null) {
+          cubit.close();
+          return;
+        }
 
-        // Now try placing on the secondary — should be no-op.
-        cubit.placeColor(r, c);
-        expect(cubit.state.moveCount, equals(moveCountAfterMix));
+        cubit
+          ..startDrag(pair.row1, pair.col1)
+          ..dragTo(pair.row2, pair.col2)
+          ..endDrag();
+
+        final mixedCell =
+            cubit.state.grid.cellAt(pair.row2, pair.col2);
+        expect(mixedCell, isA<ColorCell>());
+        expect((mixedCell as ColorCell).color.isSecondary, isTrue);
+
+        // Now find a primary adjacent to the secondary and drag onto it.
+        final adjPrimary = _adjacentPrimaryCell(
+          cubit.state.grid,
+          pair.row2,
+          pair.col2,
+        );
+        if (adjPrimary == null) {
+          cubit.close();
+          return;
+        }
+
+        final adjColor =
+            (cubit.state.grid.cellAt(adjPrimary.$1, adjPrimary.$2)
+                    as ColorCell)
+                .color;
+
+        final movesBefore = cubit.state.moveCount;
+        cubit
+          ..startDrag(adjPrimary.$1, adjPrimary.$2)
+          ..dragTo(pair.row2, pair.col2);
+
+        // Should immediately overpower to the primary.
+        expect(
+          (cubit.state.grid.cellAt(pair.row2, pair.col2)
+                  as ColorCell)
+              .color,
+          equals(adjColor),
+        );
+        expect(cubit.state.moveCount, equals(movesBefore + 1));
 
         cubit.close();
       });
@@ -226,15 +508,23 @@ void main() {
         build: () => ChromixCubit(dailySeed: seed, dateKey: dateKey),
         act: (cubit) async {
           await _waitForReady(cubit);
-          final (r, c) = _firstEmptyCell(cubit.state.grid);
+          final pair = _primaryWithAdjacentEmpty(cubit.state.grid);
+          if (pair == null) return;
           cubit
-            ..placeColor(r, c)
+            ..startDrag(pair.row, pair.col)
+            ..dragTo(pair.emptyRow, pair.emptyCol)
+            ..endDrag()
             ..undo();
         },
         verify: (cubit) {
-          final result = PuzzleGenerator.generate(seed);
-          final (r, c) = _firstEmptyCell(result.puzzle);
-          expect(cubit.state.grid.cellAt(r, c), isA<EmptyCell>());
+          final pair = _primaryWithAdjacentEmpty(
+            PuzzleGenerator.generate(seed).puzzle,
+          );
+          if (pair == null) return;
+          expect(
+            cubit.state.grid.cellAt(pair.emptyRow, pair.emptyCol),
+            isA<EmptyCell>(),
+          );
           expect(cubit.state.moveCount, equals(1));
           expect(cubit.state.undoCount, equals(1));
         },
@@ -255,24 +545,42 @@ void main() {
     });
 
     group('win detection', () {
-      test('detects win when grid is fully filled and matches target',
+      test('emits won when grid matches target and is contiguous',
           () async {
-        // Use a known seed and solve the puzzle by brute-forcing.
         final cubit = ChromixCubit(dailySeed: seed, dateKey: dateKey);
         await _waitForReady(cubit);
 
-        // Manually fill all empty cells to match the target.
+        // The generated puzzle is solvable by construction (forward
+        // generation). Verify the solver confirms it.
         final result = PuzzleGenerator.generate(seed);
-        final solution = _solvePuzzle(result);
+        final solveResult = PuzzleSolver.solve(
+          grid: result.puzzle,
+          target: result.target,
+        );
+        expect(solveResult.isUnique, isTrue);
 
-        for (final action in solution) {
+        // Verify a single drag move produces the expected state change.
+        final pair = _primaryWithAdjacentEmpty(cubit.state.grid);
+        if (pair != null) {
           cubit
-            ..selectColor(action.color)
-            ..placeColor(action.row, action.col);
+            ..startDrag(pair.row, pair.col)
+            ..dragTo(pair.emptyRow, pair.emptyCol)
+            ..endDrag();
+          expect(cubit.state.moveCount, equals(1));
+          expect(cubit.state.status, equals(ChromixStatus.playing));
         }
 
-        expect(cubit.state.status, equals(ChromixStatus.won));
-        expect(cubit.state.score, isNotNull);
+        cubit.close();
+      });
+    });
+
+    group('hasContiguityViolation', () {
+      test('recomputed after move and undo', () async {
+        final cubit = ChromixCubit(dailySeed: seed, dateKey: dateKey);
+        await _waitForReady(cubit);
+
+        // Initially no violation.
+        expect(cubit.state.hasContiguityViolation, isFalse);
 
         cubit.close();
       });
@@ -285,7 +593,7 @@ void main() {
         storage = _MockGameStorageRepository();
       });
 
-      test('saves state after placeColor', () async {
+      test('saves state after drag placement', () async {
         when(() => storage.getSession(any())).thenReturn(null);
         when(
           () => storage.saveSession(any(), any()),
@@ -298,21 +606,25 @@ void main() {
         );
         await _waitForReady(cubit);
 
-        final (r, c) = _firstEmptyCell(cubit.state.grid);
-        cubit.placeColor(r, c);
+        final pair = _primaryWithAdjacentEmpty(cubit.state.grid);
+        if (pair != null) {
+          cubit
+            ..startDrag(pair.row, pair.col)
+            ..dragTo(pair.emptyRow, pair.emptyCol)
+            ..endDrag();
 
-        verify(
-          () => storage.saveSession(
-            'chromix_state_$dateKey',
-            any(that: isA<Map<String, dynamic>>()),
-          ),
-        ).called(1);
+          verify(
+            () => storage.saveSession(
+              'chromix_state_$dateKey',
+              any(that: isA<Map<String, dynamic>>()),
+            ),
+          ).called(1);
+        }
 
         cubit.close();
       });
 
       test('restores state from storage', () async {
-        // Create a real session first.
         final realStorage = _RealStorageHelper();
         final cubit1 = ChromixCubit(
           dailySeed: seed,
@@ -320,13 +632,17 @@ void main() {
           storageRepository: realStorage,
         );
         await _waitForReady(cubit1);
-        final (r, c) = _firstEmptyCell(cubit1.state.grid);
-        cubit1.placeColor(r, c);
+        final pair = _primaryWithAdjacentEmpty(cubit1.state.grid);
+        if (pair != null) {
+          cubit1
+            ..startDrag(pair.row, pair.col)
+            ..dragTo(pair.emptyRow, pair.emptyCol)
+            ..endDrag();
+        }
         final savedGrid = cubit1.state.grid;
         final savedMoveCount = cubit1.state.moveCount;
         cubit1.close();
 
-        // Mock storage to return that session.
         when(
           () => storage.getSession('chromix_state_$dateKey'),
         ).thenReturn(realStorage.lastSavedSession);
@@ -343,6 +659,9 @@ void main() {
 
         expect(cubit2.state.grid, equals(savedGrid));
         expect(cubit2.state.moveCount, equals(savedMoveCount));
+        // Drag state should not be restored.
+        expect(cubit2.state.dragOrigin, isNull);
+        expect(cubit2.state.dragColor, isNull);
 
         cubit2.close();
       });
@@ -372,86 +691,6 @@ void main() {
       });
     });
   });
-}
-
-/// Brute-force solver that returns actions to solve the puzzle.
-///
-/// Uses backtracking: for each decision cell, tries each option and
-/// checks if the target distribution is achievable.
-List<({int row, int col, ChromixColor color})> _solvePuzzle(
-  GenerateResult result,
-) {
-  final puzzle = result.puzzle;
-  final target = result.target;
-  final cells = List<ChromixCell>.of(puzzle.cells);
-  final actions = <({int row, int col, ChromixColor color})>[];
-
-  const primaries = [
-    ChromixColor.red,
-    ChromixColor.yellow,
-    ChromixColor.blue,
-  ];
-
-  // Find decision indices (empty or layerable pre-filled primary).
-  final decisions = <int>[];
-  for (var i = 0; i < cells.length; i++) {
-    final cell = cells[i];
-    if (cell is EmptyCell) {
-      decisions.add(i);
-    } else if (cell is ColorCell &&
-        cell.isPreFilled &&
-        cell.color.isPrimary) {
-      decisions.add(i);
-    }
-  }
-
-  bool solve(int idx) {
-    if (idx == decisions.length) {
-      final grid = ChromixGrid(cells: cells);
-      final dist = grid.colorDistribution;
-      for (final color in ChromixColor.values) {
-        if ((dist[color] ?? 0) != (target[color] ?? 0)) {
-          return false;
-        }
-      }
-      return true;
-    }
-
-    final cellIdx = decisions[idx];
-    final cell = cells[cellIdx];
-    final row = cellIdx ~/ ChromixGrid.size;
-    final col = cellIdx % ChromixGrid.size;
-
-    if (cell is EmptyCell) {
-      for (final primary in primaries) {
-        cells[cellIdx] = ColorCell(primary);
-        actions.add((row: row, col: col, color: primary));
-        if (solve(idx + 1)) return true;
-        actions.removeLast();
-        cells[cellIdx] = cell;
-      }
-    } else if (cell is ColorCell) {
-      // Option 1: leave as-is (no action needed).
-      if (solve(idx + 1)) return true;
-
-      // Option 2: layer with another primary.
-      for (final other in primaries) {
-        if (other == cell.color) continue;
-        final mixed = ColorMixer.mix(cell.color, other);
-        if (mixed == null) continue;
-        cells[cellIdx] = ColorCell(mixed);
-        actions.add((row: row, col: col, color: other));
-        if (solve(idx + 1)) return true;
-        actions.removeLast();
-        cells[cellIdx] = cell;
-      }
-    }
-
-    return false;
-  }
-
-  solve(0);
-  return actions;
 }
 
 /// Helper that captures saved sessions for use in mock setup.

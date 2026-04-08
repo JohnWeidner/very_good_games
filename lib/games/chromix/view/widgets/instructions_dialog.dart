@@ -27,26 +27,36 @@ class ChromixInstructionsDialog extends StatelessWidget {
               theme,
               'Goal',
               'Fill the grid so the color distribution '
-                  'matches the target bar.',
+                  'matches the target bar, with each color '
+                  'forming one connected group.',
+            ),
+            const SizedBox(height: 12),
+            _section(
+              theme,
+              'Drag to Spread Color',
+              'Drag a primary colored cell (R, Y, B) to an adjacent '
+                  'empty cell to spread that color.',
             ),
             const SizedBox(height: 12),
             _section(
               theme,
               'Color Mixing (RYB)',
-              'Red + Yellow = Orange\n'
+              'Drag a primary onto a different primary '
+                  'to mix:\n'
+                  'Red + Yellow = Orange\n'
                   'Red + Blue = Purple\n'
-                  'Yellow + Blue = Green',
+                  'Yellow + Blue = Green\n\n'
+                  'Hold longer to overpower — the mixed '
+                  'color becomes the dragged color.',
             ),
             const SizedBox(height: 12),
             _section(
               theme,
-              'How to Play',
-              '1. Select a primary color (R, Y, or B)\n'
-                  '2. Tap an empty cell to place it\n'
-                  '3. Tap a primary cell with a different '
-                  'primary to mix\n'
-                  '4. Use undo to reverse mistakes\n'
-                  '5. Match the target color bar to win!',
+              'Contiguity Rule',
+              'Each color must form one connected group '
+                  '(orthogonally adjacent). Disconnected '
+                  'groups of the same color will not count '
+                  'as a win.',
             ),
             const SizedBox(height: 12),
             _section(
