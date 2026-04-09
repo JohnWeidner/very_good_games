@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:very_good_games/games/cascade/cubit/cubit.dart';
@@ -24,13 +26,9 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
     with TickerProviderStateMixin {
   AnimationController? _dropController;
 
-  /// Which ball is currently animating (0, 1, 2), or 3 when done.
-  int _currentBallIndex = 0;
-
-  /// Fractional progress within the current ball's path (0.0 to
-  /// positions.length - 1). Used to interpolate smoothly between
-  /// grid positions.
-  double _currentProgress = 0;
+  /// Per-ball eased progress through positions.
+  /// -1 means not started, >= 0 means animating or completed.
+  List<double> _ballProgress = const [-1, -1, -1];
 
   @override
   void dispose() {
@@ -42,52 +40,195 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
     final result = state.dropResult;
     if (result == null) return;
 
-    _currentBallIndex = 0;
-    _currentProgress = 0;
+    _ballProgress = [-1, -1, -1];
 
-    // Total segments (gaps between positions) across all balls.
-    final totalSegments = result.paths.fold<int>(
-      0,
-      (sum, p) => sum + p.positions.length - 1,
-    );
+    // Each ball's total segment count.
+    final segCounts = result.paths
+        .map((p) => p.positions.length - 1)
+        .toList();
+
+    // Ball N+1 starts when ball N reaches the bin. We need to
+    // find the *linear* time fraction at which _gravityEase
+    // output reaches binBounceStart / totalSegments for each ball,
+    // then convert that to a segment-count offset.
+    final ballStartSegments = <double>[0]; // Ball 0 starts at 0.
+
+    for (var i = 0; i < result.paths.length - 1; i++) {
+      final segs = segCounts[i];
+      final bounceStart = result.paths[i].binBounceStart ?? segs;
+      final targetFraction = bounceStart / segs;
+
+      // Binary search for the linear t where
+      // _gravityEase(t) >= targetFraction.
+      var lo = 0.0;
+      var hi = 1.0;
+      for (var iter = 0; iter < 50; iter++) {
+        final mid = (lo + hi) / 2;
+        final eased = _gravityEase(mid, result.paths[i], segs);
+        if (eased < targetFraction) {
+          lo = mid;
+        } else {
+          hi = mid;
+        }
+      }
+      // Convert linear time fraction to segment units.
+      final linearSegsToReachBin = hi * segs;
+      ballStartSegments.add(
+        ballStartSegments.last + linearSegsToReachBin,
+      );
+    }
+
+    // Total timeline = last ball's start + its full segment count.
+    final totalGlobalSegments =
+        ballStartSegments.last + segCounts.last;
 
     _dropController?.dispose();
     _dropController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: totalSegments * 500),
+      duration: Duration(
+        milliseconds: totalGlobalSegments.round() * 120,
+      ),
     );
 
     _dropController!.addListener(() {
       if (!mounted) return;
-      final progress = _dropController!.value * totalSegments;
-      var segmentsConsumed = 0;
+      final globalProgress =
+          _dropController!.value * totalGlobalSegments;
 
+      final newProgress = <double>[];
       for (var i = 0; i < result.paths.length; i++) {
-        final segments = result.paths[i].positions.length - 1;
-        if (progress < segmentsConsumed + segments) {
-          setState(() {
-            _currentBallIndex = i;
-            _currentProgress = progress - segmentsConsumed;
-          });
-          return;
+        final segs = segCounts[i];
+        final start = ballStartSegments[i];
+        final localLinear = globalProgress - start;
+
+        if (localLinear < 0) {
+          newProgress.add(-1);
+        } else {
+          final ballT = (localLinear / segs).clamp(0, 1);
+          final eased = _gravityEase(
+            ballT.toDouble(),
+            result.paths[i],
+            segs,
+          );
+          newProgress.add(eased * segs);
         }
-        segmentsConsumed += segments;
       }
 
-      // Animation complete.
-      setState(() {
-        _currentBallIndex = result.paths.length;
-        _currentProgress = 0;
-      });
+      setState(() => _ballProgress = newProgress);
     });
 
     _dropController!.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
+      if (status == AnimationStatus.completed && mounted) {
         context.read<CascadeCubit>().completeDrop();
       }
     });
 
     _dropController!.forward();
+  }
+
+  /// Maps linear time (0-1) to eased position (0-1) for a ball,
+  /// simulating gravity with velocity halving at lever hits.
+  double _gravityEase(double t, BallPath path, int totalSegments) {
+    if (totalSegments == 0) return 0;
+
+    final hitFractions = path.leverFlips
+        .map((f) => f.step / totalSegments)
+        .where((f) => f > 0 && f < 1)
+        .toList()
+      ..sort();
+
+    final boundaries = [0.0, ...hitFractions, 1.0];
+
+    var velocity = 0.0;
+    const gravity = 2.0;
+    final segmentLengths = <double>[];
+    final entryVelocities = <double>[];
+
+    for (var i = 0; i < boundaries.length - 1; i++) {
+      final length = boundaries[i + 1] - boundaries[i];
+      segmentLengths.add(length);
+      entryVelocities.add(velocity);
+
+      final dur = _solveQuadraticTime(velocity, gravity, length);
+      velocity = velocity + gravity * dur;
+
+      if (i < boundaries.length - 2) {
+        velocity *= 0.125;
+      }
+    }
+
+    velocity = 0.0;
+    final timeBoundaries = [0.0];
+    for (var i = 0; i < segmentLengths.length; i++) {
+      final dur = _solveQuadraticTime(
+        velocity,
+        gravity,
+        segmentLengths[i],
+      );
+      timeBoundaries.add(timeBoundaries.last + dur);
+      velocity = velocity + gravity * dur;
+      if (i < segmentLengths.length - 1) {
+        velocity *= 0.125;
+      }
+    }
+
+    final totalTime = timeBoundaries.last;
+    if (totalTime == 0) return t;
+
+    final physicsTime = t * totalTime;
+
+    var segIndex = 0;
+    for (var i = 0; i < timeBoundaries.length - 1; i++) {
+      if (physicsTime < timeBoundaries[i + 1] ||
+          i == timeBoundaries.length - 2) {
+        segIndex = i;
+        break;
+      }
+    }
+
+    final segStart = timeBoundaries[segIndex];
+    final dt = physicsTime - segStart;
+    final v0 = entryVelocities[segIndex];
+    final posInSegment = v0 * dt + 0.5 * gravity * dt * dt;
+    final posStart = boundaries[segIndex];
+
+    return (posStart + posInSegment).clamp(0, 1);
+  }
+
+  /// Solves v0*t + 0.5*g*t^2 = distance for t >= 0.
+  static double _solveQuadraticTime(
+    double v0,
+    double g,
+    double distance,
+  ) {
+    if (distance <= 0) return 0;
+    if (g == 0) return v0 > 0 ? distance / v0 : double.infinity;
+    final a = 0.5 * g;
+    final discriminant = v0 * v0 + 4 * a * distance;
+    if (discriminant < 0) return 0;
+    return (-v0 + _sqrt(discriminant)) / (2 * a);
+  }
+
+  static double _sqrt(double x) =>
+      x <= 0 ? 0 : math.sqrt(x);
+
+  /// Whether ball [i] has reached the bin (started bouncing or
+  /// finished). Used to determine when later balls count as
+  /// "landed" for nudge calculations.
+  bool _ballHasLanded(DropResult result, int i) {
+    if (_ballProgress[i] < 0) return false;
+    final bounceStart = result.paths[i].binBounceStart;
+    if (bounceStart == null) return false;
+    return _ballProgress[i] >= bounceStart;
+  }
+
+  /// Count of balls that have reached their bin during animation.
+  int _landedCount(DropResult result) {
+    var count = 0;
+    for (var i = 0; i < result.paths.length; i++) {
+      if (_ballHasLanded(result, i)) count++;
+    }
+    return count;
   }
 
   @override
@@ -100,8 +241,8 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
       builder: (context, state) {
         return LayoutBuilder(
           builder: (context, constraints) {
-            final cellSize = constraints.maxWidth / CascadeBoard.columns;
-            // Board rows + 1 for bins.
+            final cellSize =
+                constraints.maxWidth / CascadeBoard.columns;
             final totalHeight =
                 cellSize * (CascadeBoard.rows + 1);
 
@@ -123,16 +264,10 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
                 ),
                 child: Stack(
                   children: [
-                    // Grid background.
                     _buildGrid(cellSize),
-                    // Drop slots.
                     ..._buildDropSlots(state, cellSize),
-                    // Levers.
                     ..._buildLevers(state, cellSize),
-                    // Bins.
                     ..._buildBins(state, cellSize),
-                    // Animated balls during drop, or landed balls
-                    // after drop completes.
                     if (state.status == CascadeStatus.dropping)
                       ..._buildAnimatedBalls(state, cellSize),
                     if (state.status == CascadeStatus.won ||
@@ -154,22 +289,17 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
         cellSize * CascadeBoard.columns,
         cellSize * (CascadeBoard.rows + 1),
       ),
-      painter: _GridPainter(cellSize: cellSize),
+      painter: _SlotBackgroundPainter(cellSize: cellSize),
     );
   }
 
   /// Whether a slot ball should be visible. During configuring,
   /// always visible. During dropping, visible only until its ball
-  /// starts animating. Hidden during won/failed (landed balls
-  /// render instead).
+  /// starts animating. Hidden during won/failed.
   bool _shouldShowSlotBall(CascadeState state, BallId ball) {
     if (state.status == CascadeStatus.configuring) return true;
     if (state.status != CascadeStatus.dropping) return false;
-
-    // Balls drop in BallId order. _currentBallIndex is the index
-    // into the drop order (0 = ball1, 1 = ball2, 2 = ball3).
-    // Show the slot ball if its drop hasn't started yet.
-    return ball.index > _currentBallIndex;
+    return _ballProgress[ball.index] < 0;
   }
 
   List<Widget> _buildDropSlots(
@@ -195,11 +325,10 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
           builder: (context, candidateData, rejectedData) {
             final isHighlighted = candidateData.isNotEmpty;
 
-            // Show bottom border unless this slot's ball has
-            // started dropping (opened the gate).
             final ballHasDropped = assignedBall != null &&
                 !_shouldShowSlotBall(state, assignedBall);
-            const slotBorder = BorderSide(color: CascadeColors.gridLine);
+            const slotBorder =
+                BorderSide(color: CascadeColors.gridLine);
 
             return Container(
               width: cellSize,
@@ -207,7 +336,9 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
               decoration: isHighlighted
                   ? BoxDecoration(
                       color: Colors.blue.withValues(alpha: 0.1),
-                      border: Border.all(color: Colors.blue.shade300),
+                      border: Border.all(
+                        color: Colors.blue.shade300,
+                      ),
                       borderRadius: BorderRadius.circular(4),
                     )
                   : BoxDecoration(
@@ -219,45 +350,12 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
                             : slotBorder,
                       ),
                     ),
-              child: assignedBall != null &&
-                      _shouldShowSlotBall(state, assignedBall)
-                  ? isConfiguring
-                      ? Draggable<BallId>(
-                          data: assignedBall,
-                          feedback: Material(
-                            color: Colors.transparent,
-                            child: BallWidget(
-                              ballId: assignedBall,
-                              size: cellSize * _ballScale,
-                            ),
-                          ),
-                          childWhenDragging: Center(
-                            child: Icon(
-                              Icons.arrow_downward,
-                              color: CascadeColors.gridLine,
-                              size: cellSize * 0.4,
-                            ),
-                          ),
-                          child: Center(
-                            child: BallWidget(
-                              ballId: assignedBall,
-                              size: cellSize * _ballScale,
-                            ),
-                          ),
-                        )
-                      : Center(
-                          child: BallWidget(
-                            ballId: assignedBall,
-                            size: cellSize * _ballScale,
-                          ),
-                        )
-                  : Center(
-                      child: Icon(
-                        Icons.arrow_downward,
-                        color: CascadeColors.gridLine,
-                        size: cellSize * 0.4,
-                      ),
-                    ),
+              child: _buildSlotChild(
+                assignedBall: assignedBall,
+                state: state,
+                isConfiguring: isConfiguring,
+                cellSize: cellSize,
+              ),
             );
           },
         ),
@@ -265,23 +363,72 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
     });
   }
 
-  /// Computes which lever directions to display based on animation
-  /// progress or post-drop state. During the drop, levers flip as
-  /// balls pass through them. After a drop (won/failed), all flips
-  /// are applied so the player can see the final lever positions.
+  Widget _buildSlotChild({
+    required BallId? assignedBall,
+    required CascadeState state,
+    required bool isConfiguring,
+    required double cellSize,
+  }) {
+    if (assignedBall == null ||
+        !_shouldShowSlotBall(state, assignedBall)) {
+      return Center(
+        child: Icon(
+          Icons.arrow_downward,
+          color: CascadeColors.gridLine,
+          size: cellSize * 0.4,
+        ),
+      );
+    }
+
+    if (!isConfiguring) {
+      return Center(
+        child: BallWidget(
+          ballId: assignedBall,
+          size: cellSize * _ballScale,
+        ),
+      );
+    }
+
+    return Draggable<BallId>(
+      data: assignedBall,
+      feedback: Material(
+        color: Colors.transparent,
+        child: BallWidget(
+          ballId: assignedBall,
+          size: cellSize * _ballScale,
+        ),
+      ),
+      childWhenDragging: Center(
+        child: Icon(
+          Icons.arrow_downward,
+          color: CascadeColors.gridLine,
+          size: cellSize * 0.4,
+        ),
+      ),
+      child: Center(
+        child: BallWidget(
+          ballId: assignedBall,
+          size: cellSize * _ballScale,
+        ),
+      ),
+    );
+  }
+
+  /// Computes lever directions based on animation progress.
   List<Lever> _animatedLevers(CascadeState state) {
     final result = state.dropResult;
 
-    // During configuring or loading, show levers as-is.
     if (result == null ||
         state.status == CascadeStatus.configuring ||
         state.status == CascadeStatus.loading) {
       return state.board.levers.toList();
     }
 
-    // Start from the pre-drop lever state and replay flips.
     final levers = state.board.levers
-        .map((l) => Lever(row: l.row, col: l.col, direction: l.direction))
+        .map(
+          (l) =>
+              Lever(row: l.row, col: l.col, direction: l.direction),
+        )
         .toList();
 
     final showAll = state.status == CascadeStatus.won ||
@@ -289,15 +436,15 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
 
     for (var i = 0; i < result.paths.length; i++) {
       final path = result.paths[i];
-      if (!showAll && i > _currentBallIndex) break;
+      final progress = _ballProgress[i];
+
+      // Skip balls that haven't started.
+      if (!showAll && progress < 0) continue;
 
       for (final flip in path.leverFlips) {
-        // Apply flip if showing final state, or if the step has
-        // been reached in the current ball's animation.
-        if (showAll ||
-            i < _currentBallIndex ||
-            flip.step <= _currentProgress.floor()) {
-          levers[flip.leverIndex] = levers[flip.leverIndex].flip();
+        if (showAll || flip.step <= progress.floor()) {
+          levers[flip.leverIndex] =
+              levers[flip.leverIndex].flip();
         }
       }
     }
@@ -338,9 +485,6 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
       final expectedBallIndex = state.board.binOrder[binIndex];
       final expectedBall = BallId.values[expectedBallIndex];
 
-      // Bin border stays neutral — the balls and target labels
-      // are enough to show correctness.
-
       return Positioned(
         left: col * cellSize,
         top: CascadeBoard.rows * cellSize,
@@ -353,20 +497,14 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
   }
 
   /// Interpolates a ball's pixel position between two path steps.
-  ///
-  /// For horizontal segments (lever deflection), adds a parabolic
-  /// arc so the ball appears to bounce off the lever — rising
-  /// slightly before gravity brings it back down.
-  ///
-  /// For wall-bounce segments, the ball moves toward the wall edge
-  /// and bounces back with an arc.
   Offset _interpolatedPosition(
     BallPath path,
     double progress,
     double cellSize,
   ) {
     final maxIndex = path.positions.length - 1;
-    final clampedProgress = progress.clamp(0.0, maxIndex.toDouble());
+    final clampedProgress =
+        progress.clamp(0.0, maxIndex.toDouble());
     final fromIndex = clampedProgress.floor().clamp(0, maxIndex);
     final toIndex = (fromIndex + 1).clamp(0, maxIndex);
     final t = clampedProgress - fromIndex;
@@ -377,15 +515,13 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
     final ballSize = cellSize * _ballScale;
     final centering = (cellSize - ballSize) / 2;
 
-    var x = (from.col + (to.col - from.col) * t) * cellSize + centering;
+    var x =
+        (from.col + (to.col - from.col) * t) * cellSize + centering;
 
-    // For the final segment (entering the bin row), transition the
-    // vertical offset from centered to bottom-aligned so the ball
-    // settles at the bottom of the bin cell. Also bottom-align when
-    // sitting at the bin row after completing the transition.
     final bottomAlign = cellSize - ballSize;
     final isAtBinRow = from.row == CascadeBoard.rows;
-    final isEnteringBinRow = !isAtBinRow && to.row == CascadeBoard.rows;
+    final isEnteringBinRow =
+        !isAtBinRow && to.row == CascadeBoard.rows;
     final double yOffset;
     if (isAtBinRow) {
       yOffset = bottomAlign;
@@ -394,62 +530,111 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
     } else {
       yOffset = centering;
     }
-    var y = (from.row + (to.row - from.row) * t) * cellSize + yOffset;
+    var y =
+        (from.row + (to.row - from.row) * t) * cellSize + yOffset;
 
-    // Wall bounce: two segments where the ball moves toward the
-    // wall edge and bounces back. The wall direction is determined
-    // by which edge the ball's column is nearest.
+    // Bin bounce.
+    final bounceStart = path.binBounceStart;
+    if (bounceStart != null && fromIndex >= bounceStart) {
+      final bounceSegIndex = fromIndex - bounceStart;
+      final bounceNumber = bounceSegIndex ~/ 2;
+      final isUpSegment = bounceSegIndex.isEven;
+
+      final baseHeight = cellSize * 0.85;
+      final height = baseHeight * math.pow(0.25, bounceNumber);
+
+      final combinedT =
+          isUpSegment ? t * 0.5 : 0.5 + t * 0.5;
+      final arc = -4 * combinedT * (combinedT - 1);
+      y -= arc * height;
+      return Offset(x, y);
+    }
+
+    // Wall bounce.
     final isOutwardBounce = path.wallBounces.contains(fromIndex);
-    final isReturnBounce = path.wallBounces.contains(fromIndex - 1);
+    final isReturnBounce =
+        path.wallBounces.contains(fromIndex - 1);
 
     if (isOutwardBounce || isReturnBounce) {
-      // Determine wall direction: left wall (col 0) or right wall.
       final col = from.col;
       final wallIsLeft = col == 0;
-
-      // How far toward the wall edge the ball travels (half a cell).
       final edgeOffset = cellSize * 0.5;
 
       if (isOutwardBounce) {
-        // Moving toward wall: 0 → edgeOffset.
         final displacement = t * edgeOffset;
         x += wallIsLeft ? -displacement : displacement;
       } else {
-        // Returning from wall: edgeOffset → 0.
         final displacement = (1 - t) * edgeOffset;
         x += wallIsLeft ? -displacement : displacement;
       }
 
-      // Arc upward across both segments. Treat outward as t=0→0.5
-      // and return as t=0.5→1 of a single parabola.
-      final combinedT = isOutwardBounce ? t * 0.5 : 0.5 + t * 0.5;
+      final combinedT =
+          isOutwardBounce ? t * 0.5 : 0.5 + t * 0.5;
       final arc = -4 * combinedT * (combinedT - 1);
-      y -= arc * cellSize * 0.2;
+      y -= arc * cellSize * 0.1;
     } else {
-      // Normal horizontal deflection arc.
-      final isHorizontal = from.row == to.row && from.col != to.col;
-      if (isHorizontal) {
-        final arc = -4 * t * (t - 1);
-        y -= arc * cellSize * 0.2;
+      final isHorizontal =
+          from.row == to.row && from.col != to.col;
+
+      // Check if we're in the downward segment right after a
+      // horizontal deflection.
+      final isPrevHorizontal = fromIndex > 0 &&
+          path.positions[fromIndex - 1].row == from.row &&
+          path.positions[fromIndex - 1].col != from.col &&
+          !isHorizontal;
+
+      if (isHorizontal || isPrevHorizontal) {
+        // Spread horizontal movement and vertical arc across
+        // both the deflection segment and the following drop
+        // segment. combinedT goes 0→1 across both segments.
+        final double combinedT;
+        int deflectFromCol;
+        int deflectToCol;
+
+        if (isHorizontal) {
+          combinedT = t * 0.5; // First half of the arc.
+          deflectFromCol = from.col;
+          deflectToCol = to.col;
+        } else {
+          combinedT = 0.5 + t * 0.5; // Second half.
+          deflectFromCol = path.positions[fromIndex - 1].col;
+          deflectToCol = from.col;
+        }
+
+        // Horizontal: ease-out across the full arc so velocity
+        // reaches zero by the end.
+        final easedH = Curves.easeOut.transform(combinedT);
+        x = (deflectFromCol +
+                    (deflectToCol - deflectFromCol) * easedH) *
+                cellSize +
+            centering;
+
+        // Vertical arc: decelerate up, accelerate down.
+        final double arcT;
+        if (combinedT <= 0.5) {
+          arcT = Curves.easeOut.transform(combinedT * 2) * 0.5;
+        } else {
+          arcT = 0.5 +
+              Curves.easeIn.transform(
+                    (combinedT - 0.5) * 2,
+                  ) *
+                  0.5;
+        }
+        final arc = -4 * arcT * (arcT - 1);
+        y -= arc * cellSize * 0.1;
       }
     }
 
     return Offset(x, y);
   }
 
-  /// Returns a horizontal pixel nudge for a landed ball so that
-  /// overlapping balls in the same bin are all partially visible.
-  ///
-  /// The last ball to land at a bin stays centered (in front).
-  /// Earlier balls shift: the first displaced ball moves right,
-  /// the second displaced ball moves left.
+  /// Horizontal nudge for overlapping balls in the same bin.
   double _landedXNudge(
     DropResult result,
     int ballIndex,
     int landedCount,
   ) {
     final myBin = result.paths[ballIndex].finalBin;
-    // Count how many later landed balls share this bin.
     var laterCount = 0;
     for (var i = ballIndex + 1; i < landedCount; i++) {
       if (result.paths[i].finalBin == myBin) laterCount++;
@@ -470,28 +655,29 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
 
     final ballSize = cellSize * _ballScale;
     final widgets = <Widget>[];
+    final landed = _landedCount(result);
 
     for (var i = 0; i < result.paths.length; i++) {
+      final progress = _ballProgress[i];
+      if (progress < 0) continue; // Not started yet.
+
       final path = result.paths[i];
+      final pos =
+          _interpolatedPosition(path, progress, cellSize);
 
-      if (i > _currentBallIndex) break;
+      final nudge =
+          _ballHasLanded(result, i)
+              ? _landedXNudge(result, i, landed)
+              : 0.0;
 
-      // Completed balls sit at their final position.
-      // The current ball interpolates smoothly.
-      final progress = i < _currentBallIndex
-          ? (path.positions.length - 1).toDouble()
-          : _currentProgress;
-
-      final pos = _interpolatedPosition(path, progress, cellSize);
-      // Nudge completed balls that share a bin with a later landed ball.
-      final nudge = i < _currentBallIndex
-          ? _landedXNudge(result, i, _currentBallIndex)
-          : 0.0;
       widgets.add(
         Positioned(
           left: pos.dx + nudge,
           top: pos.dy,
-          child: BallWidget(ballId: path.ballId, size: ballSize),
+          child: BallWidget(
+            ballId: path.ballId,
+            size: ballSize,
+          ),
         ),
       );
     }
@@ -500,7 +686,6 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
   }
 
   /// Renders balls at their final bin positions after the drop.
-  /// Bottom-aligned so the ball rests at the bottom of the bin cell.
   List<Widget> _buildLandedBalls(
     CascadeState state,
     double cellSize,
@@ -515,30 +700,32 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
     return List.generate(result.paths.length, (i) {
       final path = result.paths[i];
       final pos = path.positions.last;
-      final nudge = _landedXNudge(result, i, result.paths.length);
+      final nudge =
+          _landedXNudge(result, i, result.paths.length);
       return Positioned(
         left: pos.col * cellSize + xOffset + nudge,
         top: pos.row * cellSize + yOffset,
-        child: BallWidget(ballId: path.ballId, size: ballSize),
+        child: BallWidget(
+          ballId: path.ballId,
+          size: ballSize,
+        ),
       );
     });
   }
 }
 
-class _GridPainter extends CustomPainter {
-  _GridPainter({required this.cellSize});
+class _SlotBackgroundPainter extends CustomPainter {
+  _SlotBackgroundPainter({required this.cellSize});
 
   final double cellSize;
 
-  static const _edgeColor = Color(0xFFD0D0D0);
-  static const _slotColor = Color(0xFFEEEEEE);
-
   @override
   void paint(Canvas canvas, Size size) {
-    // Top row: dark gray for edge columns, light gray for slots.
     for (var col = 0; col < CascadeBoard.columns; col++) {
       final isSlot = CascadeBoard.dropSlotColumns.contains(col);
-      final paint = Paint()..color = isSlot ? _slotColor : _edgeColor;
+      final paint = Paint()
+        ..color =
+            isSlot ? CascadeColors.slotCenter : CascadeColors.slotEdge;
       canvas.drawRect(
         Rect.fromLTWH(col * cellSize, 0, cellSize, cellSize),
         paint,
@@ -547,6 +734,6 @@ class _GridPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_GridPainter oldDelegate) =>
+  bool shouldRepaint(_SlotBackgroundPainter oldDelegate) =>
       cellSize != oldDelegate.cellSize;
 }

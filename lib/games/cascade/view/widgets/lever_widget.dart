@@ -132,7 +132,7 @@ class _LeverWidgetState extends State<LeverWidget>
               );
             },
             child: SizedBox(
-              width: widget.cellSize * 0.65,
+              width: widget.cellSize * 0.43,
               height: widget.cellSize * 0.1,
               child: Stack(
                 clipBehavior: Clip.none,

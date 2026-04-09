@@ -93,8 +93,14 @@ class PuzzleGenerator {
     final allPositions = <(int, int)>[];
     // Start at row 1 — row 0 is the drop slot row where balls are
     // dragged, so placing levers there conflicts with drag targets.
+    // On row 1, exclude edge columns (0 and 4) since balls enter
+    // from columns 1-3 and can't reach the edges without first
+    // hitting a lever.
     for (var row = 1; row < CascadeBoard.rows; row++) {
       for (var col = 0; col < CascadeBoard.columns; col++) {
+        if (row == 1 && (col == 0 || col == CascadeBoard.columns - 1)) {
+          continue;
+        }
         allPositions.add((row, col));
       }
     }

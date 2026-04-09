@@ -1,110 +1,196 @@
-# Architecture Review: feat/chromix-contiguity-drag
+## Architecture Review -- Cascade Ball-Routing Puzzle
 
-**Branch**: `feat/chromix-contiguity-drag` vs `main`
-**Date**: 2026-04-07
+**Branch**: `feat/cascade-ball-routing-puzzle`
+**Date**: 2026-04-08
 **Reviewer**: Architecture Review Agent
 
 ---
 
-## Architecture Review
-
 ### Layer Separation
 
-- Violations found: 0
-- Clean files: all checked files clean
+**Violations found: 0**
 
-**Analysis**: All changed files respect the project's layer boundaries:
-- `lib/games/chromix/logic/` files import only from `models/` -- no Flutter, no cubit, no view imports.
-- `lib/games/chromix/cubit/` imports from `logic/` and `models/` only (plus `core/` for storage). Does not import from `view/`.
-- `lib/games/chromix/view/` files import from `cubit/`, `models/`, and `theme/` -- all permitted downward dependencies.
-- `lib/core/view/widgets/win_celebration.dart` imports only `package:confetti` and `package:flutter` -- no game-specific dependencies.
+All dependency directions are correct across the Cascade module:
+
+| Layer | Imports from | Status |
+|-------|-------------|--------|
+| `models/` | `equatable`, within-layer direct imports only | Clean |
+| `logic/` | `models/` only | Clean |
+| `cubit/` | `logic/`, `models/`, `core/` | Clean |
+| `view/` | `cubit/`, `models/`, `logic/` (score_calculator only), `theme/`, `core/`, `nostr/` | Clean |
+| `theme/` | `flutter/material.dart` only | Clean |
+| `cascade_game.dart` | `core/`, `view/` | Clean |
+
+Verified no reverse imports exist:
+- `models/` does not import `cubit/`, `logic/`, `view/`, or `theme/`
+- `logic/` does not import `cubit/`, `view/`, or `theme/`
+- `cubit/` does not import `view/` or `theme/`
+
+The `view/` layer imports `logic/logic.dart` in `cascade_results_overlay.dart` at line 7 to access `cascadeStars()`. This is a read-only utility function call (pure scoring logic), consistent with the Chromix pattern where `chromix_results_overlay.dart` similarly imports `logic/logic.dart` for score calculation. This is acceptable -- the logic layer provides pure functions that the view layer consumes.
+
+**Clean files**: All 25 source files checked.
+
+---
 
 ### State Management Assessment
 
-**ChromixCubit**: Correct -- with important observations
+**CascadeCubit**: Correct
 
-- Follows VGV Cubit + `part of` state pattern (`chromix_cubit.dart` + `chromix_state.dart`). **Correct**.
-- State is immutable with Equatable, `copyWith` uses `Type? Function()?` wrapper for nullable fields (`dragOrigin`, `dragColor`, `score`). **Correct per project conventions**.
-- Business logic (drag handling, mixing, overpower timer, undo, win detection, contiguity checking) is entirely in the cubit, not in views. **Correct**.
-- Data access goes through `GameStorageRepository` injected via constructor. **Correct**.
-- Naming is descriptive and domain-specific. **Correct**.
+- **Naming**: `CascadeCubit` and `CascadeState` follow established VGV Cubit naming convention (matches `ChromixCubit`/`ChromixState`, `SignalCubit`/`SignalState`).
+- **State immutability**: `CascadeState` extends `Equatable`, all fields are `final`, lists in `CascadeBoard` are `List.unmodifiable()`. Copy is via `copyWith()`.
+- **copyWith nullable pattern**: Uses `Type? Function()?` wrapper for `dropResult` and `score` fields (lines 82-95 of `cascade_state.dart`), correctly following the project convention for nullable fields that need explicit null-setting.
+- **part-of pattern**: `cascade_state.dart` uses `part of 'cascade_cubit.dart'` (line 1), consistent with project convention.
+- **Business logic location**: All game logic (simulation, puzzle generation, scoring) lives in `logic/`. The cubit delegates to `BallSimulator.simulate()`, `PuzzleGenerator.generate()`, and `cascadeScore()`. No business logic in view widgets.
+- **Data access**: Cubit accesses `GameStorageRepository` for persistence. Views access it only through cubit or via `context.read<GameStorageRepository>()` for instructions/streaks (matching the established Chromix pattern).
+- **Handler organization**: Methods are focused and single-purpose: `assignBall`, `unassignBall`, `swapSlots`, `flipLever`, `drop`, `completeDrop`, `skipAnimation`, `reset`. Each guards on status before mutating state.
+- **Isolate usage**: Puzzle generation runs via `compute()` (line 48 of `cascade_cubit.dart`), properly keeping heavy computation off the main thread. The `_generatePuzzle` static method is correctly a top-level-compatible static for isolate execution.
 
-**Issues found**:
+**CascadeStatus enum**: Correct
 
-1. **[Important] Duplicated contiguity BFS logic -- 3 copies exist in the cubit**
-   - `chromix_cubit.dart:352-386` -- `_isColorContiguous()` (instance method, used during gameplay)
-   - `chromix_cubit.dart:467-512` -- `_computeContiguityViolation()` (static method, used during deserialization)
-   - `contiguity_checker.dart:7-44` -- `allGroupsContiguous()` (standalone function in logic layer)
+- Five clear states: `loading`, `configuring`, `dropping`, `won`, `failed`. State machine transitions are well-guarded in cubit methods.
 
-   All three implement the same BFS flood-fill algorithm for checking orthogonal contiguity of same-color cells. The cubit should delegate to `contiguity_checker.dart` instead of reimplementing the algorithm internally. The cubit already imports `logic/logic.dart` and calls `allGroupsContiguous` at line 392 for win checking, but then uses its own private copies for the violation feedback path.
+**Minor observation**: The `_preDropBoard` and `_preDropSlots` fields on `CascadeCubit` (lines 37-39) are mutable instance fields used for reset bookkeeping. This is a pragmatic choice -- they store the pre-drop snapshot to enable restoring configuration state after a failed drop. These are internal cubit fields not exposed in state, so they do not violate immutability of the emitted `CascadeState`. This is acceptable.
 
-   - `lib/games/chromix/cubit/chromix_cubit.dart:352` -- cubit reimplements BFS from `contiguity_checker.dart`
-   - `lib/games/chromix/cubit/chromix_cubit.dart:467` -- cubit reimplements BFS again as static method
-
-2. **[Suggestion] `_recomputeContiguity()` could delegate to logic layer**
-   The method at `chromix_cubit.dart:329-349` that checks per-color contiguity when counts match targets is a reusable piece of game logic. It could live in `logic/contiguity_checker.dart` as a pure function (taking grid + target map, returning bool), keeping the cubit thinner and the logic testable in isolation.
-
-**WinCelebration (core widget)**: Correct pattern
-
-- Pure presentation widget with no business logic dependencies. **Correct**.
-- Uses `findAncestorStateOfType` pattern for imperative control (`trigger`/`reset`). This is an acceptable Flutter pattern for animation orchestration, though an alternative would be a dedicated controller object.
+---
 
 ### Dependency Direction
 
-- Direction violations: 0
-- Clean dependencies: all packages and modules
+**Direction violations: 0**
 
-**Analysis**:
-- `logic/` depends on `models/` only. No reverse.
-- `cubit/` depends on `logic/` and `models/`. No reverse.
-- `view/` depends on `cubit/`, `models/`, `theme/`. No reverse.
-- `core/view/widgets/` depends on Flutter + `confetti` package only. No game-specific imports.
-- No circular dependencies detected.
+Dependency graph flows correctly:
+
+```
+cascade_game.dart --> core/, view/
+view/ --> cubit/, models/, logic/ (score only), theme/, core/, nostr/
+cubit/ --> logic/, models/, core/
+logic/ --> models/
+models/ --> (equatable only)
+theme/ --> (flutter only)
+```
+
+No circular dependencies detected. No game module imports another game module.
+
+The cross-module imports from `view/` to `nostr/` (sharing cubits, event builder, stats) are consistent with all existing games (`chromix`, `signal`, `guess_the_number`). The `nostr/` module provides app-level shared infrastructure that game views consume. These imports are:
+- `cascade_page.dart` lines 9-13: Nostr cubit/repository providers (identical to Chromix pattern)
+- `cascade_results_overlay.dart` lines 7-13: Sharing UI components, event builder
+
+**Clean dependencies**: All packages.
+
+---
 
 ### Package Structure
 
-**lib/core/view/widgets/win_celebration.dart** (NEW):
+**Cascade module**: Complete
 
-- [x] Correct location in shared `core/view/widgets/`
-- [x] Single clear responsibility (confetti celebration sequence)
-- [x] No game-specific dependencies
-- [ ] **[Important] Not exported via barrel file** -- `lib/core/core.dart` does not export `view/widgets/`. All three game pages (`chromix_page.dart:7`, `game_page.dart:9`, `signal_page.dart:7`) import the file directly as `package:very_good_games/core/view/widgets/win_celebration.dart` instead of through `package:very_good_games/core/core.dart`. Per project conventions ("Imports: use barrel files"), a `widgets.dart` barrel should be created in `lib/core/view/widgets/` and re-exported through `core.dart`.
+| Check | Status |
+|-------|--------|
+| Directory structure (models, logic, cubit, view, theme) | Present |
+| Barrel files in every directory | Present and alphabetically ordered |
+| `GameDefinition` implementation | Present (`cascade_game.dart`) |
+| Registered in `main.dart` GameRegistry | Present (line 33) |
+| `EventBuilder.buildCascadeResult()` for Nostr sharing | Present (event_builder.dart lines 85-113) |
+| Uses shared `ResultSharingListener` | Present (cascade_results_overlay.dart line 36) |
+| Uses shared `ShareResultButton` | Present (cascade_results_overlay.dart line 75) |
+| Uses shared `CommunityStatsSection` | Present (cascade_results_overlay.dart line 78) |
+| Uses shared `StarRating` | Present (cascade_results_overlay.dart line 73) |
+| Uses `utcDateKey()` from core | Present (cascade_page.dart line 26) |
+| Uses `GameStorageRepository.hasSeenInstructions()` | Present (cascade_page.dart line 102) |
+| Uses `GameStorageRepository.markInstructionsSeen()` | Present (cascade_page.dart line 106) |
+| Debug shuffle gated with `kDebugMode` | Present (cascade_page.dart line 146) |
+| Uses `WinCelebration` shared widget | Present (cascade_page.dart line 165) |
+| Single clear responsibility | Yes -- self-contained ball-routing puzzle |
 
-**lib/games/chromix/logic/contiguity_checker.dart** (NEW):
+**Test coverage assessment**:
 
-- [x] Correct location in `logic/` layer
-- [x] Pure Dart, no Flutter dependencies
-- [x] Single responsibility (contiguity checking)
-- [x] Exported in `logic/logic.dart` barrel file
+| Source file | Test file | Status |
+|------------|-----------|--------|
+| `models/ball.dart` | `ball_test.dart` | Present |
+| `models/cascade_board.dart` | `cascade_board_test.dart` | Present |
+| `models/drop_result.dart` | `drop_result_test.dart` | Present |
+| `models/lever.dart` | `lever_test.dart` | Present |
+| `logic/ball_simulator.dart` | `ball_simulator_test.dart` | Present |
+| `logic/puzzle_generator.dart` | `puzzle_generator_test.dart` | Present |
+| `logic/score_calculator.dart` | `score_calculator_test.dart` | Present |
+| `cubit/cascade_cubit.dart` | `cascade_cubit_test.dart` | Present |
+| `view/widgets/ball_widget.dart` | `ball_widget_test.dart` | Present |
+| `view/widgets/bin_widget.dart` | `bin_widget_test.dart` | Present |
+| `view/widgets/lever_widget.dart` | `lever_widget_test.dart` | Present |
+| `view/widgets/instructions_dialog.dart` | `instructions_dialog_test.dart` | Present |
+| `view/widgets/cascade_board_widget.dart` | -- | **Missing** |
+| `view/widgets/cascade_results_overlay.dart` | -- | **Missing** |
+| `view/widgets/ball_tray.dart` | -- | **Missing** |
+| `view/cascade_page.dart` | -- | Missing (consistent with Chromix pattern) |
+| `cascade_game.dart` | -- | Missing (consistent with Chromix pattern) |
 
-**lib/games/chromix/view/widgets/widgets.dart** (barrel):
+Three test files are missing for widget files that should have tests. The `cascade_page_test.dart` and `cascade_game_test.dart` omissions are consistent with the existing Chromix game module (which also lacks those tests).
 
-- [x] Exports are alphabetically ordered
-- [x] Deleted `color_palette.dart` is no longer exported
-- [x] All widget files are accounted for
+---
 
-**Duplicate `_colorFor` helper**:
+### Detailed Findings
 
-- **[Suggestion]** `chromix_cell_widget.dart:98` and `color_bar.dart:97` both define identical `static Color _colorFor(ChromixColor color)` switch expressions mapping `ChromixColor` to `Color`. This could be a single utility in `theme/` (e.g., an extension on `ChromixColor` or a static method on `ChromixColors`), reducing duplication and ensuring color mappings stay in sync.
+#### Important Issues
 
-### Cross-Game Consistency
+**1. Missing `cascade_results_overlay_test.dart`**
+- File: `lib/games/cascade/view/widgets/cascade_results_overlay.dart`
+- The Chromix reference game includes `chromix_results_overlay_test.dart`. This overlay contains sharing logic (`_share` method at line 109), score display, star rating, and Nostr integration. It should have a corresponding widget test to maintain parity with the established testing pattern.
 
-The three game pages (`chromix_page.dart`, `signal_page.dart`, `game_page.dart`) all use the same `WinCelebration` widget and follow the same MultiBlocProvider pattern with identical Nostr-related cubit wiring. This is good consistency, though the amount of identical boilerplate across game pages (ResultSharingCubit, CommunityStatsCubit, LeaderboardCubit, ProfileCubit creation) is a future candidate for extraction into a shared `GamePageShell` widget.
+**2. Missing `cascade_board_widget_test.dart`**
+- File: `lib/games/cascade/view/widgets/cascade_board_widget.dart`
+- At 553 lines this is the largest and most complex widget in the module, containing animation controllers, interpolation logic, drag-and-drop behavior, and multiple rendering paths depending on game status. The `_interpolatedPosition` method (lines 363-437) has non-trivial geometry calculations with wall bounces and arcs. Testing this widget would catch animation and layout regressions.
+
+**3. Missing `ball_tray_test.dart`**
+- File: `lib/games/cascade/view/widgets/ball_tray.dart`
+- Contains drag-and-drop interaction logic (Draggable widgets). A widget test verifying that unassigned balls render, that balls can be dragged, and that the `onBallAssigned` callback fires would prevent interaction regressions.
+
+#### Suggestions
+
+**1. Consider extracting board position interpolation to logic layer**
+- File: `lib/games/cascade/view/widgets/cascade_board_widget.dart`, lines 363-437
+- The `_interpolatedPosition` method is a pure function computing pixel positions from path data and cell size. Extracting it to `logic/` (e.g., as a static method or standalone function) would make the geometry calculations unit-testable without widget test overhead, and reduce the widget's 553-line footprint. The Chromix module keeps rendering logic in widgets, so this is not required by convention, but the complexity of wall-bounce and arc calculations in Cascade warrants it.
+
+**2. Pre-drop snapshot could be part of persisted state**
+- File: `lib/games/cascade/cubit/cascade_cubit.dart`, lines 37-39
+- `_preDropBoard` and `_preDropSlots` are mutable instance fields that store pre-drop configuration for the reset feature. If the app process is killed during a `failed` state and the session is restored, the reset falls back to `state.board.resetLevers(state.initialLevers)` and `defaultSlotAssignments` (line 238) rather than the actual pre-drop configuration. Including pre-drop data in the serialized session would provide exact reset behavior across app restarts.
+
+**3. Duplicate `utcDateKey()` call in results overlay**
+- File: `lib/games/cascade/view/widgets/cascade_results_overlay.dart`, line 80
+- The overlay calls `utcDateKey()` independently for the leaderboard `dTag` rather than receiving the `dateKey` already computed in `CascadePage`. If a user completes a game around midnight UTC, the page's `dateKey` and the overlay's `utcDateKey()` could theoretically differ. This is a pre-existing pattern from Chromix (`chromix_results_overlay.dart` line 81 does the same), so it is not a new issue introduced by this branch.
+
+---
+
+### Dart Analysis
+
+`dart analyze lib/games/cascade/` returned **No issues found**. Zero warnings, zero info hints, zero errors.
+
+---
+
+### Compliance with "Adding a New Game" Checklist
+
+Per the project's CLAUDE.md "Adding a New Game" section:
+
+| Step | Requirement | Status |
+|------|-------------|--------|
+| 1 | Create `lib/games/cascade/` with models, logic, cubit, view, theme | Done |
+| 2 | Implement `GameDefinition` in `cascade_game.dart` | Done |
+| 3 | Register in `main.dart` GameRegistry | Done |
+| 4 | Add `EventBuilder.buildCascadeResult()` for Nostr sharing | Done |
+| 5 | Use shared overlay widgets | Done (ResultSharingListener, ShareResultButton, CommunityStatsSection, StarRating) |
+| 6 | Use `utcDateKey()` for date formatting | Done |
+| 7 | Use `GameStorageRepository` for persistence | Done (sessions, streaks, instructions seen) |
+
+---
 
 ### Summary of Findings
 
 | # | Severity | Description | Location |
 |---|----------|-------------|----------|
-| 1 | Important | Contiguity BFS logic duplicated 3 times (cubit has 2 private copies of what `contiguity_checker.dart` already provides) | `chromix_cubit.dart:352-386`, `chromix_cubit.dart:467-512` |
-| 2 | Important | `win_celebration.dart` not exported via barrel files; imported directly bypassing `core.dart` | `chromix_page.dart:7`, `game_page.dart:9`, `signal_page.dart:7` |
-| 3 | Suggestion | `_colorFor` helper duplicated in `chromix_cell_widget.dart` and `color_bar.dart` -- extract to `theme/` | `chromix_cell_widget.dart:98`, `color_bar.dart:97` |
-| 4 | Suggestion | Per-color contiguity violation check in cubit could be extracted to `logic/contiguity_checker.dart` as a pure function | `chromix_cubit.dart:329-349` |
-| 5 | Suggestion | MultiBlocProvider boilerplate (5 Nostr cubits) is identical across all 3 game pages -- future extraction candidate | `chromix_page.dart:29-69`, `signal_page.dart:29-64`, `game_page.dart:39-82` |
+| 1 | Important | Missing `cascade_results_overlay_test.dart` -- Chromix has its equivalent test | `lib/games/cascade/view/widgets/cascade_results_overlay.dart` |
+| 2 | Important | Missing `cascade_board_widget_test.dart` -- 553-line widget with animation and geometry logic | `lib/games/cascade/view/widgets/cascade_board_widget.dart` |
+| 3 | Important | Missing `ball_tray_test.dart` -- drag-and-drop interaction widget | `lib/games/cascade/view/widgets/ball_tray.dart` |
+| 4 | Suggestion | Extract `_interpolatedPosition` to logic layer for unit testability | `cascade_board_widget.dart:363-437` |
+| 5 | Suggestion | Include pre-drop snapshot in persisted session for exact reset across restarts | `cascade_cubit.dart:37-39` |
+| 6 | Suggestion | Duplicate `utcDateKey()` call in overlay (pre-existing pattern from Chromix) | `cascade_results_overlay.dart:80` |
 
 ### Verdict
 
-**Ready to merge with minor fixes.** Fix 2 important issues before merging:
-1. Eliminate the duplicated BFS implementations in the cubit by delegating to `contiguity_checker.dart`.
-2. Add barrel file exports for `win_celebration.dart` and update imports across all game pages.
-
-No layer separation violations, no dependency direction violations, and state management follows VGV conventions correctly. The suggestions are improvements that can be addressed in a follow-up.
+**Ready to merge after adding 3 missing widget tests.** Architecture is clean -- zero layer violations, zero dependency direction issues, zero Dart analysis issues. The module follows all VGV conventions and the "Adding a New Game" checklist completely. The three important items are all missing test files for interaction-heavy widgets.

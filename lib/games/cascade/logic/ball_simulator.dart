@@ -99,6 +99,19 @@ class BallSimulator {
     // Add final position in the bin row (one past the grid).
     positions.add((row: CascadeBoard.rows, col: col));
 
+    // Add bin bounce positions: 3 bounces, each is 2 segments
+    // (up to peak, back down). All at the same grid position —
+    // the view handles vertical displacement.
+    final binBounceStart = positions.length - 1;
+    const bounceCount = 4;
+    for (var i = 0; i < bounceCount; i++) {
+      // Peak position + return to bottom (same grid cell,
+      // view handles vertical displacement).
+      positions
+        ..add((row: CascadeBoard.rows, col: col))
+        ..add((row: CascadeBoard.rows, col: col));
+    }
+
     // Determine which bin the ball landed in.
     // Bins are at columns 1, 2, 3 (same as drop slots).
     final finalBin = col;
@@ -110,6 +123,7 @@ class BallSimulator {
         finalBin: finalBin,
         leverFlips: leverFlips,
         wallBounces: wallBounces,
+        binBounceStart: binBounceStart,
       ),
       currentBoard,
     );

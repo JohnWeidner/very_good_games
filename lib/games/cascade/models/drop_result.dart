@@ -16,6 +16,7 @@ class BallPath extends Equatable {
     required this.finalBin,
     this.leverFlips = const [],
     this.wallBounces = const {},
+    this.binBounceStart,
   });
 
   /// Which ball this path is for.
@@ -43,6 +44,13 @@ class BallPath extends Equatable {
   /// of the outward segment.
   final Set<int> wallBounces;
 
+  /// Position index where bin bounce animation begins.
+  ///
+  /// After landing in the bin, the ball bounces 3 times with
+  /// decreasing height. Each bounce is 2 segments (up + down).
+  /// Null if no bin bounces (shouldn't happen in normal play).
+  final int? binBounceStart;
+
   @override
   List<Object?> get props => [
     ballId,
@@ -50,6 +58,7 @@ class BallPath extends Equatable {
     finalBin,
     leverFlips,
     wallBounces,
+    binBounceStart,
   ];
 }
 

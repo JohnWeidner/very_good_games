@@ -15,19 +15,17 @@ void main() {
         slotAssignments: [BallId.ball1, BallId.ball2, BallId.ball3],
       );
 
-      // Ball 1 drops from column 1, stays in column 1.
       expect(result.paths[0].finalBin, 1);
-      expect(result.paths[0].positions.length, CascadeBoard.rows + 1);
+      // 7 rows + 1 bin + 8 bin bounces, no deflections.
+      expect(result.paths[0].positions.length, CascadeBoard.rows + 9);
+      expect(result.paths[0].leverFlips, isEmpty);
+      expect(result.paths[0].wallBounces, isEmpty);
 
-      // Ball 2 drops from column 2, stays in column 2.
       expect(result.paths[1].finalBin, 2);
-
-      // Ball 3 drops from column 3, stays in column 3.
       expect(result.paths[2].finalBin, 3);
     });
 
-    test('lever deflects ball and flips', () {
-      // Lever at row 2, col 2 pointing right => ball goes to col 3.
+    test('lever deflects ball and records leverFlip', () {
       final board = CascadeBoard(
         levers: const [
           Lever(row: 2, col: 2, direction: LeverDirection.right),
@@ -40,16 +38,20 @@ void main() {
         slotAssignments: [BallId.ball1, BallId.ball2, BallId.ball3],
       );
 
-      // Ball 2 (slot 1, col 2) hits lever at (2,2), deflects right to col 3.
+      // Ball 2 hits lever at (2,2), deflects right to col 3.
       expect(result.paths[1].finalBin, 3);
+      expect(result.paths[1].leverFlips, hasLength(1));
+      expect(result.paths[1].leverFlips[0].leverIndex, 0);
+
+      // Deflection adds an intermediate position.
+      // 7 rows + 1 bin + 1 intermediate + 8 bin bounces = 17.
+      expect(result.paths[1].positions.length, CascadeBoard.rows + 10);
     });
 
-    test('lever at wall edge does not deflect but still flips', () {
-      // We need a lever to push ball to col 0 first.
-      // Lever at (1, 1) pointing left => ball from slot 0 (col 1)
-      // goes to col 0 at row 1, then hits lever at (3,0) pointing
-      // left. Can't go to -1, stays at col 0.
-      final board2 = CascadeBoard(
+    test('wall bounce records wallBounces and extra positions', () {
+      // Lever at (1,1) pushes ball to col 0, then lever at (3,0)
+      // points left — blocked by wall, should wall-bounce.
+      final board = CascadeBoard(
         levers: const [
           Lever(row: 1, col: 1, direction: LeverDirection.left),
           Lever(row: 3, col: 0, direction: LeverDirection.left),
@@ -58,22 +60,23 @@ void main() {
       );
 
       final result = BallSimulator.simulate(
-        board: board2,
+        board: board,
         slotAssignments: [BallId.ball1, BallId.ball2, BallId.ball3],
       );
 
-      // Ball 1 (slot 0, col 1) deflects left at (1,1) to col 0,
-      // then hits lever at (3,0) pointing left. Can't go to -1,
-      // stays at col 0. Ball lands in col 0 (not a bin column).
-      expect(result.paths[0].finalBin, 0);
+      final path = result.paths[0];
+      expect(path.finalBin, 0);
+
+      // 2 lever hits: one deflection (+1 intermediate) and one
+      // wall bounce (+2 intermediates).
+      expect(path.leverFlips, hasLength(2));
+      expect(path.wallBounces, hasLength(1));
+
+      // 7 rows + 1 bin + 1 deflection + 2 wall bounce + 8 bin bounces = 19.
+      expect(path.positions.length, CascadeBoard.rows + 12);
     });
 
     test('sequential drops: first ball flips lever for second', () {
-      // Lever at (2, 2) pointing right.
-      // Ball 2 (slot 1, col 2) deflects right, lever flips to left.
-      // Ball 3 (slot 2, col 3) won't hit this lever.
-      // But if we put a lever at (2, 2) and drop from col 2 twice
-      // via different slots... we need to use slot assignments.
       final board = CascadeBoard(
         levers: const [
           Lever(row: 2, col: 2, direction: LeverDirection.right),
@@ -81,23 +84,17 @@ void main() {
         binOrder: const [0, 1, 2],
       );
 
-      // Slot 0 = ball1 at col 1 (misses lever at col 2).
-      // Slot 1 = ball2 at col 2 (hits lever, deflects right to 3,
-      //   lever flips to left).
-      // Slot 2 = ball3 at col 3 (misses lever at col 2).
       final result = BallSimulator.simulate(
         board: board,
         slotAssignments: [BallId.ball1, BallId.ball2, BallId.ball3],
       );
 
-      expect(result.paths[0].finalBin, 1); // Straight down.
-      expect(result.paths[1].finalBin, 3); // Deflected right.
-      expect(result.paths[2].finalBin, 3); // Straight down.
+      expect(result.paths[0].finalBin, 1);
+      expect(result.paths[1].finalBin, 3);
+      expect(result.paths[2].finalBin, 3);
     });
 
     test('win detection: all balls in correct bins', () {
-      // No levers, identity bin order [0,1,2]:
-      // Ball 1 -> col 1 -> bin 0 expects ball index 0 (ball1).
       final board = CascadeBoard(
         levers: const [],
         binOrder: const [0, 1, 2],
@@ -117,7 +114,6 @@ void main() {
         binOrder: const [0, 1, 2],
       );
 
-      // Swap ball1 and ball2.
       final result = BallSimulator.simulate(
         board: board,
         slotAssignments: [BallId.ball2, BallId.ball1, BallId.ball3],
@@ -126,20 +122,22 @@ void main() {
       expect(result.isWin, isFalse);
     });
 
-    test('each ball path has correct number of positions', () {
+    test('drops in ball-ID order regardless of slot assignment', () {
       final board = CascadeBoard(
         levers: const [],
         binOrder: const [0, 1, 2],
       );
 
+      // Assign ball3 to slot 0, ball1 to slot 1, ball2 to slot 2.
       final result = BallSimulator.simulate(
         board: board,
-        slotAssignments: [BallId.ball1, BallId.ball2, BallId.ball3],
+        slotAssignments: [BallId.ball3, BallId.ball1, BallId.ball2],
       );
 
-      for (final path in result.paths) {
-        expect(path.positions.length, CascadeBoard.rows + 1);
-      }
+      // Drop order is always ball1, ball2, ball3.
+      expect(result.paths[0].ballId, BallId.ball1);
+      expect(result.paths[1].ballId, BallId.ball2);
+      expect(result.paths[2].ballId, BallId.ball3);
     });
   });
 }

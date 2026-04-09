@@ -46,7 +46,7 @@ class CascadeCubit extends Cubit<CascadeState> {
     await Future<void>.delayed(Duration.zero);
     if (isClosed) return;
 
-    final result = await compute(_generatePuzzle, dailySeed);
+    final result = await compute(PuzzleGenerator.generate, dailySeed);
 
     if (storage != null) {
       final session = storage.getSession('$_storagePrefix$dateKey');
@@ -78,29 +78,10 @@ class CascadeCubit extends Cubit<CascadeState> {
     );
   }
 
-  static CascadeGenerateResult _generatePuzzle(int seed) {
-    return PuzzleGenerator.generate(seed);
-  }
-
   /// Resets with a new puzzle from [seed]. For playtesting only.
   void resetWithSeed(int seed) {
     emit(CascadeState.loading());
-    _initializeFromSeed(seed);
-  }
-
-  Future<void> _initializeFromSeed(int seed) async {
-    await Future<void>.delayed(Duration.zero);
-    if (isClosed) return;
-
-    final result = await compute(_generatePuzzle, seed);
-    if (isClosed) return;
-
-    emit(
-      CascadeState(
-        board: result.board,
-        initialLevers: result.initialLevers,
-      ),
-    );
+    _initialize(seed, _dateKey, null);
   }
 
   /// Assigns [ball] to the drop slot at [slotIndex].
@@ -142,20 +123,6 @@ class CascadeCubit extends Cubit<CascadeState> {
     _persistSession();
   }
 
-  /// Swaps the ball assignments between [fromSlot] and [toSlot].
-  void swapSlots(int fromSlot, int toSlot) {
-    if (state.status != CascadeStatus.configuring) return;
-    if (fromSlot == toSlot) return;
-
-    final slots = List<BallId?>.of(state.slotAssignments);
-    final temp = slots[fromSlot];
-    slots[fromSlot] = slots[toSlot];
-    slots[toSlot] = temp;
-
-    emit(state.copyWith(slotAssignments: slots));
-    _persistSession();
-  }
-
   /// Flips the lever at [leverIndex].
   void flipLever(int leverIndex) {
     if (state.status != CascadeStatus.configuring) return;
@@ -179,7 +146,7 @@ class CascadeCubit extends Cubit<CascadeState> {
     _preDropBoard = state.board;
     _preDropSlots = List<BallId?>.of(state.slotAssignments);
 
-    final assignments = state.slotAssignments.cast<BallId>();
+    final assignments = state.slotAssignments.whereType<BallId>().toList();
     final result = BallSimulator.simulate(
       board: state.board,
       slotAssignments: assignments,

@@ -28,4 +28,10 @@ abstract final class CascadeColors {
 
   /// Subtle grid line color.
   static const gridLine = Color(0xFFE0E0E0);
+
+  /// Drop slot edge cell background (columns 0 and 4).
+  static const slotEdge = Color(0xFFD0D0D0);
+
+  /// Drop slot center cell background (columns 1-3).
+  static const slotCenter = Color(0xFFEEEEEE);
 }

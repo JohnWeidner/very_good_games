@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:very_good_games/core/daily_seed/date_key.dart';
 import 'package:very_good_games/core/view/widgets/star_rating.dart';
 import 'package:very_good_games/games/cascade/cubit/cubit.dart';
-import 'package:very_good_games/games/cascade/logic/logic.dart';
 import 'package:very_good_games/nostr/sharing/cubit/result_sharing_cubit.dart';
 import 'package:very_good_games/nostr/sharing/event_builder.dart';
 import 'package:very_good_games/nostr/sharing/view/community_stats_section.dart';
@@ -31,7 +30,7 @@ class CascadeResultsOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final score = state.score ?? 0;
-    final stars = cascadeStars(state.attempts);
+    final stars = state.stars;
 
     return ResultSharingListener(
       child: ColoredBox(
@@ -108,7 +107,7 @@ class CascadeResultsOverlay extends StatelessWidget {
 
   void _share(BuildContext context) {
     final score = state.score ?? 0;
-    final stars = cascadeStars(state.attempts);
+    final stars = state.stars;
 
     context.read<ResultSharingCubit>().share(
       eventBuilder: ({required pubKeyHex, required date}) =>
