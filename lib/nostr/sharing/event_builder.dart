@@ -81,6 +81,38 @@ class EventBuilder {
     );
   }
 
+  /// Builds an unsigned kind 30042 event for a Cascade puzzle result.
+  static Nip01Event buildCascadeResult({
+    required String pubKeyHex,
+    required int score,
+    required int stars,
+    required int attempts,
+    required String date,
+  }) {
+    final starEmoji = '\u2b50' * stars;
+
+    final content =
+        '\ud83c\udfb1 Very Good Games \u2014 Cascade\n'
+        '\ud83c\udfaf $stars Stars \u00b7 $starEmoji\n'
+        '\ud83e\udde9 $score points '
+        '($attempts ${attempts == 1 ? 'attempt' : 'attempts'})\n\n$date';
+
+    return Nip01Event(
+      pubKey: pubKeyHex,
+      kind: 30042,
+      tags: [
+        ['d', 'cascade:$date'],
+        ['t', 'vgg'],
+        ['t', 'cascade'],
+        ['L', 'games.vgg.score'],
+        ['l', 'score-$score', 'games.vgg.score'],
+        ['l', 'stars-$stars', 'games.vgg.score'],
+        ['l', 'attempts-$attempts', 'games.vgg.score'],
+      ],
+      content: content,
+    );
+  }
+
   /// Builds an unsigned kind 30042 event for a Signal puzzle result.
   static Nip01Event buildSignalResult({
     required String pubKeyHex,

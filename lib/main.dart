@@ -12,6 +12,7 @@ import 'package:very_good_games/app/app.dart';
 import 'package:very_good_games/app/app_bloc_observer.dart';
 import 'package:very_good_games/app/routes/routes.dart';
 import 'package:very_good_games/core/core.dart';
+import 'package:very_good_games/games/cascade/cascade_game.dart';
 import 'package:very_good_games/games/chromix/chromix_game.dart';
 import 'package:very_good_games/games/guess_the_number/guess_the_number_game.dart';
 import 'package:very_good_games/games/signal/signal_game.dart';
@@ -29,6 +30,7 @@ void main() async {
   // Register games here as they are built.
   final gameRegistry = GameRegistry(
     games: [
+      CascadeGame(storageRepository: storageRepository),
       ChromixGame(storageRepository: storageRepository),
       GuessTheNumberGame(storageRepository: storageRepository),
       SignalGame(storageRepository: storageRepository),
