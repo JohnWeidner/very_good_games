@@ -32,23 +32,12 @@ class CascadeBoard extends Equatable {
   /// Drop slot columns (center 3 of the 5 columns).
   static const dropSlotColumns = [1, 2, 3];
 
-  /// Bin positions (center 3 columns, same as drop slots).
-  static const binColumns = [1, 2, 3];
-
   /// The levers on the board (unmodifiable).
   final List<Lever> levers;
 
   /// Bin order: `binOrder[i]` is the ball index (0, 1, 2)
   /// expected at bin position `i`.
   final List<int> binOrder;
-
-  /// Returns the lever at ([row], [col]), or `null` if none.
-  Lever? leverAt(int row, int col) {
-    for (final lever in levers) {
-      if (lever.row == row && lever.col == col) return lever;
-    }
-    return null;
-  }
 
   /// Returns a new board with the lever at [index] flipped.
   CascadeBoard flipLever(int index) {

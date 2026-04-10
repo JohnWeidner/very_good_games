@@ -143,14 +143,14 @@ class BallSimulator {
   ///
   /// Ball at slot `i` should land in the bin where `binOrder[binIndex] == i`.
   /// Since balls are mapped by BallId (ball1=0, ball2=1, ball3=2),
-  /// the ball in bin column `binColumns[j]` is correct if
+  /// the ball in bin column `dropSlotColumns[j]` is correct if
   /// `binOrder[j] == ball.index`.
   static bool _checkWin(List<BallPath> paths, List<int> binOrder) {
     for (final path in paths) {
       final binCol = path.finalBin;
 
       // Find which bin position this column corresponds to.
-      final binIndex = CascadeBoard.binColumns.indexOf(binCol);
+      final binIndex = CascadeBoard.dropSlotColumns.indexOf(binCol);
       if (binIndex == -1) {
         // Ball didn't land in a bin column — always wrong.
         return false;

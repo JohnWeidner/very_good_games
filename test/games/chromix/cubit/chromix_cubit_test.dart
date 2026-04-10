@@ -110,7 +110,7 @@ void main() {
       expect(cubit.state.dragOrigin, isNull);
       expect(cubit.state.dragColor, isNull);
 
-      cubit.close();
+      await cubit.close();
     });
 
     test('initial grid matches PuzzleGenerator output', () async {
@@ -122,7 +122,7 @@ void main() {
       expect(cubit.state.target, equals(expected.target));
       expect(cubit.state.optimalMoves, equals(expected.optimalMoves));
 
-      cubit.close();
+      await cubit.close();
     });
 
     group('startDrag', () {
@@ -194,12 +194,12 @@ void main() {
             if (cubit.state.grid.cellAt(r, c) is BlockerCell) {
               cubit.startDrag(r, c);
               expect(cubit.state.dragOrigin, isNull);
-              cubit.close();
+              await cubit.close();
               return;
             }
           }
         }
-        cubit.close();
+        await cubit.close();
       });
     });
 
@@ -272,13 +272,13 @@ void main() {
                   ..startDrag(r, c)
                   ..dragTo(nr, nc);
                 expect(cubit.state.moveCount, equals(0));
-                cubit.close();
+                await cubit.close();
                 return;
               }
             }
           }
         }
-        cubit.close();
+        await cubit.close();
       });
 
     });
@@ -352,7 +352,7 @@ void main() {
         // Two moves: mix + overpower.
         expect(cubit.state.moveCount, equals(2));
 
-        cubit.close();
+        await cubit.close();
       });
 
       test('lifting finger before timer keeps mix result', () async {
@@ -388,7 +388,7 @@ void main() {
         );
         expect(cubit.state.moveCount, equals(1));
 
-        cubit.close();
+        await cubit.close();
       });
 
       test('overpower undo restores mix then restores original',
@@ -434,7 +434,7 @@ void main() {
           equals(originalColor),
         );
 
-        cubit.close();
+        await cubit.close();
       });
 
       test('drag onto secondary cell is no-op (locked)', () async {
@@ -463,7 +463,7 @@ void main() {
           pair.col2,
         );
         if (adjPrimary == null) {
-          cubit.close();
+          await cubit.close();
           return; // No adjacent primary to test with.
         }
 
@@ -482,7 +482,7 @@ void main() {
         );
         expect(cubit.state.moveCount, equals(movesBefore));
 
-        cubit.close();
+        await cubit.close();
       });
     });
 
@@ -552,7 +552,7 @@ void main() {
         expect(cubit.state.moveCount, equals(1));
         expect(cubit.state.status, equals(ChromixStatus.playing));
 
-        cubit.close();
+        await cubit.close();
       });
     });
 
@@ -563,7 +563,7 @@ void main() {
 
         expect(cubit.state.hasContiguityViolation, isFalse);
 
-        cubit.close();
+        await cubit.close();
       });
 
       test('true when a color at target count is non-contiguous',
@@ -640,7 +640,7 @@ void main() {
           ).called(1);
         }
 
-        cubit.close();
+        await cubit.close();
       });
 
       test('restores state from storage', () async {
@@ -660,7 +660,7 @@ void main() {
         }
         final savedGrid = cubit1.state.grid;
         final savedMoveCount = cubit1.state.moveCount;
-        cubit1.close();
+        await cubit1.close();
 
         when(
           () => storage.getSession('chromix_state_$dateKey'),
@@ -682,7 +682,7 @@ void main() {
         expect(cubit2.state.dragOrigin, isNull);
         expect(cubit2.state.dragColor, isNull);
 
-        cubit2.close();
+        await cubit2.close();
       });
 
       test('handles corrupted session gracefully', () async {
@@ -706,7 +706,7 @@ void main() {
         );
         expect(cubit.state.moveCount, equals(0));
 
-        cubit.close();
+        await cubit.close();
       });
     });
   });

@@ -481,7 +481,7 @@ class _CascadeBoardWidgetState extends State<CascadeBoardWidget>
     double cellSize,
   ) {
     return List.generate(3, (binIndex) {
-      final col = CascadeBoard.binColumns[binIndex];
+      final col = CascadeBoard.dropSlotColumns[binIndex];
       final expectedBallIndex = state.board.binOrder[binIndex];
       final expectedBall = BallId.values[expectedBallIndex];
 

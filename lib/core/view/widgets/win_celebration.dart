@@ -88,8 +88,6 @@ class WinCelebrationState extends State<WinCelebration> {
               confettiController: _confettiController,
               blastDirectionality: BlastDirectionality.explosive,
               numberOfParticles: 30,
-              maxBlastForce: 20,
-              minBlastForce: 5,
             ),
           ),
       ],

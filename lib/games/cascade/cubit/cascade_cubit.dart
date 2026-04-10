@@ -32,12 +32,6 @@ class CascadeCubit extends Cubit<CascadeState> {
 
   String get _storageKey => '$_storagePrefix$_dateKey';
 
-  /// Snapshot of the board at the moment the user last tapped Drop.
-  CascadeBoard? _preDropBoard;
-
-  /// Snapshot of slot assignments at the moment the user last tapped Drop.
-  List<BallId?>? _preDropSlots;
-
   Future<void> _initialize(
     int dailySeed,
     String dateKey,
@@ -58,10 +52,16 @@ class CascadeCubit extends Cubit<CascadeState> {
             return;
           }
         }
-        // Deserialization can fail due to schema changes or corrupted
-        // data. Clear stale session and generate a fresh puzzle.
+        // Deserialization can fail with FormatException, TypeError,
+        // or RangeError from corrupted/stale session data.
+        on Exception {
+          unawaited(
+            storage.saveSession('$_storagePrefix$dateKey', null),
+          );
+        }
+        // TypeError/RangeError from bad casts on untrusted JSON.
         // ignore: avoid_catching_errors
-        on Object {
+        on Error {
           unawaited(
             storage.saveSession('$_storagePrefix$dateKey', null),
           );
@@ -110,19 +110,6 @@ class CascadeCubit extends Cubit<CascadeState> {
     _persistSession();
   }
 
-  /// Removes the ball from the slot at [slotIndex].
-  void unassignBall(int slotIndex) {
-    if (state.status != CascadeStatus.configuring) return;
-    if (slotIndex < 0 || slotIndex > 2) return;
-    if (state.slotAssignments[slotIndex] == null) return;
-
-    final slots = List<BallId?>.of(state.slotAssignments);
-    slots[slotIndex] = null;
-
-    emit(state.copyWith(slotAssignments: slots));
-    _persistSession();
-  }
-
   /// Flips the lever at [leverIndex].
   void flipLever(int leverIndex) {
     if (state.status != CascadeStatus.configuring) return;
@@ -141,10 +128,6 @@ class CascadeCubit extends Cubit<CascadeState> {
   void drop() {
     if (state.status != CascadeStatus.configuring) return;
     if (!state.allBallsAssigned) return;
-
-    // Snapshot the current configuration so Reset restores to it.
-    _preDropBoard = state.board;
-    _preDropSlots = List<BallId?>.of(state.slotAssignments);
 
     final assignments = state.slotAssignments.whereType<BallId>().toList();
     final result = BallSimulator.simulate(
@@ -202,9 +185,9 @@ class CascadeCubit extends Cubit<CascadeState> {
 
     emit(
       state.copyWith(
-        board: _preDropBoard ?? state.board.resetLevers(state.initialLevers),
+        board: state.board.resetLevers(state.initialLevers),
         status: CascadeStatus.configuring,
-        slotAssignments: _preDropSlots ?? defaultSlotAssignments,
+        slotAssignments: defaultSlotAssignments,
         dropResult: () => null,
       ),
     );

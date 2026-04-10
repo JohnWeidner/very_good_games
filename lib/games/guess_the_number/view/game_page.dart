@@ -206,7 +206,7 @@ class _GameViewState extends State<_GameView> {
               prev.status != curr.status &&
               (curr.status == GameStatus.won ||
                   curr.status == GameStatus.lost),
-          listener: (context, state) => _onGameOver(context, state),
+          listener: _onGameOver,
           builder: (context, state) {
             final cubit = context.read<GameCubit>();
             final isSelecting =

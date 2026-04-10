@@ -42,6 +42,8 @@ void main() {
       expect(result.paths[1].finalBin, 3);
       expect(result.paths[1].leverFlips, hasLength(1));
       expect(result.paths[1].leverFlips[0].leverIndex, 0);
+      // Step is the position index where the ball reaches the lever row.
+      expect(result.paths[1].leverFlips[0].step, 2);
 
       // Deflection adds an intermediate position.
       // 7 rows + 1 bin + 1 intermediate + 8 bin bounces = 17.

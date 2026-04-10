@@ -16,17 +16,6 @@ void main() {
       expect(CascadeBoard.columns, 5);
       expect(CascadeBoard.rows, 7);
       expect(CascadeBoard.dropSlotColumns, [1, 2, 3]);
-      expect(CascadeBoard.binColumns, [1, 2, 3]);
-    });
-
-    test('leverAt returns lever at matching position', () {
-      expect(board.leverAt(1, 2), levers[0]);
-      expect(board.leverAt(3, 1), levers[1]);
-    });
-
-    test('leverAt returns null for empty position', () {
-      expect(board.leverAt(0, 0), isNull);
-      expect(board.leverAt(5, 5), isNull);
     });
 
     test('flipLever returns board with flipped lever', () {

@@ -93,7 +93,7 @@ void main() {
       expect(cubit.state.score, isNull);
       expect(cubit.state.grid.towerPositions, isNotEmpty);
 
-      cubit.close();
+      await cubit.close();
     });
 
     test('initial grid matches PuzzleGenerator output', () async {
@@ -104,7 +104,7 @@ void main() {
       expect(cubit.state.grid, equals(expected.puzzle));
       expect(cubit.state.solutionWallCount, equals(expected.solutionWallCount));
 
-      cubit.close();
+      await cubit.close();
     });
 
     group('toggleCell', () {
@@ -149,7 +149,7 @@ void main() {
         cubit.toggleCell(pos.$1, pos.$2);
 
         expect(cubit.state, equals(stateBefore));
-        cubit.close();
+        await cubit.close();
       });
 
       blocTest<SignalCubit, SignalState>(
@@ -240,7 +240,7 @@ void main() {
           ),
         ).called(1);
 
-        cubit.close();
+        await cubit.close();
       });
 
       test('clears session on win', () async {
@@ -265,7 +265,7 @@ void main() {
           () => storage.saveSession('signal_state_$dateKey', null),
         ).called(1);
 
-        cubit.close();
+        await cubit.close();
       });
 
       test('restores state from storage', () async {
@@ -280,7 +280,7 @@ void main() {
         final (r, c) = _firstEmptyCell(cubit1.state.grid);
         cubit1.toggleCell(r, c);
         final savedGrid = cubit1.state.grid;
-        cubit1.close();
+        await cubit1.close();
 
         // Now mock storage to return that session.
         when(
@@ -298,7 +298,7 @@ void main() {
         expect(cubit2.state.grid, equals(savedGrid));
         expect(cubit2.state.moveCount, equals(1));
 
-        cubit2.close();
+        await cubit2.close();
       });
 
       test('handles corrupted session gracefully', () async {
@@ -318,7 +318,7 @@ void main() {
         expect(cubit.state.status, equals(SignalStatus.playing));
         expect(cubit.state.moveCount, equals(0));
 
-        cubit.close();
+        await cubit.close();
       });
     });
   });

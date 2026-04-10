@@ -615,7 +615,7 @@ void main() {
               )
               ..selectQuestion(QuestionType.isOdd)
               ..confirmQuestion();
-        cubit.close();
+        await cubit.close();
 
         // Try to restore with a different seed.
         final restored = GameCubit.restore(
@@ -660,7 +660,7 @@ void main() {
 
         final savedCells = List<CellState>.from(cubit.state.cells);
         final savedQuestionCount = cubit.state.questionCount;
-        cubit.close();
+        await cubit.close();
 
         // Restore.
         final restored = GameCubit.restore(
@@ -677,7 +677,7 @@ void main() {
         expect(restored.state.status, equals(GameStatus.playing));
         expect(restored.state.usedQuestionTypes, contains(QuestionType.isOdd));
 
-        restored.close();
+        await restored.close();
       });
     });
   });

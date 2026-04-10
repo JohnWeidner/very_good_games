@@ -7,11 +7,8 @@ import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/games/cascade/cubit/cubit.dart';
 import 'package:very_good_games/games/cascade/view/widgets/widgets.dart';
 import 'package:very_good_games/nostr/profile/profile.dart';
-import 'package:very_good_games/nostr/sharing/cubit/result_sharing_cubit.dart';
-import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
-import 'package:very_good_games/nostr/stats/cubit/community_stats_cubit.dart';
-import 'package:very_good_games/nostr/stats/cubit/leaderboard_cubit.dart';
-import 'package:very_good_games/nostr/stats/repository/community_stats_repository.dart';
+import 'package:very_good_games/nostr/sharing/sharing.dart';
+import 'package:very_good_games/nostr/stats/stats.dart';
 
 /// The top-level page for a Cascade puzzle game session.
 class CascadePage extends StatelessWidget {

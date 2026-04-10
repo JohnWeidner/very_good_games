@@ -17,9 +17,6 @@ abstract final class CascadeColors {
   /// Lever active color (during flip animation).
   static const leverActive = Color(0xFF424242);
 
-  /// Correct bin glow color.
-  static const binCorrect = Color(0xFF43A047);
-
   /// Neutral bin color.
   static const binNeutral = Color(0xFF9E9E9E);
 
