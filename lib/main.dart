@@ -52,6 +52,7 @@ void main() async {
   final communityStatsRepository = CommunityStatsRepository(
     ndkProvider: ndkProvider,
   );
+  final contactListRepository = ContactListRepository(ndkProvider: ndkProvider);
 
   // Initialize Drift database for profile caching.
   final appDir = await getApplicationDocumentsDirectory();
@@ -73,6 +74,7 @@ void main() async {
       nostrPublishRepository: nostrPublishRepository,
       nostrDeletionRepository: nostrDeletionRepository,
       communityStatsRepository: communityStatsRepository,
+      contactListRepository: contactListRepository,
       nostrProfileRepository: nostrProfileRepository,
     ),
   );

@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ndk/ndk.dart';
-import 'package:ndk/shared/nips/nip01/helpers.dart' show Helpers;
 import 'package:very_good_games/nostr/identity/view/identity_setup_launcher.dart';
 import 'package:very_good_games/nostr/profile/profile.dart';
+import 'package:very_good_games/nostr/stats/cubit/contact_list_cubit.dart';
 import 'package:very_good_games/nostr/stats/cubit/leaderboard_cubit.dart';
 import 'package:very_good_games/nostr/stats/models/leaderboard.dart';
 
-/// Displays the top 10 leaderboard entries for a daily game.
+/// Displays the leaderboard for a daily game.
 ///
-/// Fetches leaderboard on first build via `initState`, then renders
-/// different UI based on cubit state: identity setup prompt, loading
-/// skeleton, leaderboard table with user highlight, "no scores yet"
-/// message, or "unavailable" fallback.
+/// Shows global top scores to all users. When the user has a Nostr identity,
+/// loads their follows and merges followed users' scores with a follow
+/// indicator icon. Tapping a row opens a profile bottom sheet.
 class LeaderboardSection extends StatefulWidget {
   /// Creates a [LeaderboardSection].
   const LeaderboardSection({required this.dTag, this.userPubKeyHex, super.key});
@@ -33,73 +32,80 @@ class _LeaderboardSectionState extends State<LeaderboardSection> {
   void initState() {
     super.initState();
     context.read<LeaderboardCubit>().fetchLeaderboard(widget.dTag);
+    context.read<ContactListCubit>().loadFollows();
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<LeaderboardCubit, LeaderboardState>(
-      listenWhen: (prev, curr) =>
-          curr.status == LeaderboardStatus.loaded &&
-          curr.leaderboard != null &&
-          curr.leaderboard!.entries.isNotEmpty,
-      listener: (context, state) {
-        // Fetch profiles for leaderboard entries.
-        final pubkeys = state.leaderboard!.entries
-            .map((e) => _decodePubkeyHex(e.npub))
-            .whereType<String>()
-            .toList();
-        if (pubkeys.isNotEmpty) {
-          context.read<ProfileCubit>().fetchProfiles(pubkeys);
-        }
-      },
+    return MultiBlocListener(
+      listeners: [
+        // Fetch profiles when leaderboard loads.
+        BlocListener<LeaderboardCubit, LeaderboardState>(
+          listenWhen: (prev, curr) =>
+              curr.status == LeaderboardStatus.loaded &&
+              curr.leaderboard != null &&
+              curr.leaderboard!.entries.isNotEmpty,
+          listener: (context, state) {
+            final pubkeys = state.leaderboard!.entries
+                .map((e) => decodePubkeyHex(e.npub))
+                .whereType<String>()
+                .toList();
+            if (pubkeys.isNotEmpty) {
+              context.read<ProfileCubit>().fetchProfiles(pubkeys);
+            }
+          },
+        ),
+        // Merge followed scores when contact list loads.
+        BlocListener<ContactListCubit, ContactListState>(
+          listenWhen: (prev, curr) =>
+              curr.status == ContactListStatus.loaded &&
+              curr.followedPubkeys.isNotEmpty,
+          listener: (context, state) {
+            context.read<LeaderboardCubit>().mergeFollowedScores(
+              widget.dTag,
+              state.followedPubkeys,
+            );
+          },
+        ),
+      ],
       child: BlocBuilder<LeaderboardCubit, LeaderboardState>(
         builder: (context, state) {
-          // Identity setup required
-          if (!state.hasIdentity) {
-            return const _IdentitySetupPrompt();
-          }
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Identity setup prompt (above leaderboard, not a gate).
+              if (!state.hasIdentity) const _IdentitySetupPrompt(),
 
-          // Loading state
-          if (state.status == LeaderboardStatus.loading) {
-            return const _LoadingPlaceholder();
-          }
+              // Loading state.
+              if (state.status == LeaderboardStatus.loading)
+                const _LoadingPlaceholder(),
 
-          // Loaded state
-          if (state.status == LeaderboardStatus.loaded &&
-              state.leaderboard != null) {
-            final leaderboard = state.leaderboard!;
+              // Loaded state.
+              if (state.status == LeaderboardStatus.loaded &&
+                  state.leaderboard != null) ...[
+                if (state.leaderboard!.isEmpty)
+                  const _NoScoresYetMessage()
+                else
+                  _LeaderboardList(
+                    leaderboard: state.leaderboard!,
+                    userPubKeyHex: widget.userPubKeyHex,
+                  ),
+              ],
 
-            if (leaderboard.isEmpty) {
-              return const _NoScoresYetMessage();
-            }
-
-            return _LeaderboardTable(
-              leaderboard: leaderboard,
-              userPubKeyHex: widget.userPubKeyHex,
-            );
-          }
-
-          // Unavailable or initial state
-          return const _UnavailableMessage();
+              // Unavailable or initial state (only if not loading).
+              if (state.status == LeaderboardStatus.unavailable)
+                const _UnavailableMessage(),
+            ],
+          );
         },
       ),
     );
   }
 }
 
-String? _decodePubkeyHex(String npub) {
-  try {
-    final decoded = Helpers.decodeBech32(npub);
-    if (decoded[1] == 'npub') return decoded[0];
-    return null;
-  } on Exception {
-    return null;
-  }
-}
-
 // Helper widgets
 
-/// Prompts user to set up Nostr identity to participate in leaderboard.
+/// Prompts user to set up Nostr identity (shown above leaderboard).
 class _IdentitySetupPrompt extends StatelessWidget {
   const _IdentitySetupPrompt();
 
@@ -169,9 +175,9 @@ class _NoScoresYetMessage extends StatelessWidget {
   }
 }
 
-/// Renders the leaderboard table with rank, player, score columns.
-class _LeaderboardTable extends StatelessWidget {
-  const _LeaderboardTable({required this.leaderboard, this.userPubKeyHex});
+/// Renders the leaderboard as a list with tappable rows.
+class _LeaderboardList extends StatelessWidget {
+  const _LeaderboardList({required this.leaderboard, this.userPubKeyHex});
 
   final Leaderboard leaderboard;
   final String? userPubKeyHex;
@@ -179,42 +185,57 @@ class _LeaderboardTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    // Encode user's hex pubkey to npub once for comparison.
     final userNpub = _encodeUserNpub();
 
     return BlocBuilder<ProfileCubit, ProfileState>(
       builder: (context, profileState) {
         return Padding(
           padding: const EdgeInsets.only(top: 16),
-          child: Table(
-            columnWidths: const {
-              0: FlexColumnWidth(), // Rank
-              1: FlexColumnWidth(3), // Player
-              2: FlexColumnWidth(), // Score
-            },
+          child: Column(
             children: [
-              // Header row
-              const TableRow(
-                children: [
-                  _TableCell('Rank', isHeader: true),
-                  _TableCell('Player', isHeader: true),
-                  _TableCell('Score', isHeader: true),
-                ],
-              ),
-              // Data rows
-              for (final entry in leaderboard.entries)
-                TableRow(
-                  decoration: BoxDecoration(
-                    color: userNpub != null && entry.npub == userNpub
-                        ? theme.colorScheme.primaryContainer
-                        : null,
-                  ),
+              // Header row.
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                child: Row(
                   children: [
-                    _TableCell('${entry.rank}'),
-                    _TableCell(_resolveDisplayName(entry, profileState)),
-                    _TableCell('${entry.score}'),
+                    SizedBox(
+                      width: 40,
+                      child: Text(
+                        'Rank',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        'Player',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    SizedBox(
+                      width: 50,
+                      child: Text(
+                        'Score',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   ],
+                ),
+              ),
+              // Data rows.
+              for (final entry in leaderboard.entries)
+                _LeaderboardRow(
+                  entry: entry,
+                  profileState: profileState,
+                  isCurrentUser: userNpub != null && entry.npub == userNpub,
                 ),
             ],
           ),
@@ -223,22 +244,6 @@ class _LeaderboardTable extends StatelessWidget {
     );
   }
 
-  /// Resolves display name from profile data, falling back to
-  /// truncated npub.
-  String _resolveDisplayName(
-    LeaderboardEntry entry,
-    ProfileState profileState,
-  ) {
-    final hexKey = _decodePubkeyHex(entry.npub);
-    if (hexKey != null) {
-      final profile = profileState.profiles[hexKey];
-      if (profile != null) return profile.displayName;
-    }
-    return entry.displayName;
-  }
-
-  /// Encodes [userPubKeyHex] to npub for string comparison.
-  /// Returns null if no user key or encoding fails.
   String? _encodeUserNpub() {
     if (userPubKeyHex == null) return null;
     try {
@@ -249,26 +254,95 @@ class _LeaderboardTable extends StatelessWidget {
   }
 }
 
-/// Cell in the leaderboard table.
-class _TableCell extends StatelessWidget {
-  const _TableCell(this.text, {this.isHeader = false});
+/// A single tappable leaderboard row.
+class _LeaderboardRow extends StatelessWidget {
+  const _LeaderboardRow({
+    required this.entry,
+    required this.profileState,
+    required this.isCurrentUser,
+  });
 
-  final String text;
-  final bool isHeader;
+  final LeaderboardEntry entry;
+  final ProfileState profileState;
+  final bool isCurrentUser;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-      child: Text(
-        text,
-        style: isHeader
-            ? theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)
-            : theme.textTheme.bodySmall,
-        textAlign: TextAlign.center,
+
+    return InkWell(
+      onTap: () {
+        final pubkeyHex = decodePubkeyHex(entry.npub);
+        if (pubkeyHex != null) {
+          ProfileBottomSheet.show(
+            context,
+            pubkeyHex: pubkeyHex,
+            isFollowed: entry.isFollowed,
+            isCurrentUser: isCurrentUser,
+          );
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: isCurrentUser ? theme.colorScheme.primaryContainer : null,
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 40,
+              child: Text(
+                '${entry.rank}',
+                style: theme.textTheme.bodySmall,
+                textAlign: TextAlign.center,
+              ),
+            ),
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      _resolveDisplayName(),
+                      style: theme.textTheme.bodySmall,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (entry.isFollowed)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Icon(
+                        Icons.how_to_reg,
+                        size: 14,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            SizedBox(
+              width: 50,
+              child: Text(
+                '${entry.score}',
+                style: theme.textTheme.bodySmall,
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  String _resolveDisplayName() {
+    final hexKey = decodePubkeyHex(entry.npub);
+    if (hexKey != null) {
+      final profile = profileState.profiles[hexKey];
+      if (profile != null) return profile.displayName;
+    }
+    return entry.displayName;
   }
 }
 

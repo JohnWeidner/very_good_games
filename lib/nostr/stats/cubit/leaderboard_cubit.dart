@@ -24,23 +24,18 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
 
   /// Fetches leaderboard for the given [dTag].
   ///
-  /// First checks if user has Nostr identity. If not, emits state with
-  /// `hasIdentity=false` so UI can show identity setup prompt.
-  /// If identity exists, fetches leaderboard from relays and emits
-  /// loaded or unavailable state.
+  /// Checks identity status but always fetches the global leaderboard
+  /// regardless. Identity status is stored in state so the UI can
+  /// show an optional setup prompt above the leaderboard.
   Future<void> fetchLeaderboard(String dTag) async {
     try {
       final hasIdentity = await _identityRepository.hasIdentity();
-
-      if (!hasIdentity) {
-        emit(state.copyWith(hasIdentity: false));
-        return;
-      }
 
       emit(
         state.copyWith(
           status: LeaderboardStatus.loading,
           leaderboard: () => null,
+          hasIdentity: hasIdentity,
         ),
       );
 
@@ -67,6 +62,87 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
           leaderboard: () => null,
         ),
       );
+    }
+  }
+
+  /// Merges followed users' scores into the existing leaderboard.
+  ///
+  /// Deduplicates by npub, marks followed entries, sorts by score DESC /
+  /// createdAt ASC, and caps at 20 total entries with re-assigned ranks.
+  Future<void> mergeFollowedScores(
+    String dTag,
+    Set<String> followedPubkeys,
+  ) async {
+    if (followedPubkeys.isEmpty) {
+      emit(
+        state.copyWith(
+          followedPubkeys: followedPubkeys,
+          followsStatus: LeaderboardStatus.loaded,
+        ),
+      );
+      return;
+    }
+
+    emit(
+      state.copyWith(
+        followedPubkeys: followedPubkeys,
+        followsStatus: LeaderboardStatus.loading,
+      ),
+    );
+
+    try {
+      final followedEntries = await _statsRepository.fetchScoresForAuthors(
+        dTag,
+        followedPubkeys.toList(),
+      );
+
+      final existingEntries =
+          state.leaderboard?.entries ?? const <LeaderboardEntry>[];
+
+      // Merge: existing global + followed, deduplicate by npub.
+      final byNpub = <String, LeaderboardEntry>{};
+      for (final entry in existingEntries) {
+        byNpub[entry.npub] = entry;
+      }
+      for (final entry in followedEntries) {
+        // Only add if not already in global list.
+        byNpub.putIfAbsent(entry.npub, () => entry);
+      }
+
+      // Mark followed entries.
+      final merged = byNpub.values.map((entry) {
+        final pubkeyHex = decodePubkeyHex(entry.npub);
+        final isFollowed =
+            pubkeyHex != null && followedPubkeys.contains(pubkeyHex);
+        return entry.copyWith(isFollowed: isFollowed);
+      }).toList();
+
+      // Sort: score DESC, then createdAt ASC.
+      merged.sort((a, b) {
+        final scoreComp = b.score.compareTo(a.score);
+        if (scoreComp != 0) return scoreComp;
+        return a.createdAt.compareTo(b.createdAt);
+      });
+
+      // Cap at 20 and re-assign ranks.
+      final capped = merged.take(20).toList();
+      for (var i = 0; i < capped.length; i++) {
+        capped[i] = capped[i].copyWith(rank: i + 1);
+      }
+
+      final mergedLeaderboard = Leaderboard(
+        dTag: state.leaderboard?.dTag ?? dTag,
+        entries: capped,
+      );
+
+      emit(
+        state.copyWith(
+          leaderboard: () => mergedLeaderboard,
+          followsStatus: LeaderboardStatus.loaded,
+        ),
+      );
+    } on Exception {
+      emit(state.copyWith(followsStatus: LeaderboardStatus.unavailable));
     }
   }
 }

@@ -1,6 +1,8 @@
 /// Reusable Nostr identity, signing, and profile management for Flutter.
 library;
 
+export 'src/contact_list/contact_list.dart';
+export 'src/contact_list/contact_list_repository.dart';
 export 'src/database/nostr_database.dart';
 export 'src/identity/nostr_identity_repository.dart';
 export 'src/profile/nostr_profile.dart';

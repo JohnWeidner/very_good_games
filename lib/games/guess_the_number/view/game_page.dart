@@ -12,6 +12,7 @@ import 'package:very_good_games/nostr/profile/profile.dart';
 import 'package:very_good_games/nostr/sharing/cubit/result_sharing_cubit.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
 import 'package:very_good_games/nostr/stats/cubit/community_stats_cubit.dart';
+import 'package:very_good_games/nostr/stats/cubit/contact_list_cubit.dart';
 import 'package:very_good_games/nostr/stats/cubit/leaderboard_cubit.dart';
 import 'package:very_good_games/nostr/stats/repository/community_stats_repository.dart';
 
@@ -75,6 +76,12 @@ class GamePage extends StatelessWidget {
             identityRepository: context.read<NostrIdentityRepository>(),
           ),
         ),
+        BlocProvider(
+          create: (context) => ContactListCubit(
+            contactListRepository: context.read<ContactListRepository>(),
+            identityRepository: context.read<NostrIdentityRepository>(),
+          ),
+        ),
       ],
       child: const _GameView(),
     );
@@ -105,8 +112,7 @@ class _GameViewState extends State<_GameView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final state = context.read<GameCubit>().state;
-      if (state.status == GameStatus.won ||
-          state.status == GameStatus.lost) {
+      if (state.status == GameStatus.won || state.status == GameStatus.lost) {
         setState(() => _showResults = true);
       }
     });
@@ -204,8 +210,7 @@ class _GameViewState extends State<_GameView> {
         child: BlocConsumer<GameCubit, GameState>(
           listenWhen: (prev, curr) =>
               prev.status != curr.status &&
-              (curr.status == GameStatus.won ||
-                  curr.status == GameStatus.lost),
+              (curr.status == GameStatus.won || curr.status == GameStatus.lost),
           listener: _onGameOver,
           builder: (context, state) {
             final cubit = context.read<GameCubit>();

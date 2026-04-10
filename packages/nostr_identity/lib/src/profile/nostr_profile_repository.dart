@@ -10,7 +10,7 @@ import 'package:nostr_identity/src/signing/nostr_signer.dart';
 
 /// Repository for reading and writing Nostr kind-0 profile metadata.
 ///
-/// Uses a Drift database for persistent caching with a 24-hour staleness
+/// Uses a Drift database for persistent caching with a 7-day staleness
 /// policy. Stale or missing profiles are fetched from relays.
 ///
 /// Publishes use read-then-merge to preserve unknown fields set by
@@ -26,16 +26,19 @@ class NostrProfileRepository {
   final NdkProvider _ndkProvider;
   final NostrDatabase _database;
 
-  static const _staleDuration = Duration(hours: 24);
+  static const _staleDuration = Duration(days: 7);
   static const _relayTimeout = Duration(seconds: 5);
 
   /// Fetches a single profile by [pubkeyHex].
   ///
   /// Returns cached if fresh (< 24h), else queries relays.
   /// Returns `null` if not found or relay timeout.
-  Future<NostrProfile?> getProfile(String pubkeyHex) async {
+  Future<NostrProfile?> getProfile(
+    String pubkeyHex, {
+    bool forceRefresh = false,
+  }) async {
     final cached = await _database.getProfile(pubkeyHex);
-    if (cached != null && _isFresh(cached.lastFetchedAt)) {
+    if (!forceRefresh && cached != null && _isFresh(cached.lastFetchedAt)) {
       return _fromRow(cached);
     }
 
@@ -239,13 +242,27 @@ class NostrProfileRepository {
   }
 
   NostrProfile _fromRow(ProfileTableData row) {
+    String? nip05;
+    String? lud16;
+    if (row.rawJson != null) {
+      try {
+        final json = jsonDecode(row.rawJson!) as Map<String, dynamic>;
+        nip05 = json['nip05'] as String?;
+        lud16 = json['lud16'] as String?;
+      } on FormatException {
+        // Malformed JSON — leave nip05/lud16 null.
+      }
+    }
     return NostrProfile(
       pubkey: row.pubkey,
       name: row.name,
       picture: row.picture,
       about: row.about,
+      nip05: nip05,
+      lud16: lud16,
       rawJson: row.rawJson,
       createdAt: row.createdAt,
+      lastFetchedAt: row.lastFetchedAt,
     );
   }
 }

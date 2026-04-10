@@ -10,6 +10,7 @@ import 'package:very_good_games/nostr/profile/profile.dart';
 import 'package:very_good_games/nostr/sharing/cubit/result_sharing_cubit.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
 import 'package:very_good_games/nostr/stats/cubit/community_stats_cubit.dart';
+import 'package:very_good_games/nostr/stats/cubit/contact_list_cubit.dart';
 import 'package:very_good_games/nostr/stats/cubit/leaderboard_cubit.dart';
 import 'package:very_good_games/nostr/stats/repository/community_stats_repository.dart';
 
@@ -31,38 +32,36 @@ class ChromixPage extends StatelessWidget {
           create: (context) => ChromixCubit(
             dailySeed: dailySeed,
             dateKey: dateKey,
-            storageRepository:
-                context.read<GameStorageRepository>(),
+            storageRepository: context.read<GameStorageRepository>(),
           ),
         ),
         BlocProvider(
           create: (context) => ResultSharingCubit(
-            identityRepository:
-                context.read<NostrIdentityRepository>(),
-            publishRepository:
-                context.read<NostrPublishRepository>(),
+            identityRepository: context.read<NostrIdentityRepository>(),
+            publishRepository: context.read<NostrPublishRepository>(),
           ),
         ),
         BlocProvider(
           create: (context) => CommunityStatsCubit(
-            statsRepository:
-                context.read<CommunityStatsRepository>(),
+            statsRepository: context.read<CommunityStatsRepository>(),
           ),
         ),
         BlocProvider(
           create: (context) => LeaderboardCubit(
-            statsRepository:
-                context.read<CommunityStatsRepository>(),
-            identityRepository:
-                context.read<NostrIdentityRepository>(),
+            statsRepository: context.read<CommunityStatsRepository>(),
+            identityRepository: context.read<NostrIdentityRepository>(),
           ),
         ),
         BlocProvider(
           create: (context) => ProfileCubit(
-            profileRepository:
-                context.read<NostrProfileRepository>(),
-            identityRepository:
-                context.read<NostrIdentityRepository>(),
+            profileRepository: context.read<NostrProfileRepository>(),
+            identityRepository: context.read<NostrIdentityRepository>(),
+          ),
+        ),
+        BlocProvider(
+          create: (context) => ContactListCubit(
+            contactListRepository: context.read<ContactListRepository>(),
+            identityRepository: context.read<NostrIdentityRepository>(),
           ),
         ),
       ],
@@ -117,9 +116,7 @@ class _ChromixViewState extends State<_ChromixView> {
   }
 
   void _fetchCommunityStats(BuildContext context) {
-    context
-        .read<CommunityStatsCubit>()
-        .fetchStats('chromix:${widget.dateKey}');
+    context.read<CommunityStatsCubit>().fetchStats('chromix:${widget.dateKey}');
   }
 
   void _onWin(BuildContext context) {
@@ -158,22 +155,18 @@ class _ChromixViewState extends State<_ChromixView> {
             ),
           IconButton(
             icon: const Icon(Icons.info_outline),
-            onPressed: () =>
-                ChromixInstructionsDialog.show(context),
+            onPressed: () => ChromixInstructionsDialog.show(context),
           ),
         ],
       ),
       body: WinCelebration(
         child: BlocConsumer<ChromixCubit, ChromixState>(
           listenWhen: (prev, curr) =>
-              prev.status != curr.status &&
-              curr.status == ChromixStatus.won,
+              prev.status != curr.status && curr.status == ChromixStatus.won,
           listener: (context, state) => _onWin(context),
           builder: (context, state) {
             if (state.status == ChromixStatus.loading) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
+              return const Center(child: CircularProgressIndicator());
             }
 
             return Stack(
@@ -183,12 +176,10 @@ class _ChromixViewState extends State<_ChromixView> {
                   child: Column(
                     children: [
                       Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.spaceEvenly,
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           BlocBuilder<ChromixCubit, ChromixState>(
-                            buildWhen: (prev, curr) =>
-                                prev.grid != curr.grid,
+                            buildWhen: (prev, curr) => prev.grid != curr.grid,
                             builder: (context, state) {
                               return ColorPieChart.fromGrid(
                                 grid: state.grid,
@@ -207,17 +198,12 @@ class _ChromixViewState extends State<_ChromixView> {
                       const SizedBox(height: 12),
                       if (state.hasContiguityViolation)
                         Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.only(bottom: 8),
                           child: Text(
                             'Colors must be connected',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .error,
+                                  color: Theme.of(context).colorScheme.error,
                                 ),
                           ),
                         ),
@@ -225,23 +211,19 @@ class _ChromixViewState extends State<_ChromixView> {
                     ],
                   ),
                 ),
-                if (state.status == ChromixStatus.won &&
-                    _showResults)
+                if (state.status == ChromixStatus.won && _showResults)
                   Positioned.fill(
                     child: ChromixResultsOverlay(
                       state: state,
-                      onViewPuzzle: () =>
-                          setState(() => _showResults = false),
+                      onViewPuzzle: () => setState(() => _showResults = false),
                     ),
                   ),
-                if (state.status == ChromixStatus.won &&
-                    !_showResults)
+                if (state.status == ChromixStatus.won && !_showResults)
                   Positioned(
                     bottom: 16,
                     right: 16,
                     child: FloatingActionButton.extended(
-                      onPressed: () =>
-                          setState(() => _showResults = true),
+                      onPressed: () => setState(() => _showResults = true),
                       icon: const Icon(Icons.emoji_events),
                       label: const Text('Results'),
                     ),
@@ -275,10 +257,9 @@ class _UndoRow extends StatelessWidget {
           '${state.moveCount} moves · '
           '${state.undoCount} undos',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withValues(alpha: 0.6),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
       ],

@@ -18,6 +18,7 @@ class App extends StatelessWidget {
     required NostrPublishRepository nostrPublishRepository,
     required NostrDeletionRepository nostrDeletionRepository,
     required CommunityStatsRepository communityStatsRepository,
+    required ContactListRepository contactListRepository,
     required NostrProfileRepository nostrProfileRepository,
     super.key,
   }) : _router = router,
@@ -27,6 +28,7 @@ class App extends StatelessWidget {
        _nostrPublishRepository = nostrPublishRepository,
        _nostrDeletionRepository = nostrDeletionRepository,
        _communityStatsRepository = communityStatsRepository,
+       _contactListRepository = contactListRepository,
        _nostrProfileRepository = nostrProfileRepository;
 
   final GoRouter _router;
@@ -36,6 +38,7 @@ class App extends StatelessWidget {
   final NostrPublishRepository _nostrPublishRepository;
   final NostrDeletionRepository _nostrDeletionRepository;
   final CommunityStatsRepository _communityStatsRepository;
+  final ContactListRepository _contactListRepository;
   final NostrProfileRepository _nostrProfileRepository;
 
   @override
@@ -48,6 +51,7 @@ class App extends StatelessWidget {
         RepositoryProvider.value(value: _nostrPublishRepository),
         RepositoryProvider.value(value: _nostrDeletionRepository),
         RepositoryProvider.value(value: _communityStatsRepository),
+        RepositoryProvider.value(value: _contactListRepository),
         RepositoryProvider.value(value: _nostrProfileRepository),
       ],
       child: MaterialApp.router(

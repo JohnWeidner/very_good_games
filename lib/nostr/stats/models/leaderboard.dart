@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:ndk/ndk.dart';
+import 'package:ndk/shared/nips/nip01/helpers.dart' show Helpers;
 
 /// A single entry in the leaderboard.
 class LeaderboardEntry extends Equatable {
@@ -9,6 +10,7 @@ class LeaderboardEntry extends Equatable {
     required this.score,
     required this.rank,
     required this.createdAt,
+    this.isFollowed = false,
   });
 
   /// User's public key (bech32 encoded).
@@ -22,6 +24,9 @@ class LeaderboardEntry extends Equatable {
 
   /// Nostr event creation timestamp (unix seconds).
   final int createdAt;
+
+  /// Whether this user is followed by the current user.
+  final bool isFollowed;
 
   /// Display name: truncated npub for v1 (alias support deferred to v2).
   String get displayName => _truncateNpub(npub);
@@ -38,17 +43,19 @@ class LeaderboardEntry extends Equatable {
     int? score,
     int? rank,
     int? createdAt,
+    bool? isFollowed,
   }) {
     return LeaderboardEntry(
       npub: npub ?? this.npub,
       score: score ?? this.score,
       rank: rank ?? this.rank,
       createdAt: createdAt ?? this.createdAt,
+      isFollowed: isFollowed ?? this.isFollowed,
     );
   }
 
   @override
-  List<Object> get props => [npub, score, rank, createdAt];
+  List<Object> get props => [npub, score, rank, createdAt, isFollowed];
 }
 
 /// Container for leaderboard data (top N entries, sorted).
@@ -84,4 +91,17 @@ class Leaderboard extends Equatable {
 
   @override
   List<Object> get props => [dTag, entries];
+}
+
+/// Decodes a bech32 npub to hex pubkey.
+///
+/// Returns `null` if decoding fails.
+String? decodePubkeyHex(String npub) {
+  try {
+    final decoded = Helpers.decodeBech32(npub);
+    if (decoded[1] == 'npub') return decoded[0];
+    return null;
+  } on Exception {
+    return null;
+  }
 }

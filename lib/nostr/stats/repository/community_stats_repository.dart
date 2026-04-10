@@ -108,6 +108,72 @@ class CommunityStatsRepository {
     }
   }
 
+  /// Fetches scores for specific [authorPubkeys] on a given [dTag].
+  ///
+  /// Chunks author lists into batches of 50 for relay queries.
+  /// Returns unranked [LeaderboardEntry] list with scores extracted.
+  Future<List<LeaderboardEntry>> fetchScoresForAuthors(
+    String dTag,
+    List<String> authorPubkeys,
+  ) async {
+    if (authorPubkeys.isEmpty) return [];
+
+    final entries = <LeaderboardEntry>[];
+
+    try {
+      // Chunk into batches of 50.
+      for (var i = 0; i < authorPubkeys.length; i += 50) {
+        final batch = authorPubkeys.sublist(
+          i,
+          i + 50 > authorPubkeys.length ? authorPubkeys.length : i + 50,
+        );
+
+        final response = _ndkProvider.ndk.requests.query(
+          filter: Filter(
+            kinds: [30042],
+            dTags: [dTag],
+            authors: batch,
+            limit: batch.length,
+          ),
+          explicitRelays: defaultRelayUrls,
+          cacheRead: false,
+          cacheWrite: false,
+        );
+
+        final events = await response.future.timeout(
+          const Duration(seconds: 5),
+        );
+
+        // Deduplicate by pubkey (keep oldest per author).
+        final byPubkey = <String, Nip01Event>{};
+        for (final event in events) {
+          final existing = byPubkey[event.pubKey];
+          if (existing == null || event.createdAt < existing.createdAt) {
+            byPubkey[event.pubKey] = event;
+          }
+        }
+
+        for (final event in byPubkey.values) {
+          final score = _extractScore(event);
+          if (score != null) {
+            entries.add(
+              LeaderboardEntry(
+                npub: Nip19.encodePubKey(event.pubKey),
+                score: score,
+                rank: 0,
+                createdAt: event.createdAt,
+              ),
+            );
+          }
+        }
+      }
+    } on Exception {
+      // Return partial results on failure.
+    }
+
+    return entries;
+  }
+
   /// Queries kind 30042 events for [dTag] and deduplicates by pubkey,
   /// keeping the oldest `createdAt` per author (first submission wins).
   ///

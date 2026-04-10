@@ -131,6 +131,110 @@ void main() {
       });
     });
 
+    group('nip05', () {
+      test('parses nip05 from event', () {
+        final content = jsonEncode({
+          'name': 'Alice',
+          'nip05': 'alice@example.com',
+        });
+        final event = Nip01Event(
+          pubKey: 'abc123',
+          kind: 0,
+          tags: [],
+          content: content,
+        );
+        final profile = NostrProfile.fromEvent(event);
+
+        expect(profile.nip05, 'alice@example.com');
+      });
+
+      test('returns null when event has no nip05', () {
+        final content = jsonEncode({'name': 'Alice'});
+        final event = Nip01Event(
+          pubKey: 'abc123',
+          kind: 0,
+          tags: [],
+          content: content,
+        );
+        final profile = NostrProfile.fromEvent(event);
+
+        expect(profile.nip05, isNull);
+      });
+
+      test('stores nip05 from constructor', () {
+        const profile = NostrProfile(
+          pubkey: 'abc123',
+          nip05: 'alice@example.com',
+        );
+
+        expect(profile.nip05, 'alice@example.com');
+      });
+
+      test('defaults to null', () {
+        const profile = NostrProfile(pubkey: 'abc123');
+
+        expect(profile.nip05, isNull);
+      });
+    });
+
+    group('lud16', () {
+      test('parses lud16 from event', () {
+        final content = jsonEncode({
+          'name': 'Alice',
+          'lud16': 'alice@getalby.com',
+        });
+        final event = Nip01Event(
+          pubKey: 'abc123',
+          kind: 0,
+          tags: [],
+          content: content,
+        );
+        final profile = NostrProfile.fromEvent(event);
+
+        expect(profile.lud16, 'alice@getalby.com');
+      });
+
+      test('returns null when event has no lud16', () {
+        final content = jsonEncode({'name': 'Alice'});
+        final event = Nip01Event(
+          pubKey: 'abc123',
+          kind: 0,
+          tags: [],
+          content: content,
+        );
+        final profile = NostrProfile.fromEvent(event);
+
+        expect(profile.lud16, isNull);
+      });
+
+      test('defaults to null', () {
+        const profile = NostrProfile(pubkey: 'abc123');
+
+        expect(profile.lud16, isNull);
+      });
+    });
+
+    group('lastFetchedAt', () {
+      test('stores lastFetchedAt value', () {
+        const profile = NostrProfile(pubkey: 'abc123', lastFetchedAt: 9999);
+
+        expect(profile.lastFetchedAt, 9999);
+      });
+
+      test('defaults to null', () {
+        const profile = NostrProfile(pubkey: 'abc123');
+
+        expect(profile.lastFetchedAt, isNull);
+      });
+
+      test('is included in equality', () {
+        const a = NostrProfile(pubkey: 'abc123', lastFetchedAt: 100);
+        const b = NostrProfile(pubkey: 'abc123', lastFetchedAt: 200);
+
+        expect(a, isNot(b));
+      });
+    });
+
     group('displayName', () {
       test('returns name when available', () {
         const profile = NostrProfile(pubkey: 'abc123', name: 'Alice');

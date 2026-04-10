@@ -130,6 +130,33 @@ void main() {
 
         expect(profile, isNull);
       });
+
+      test('bypasses cache when forceRefresh is true', () async {
+        // Populate cache.
+        stubQuery([makeKind0Event(pubKey: 'abc123', name: 'Old Name')]);
+        await repository.getProfile('abc123');
+
+        // Force refresh returns updated name from relay.
+        stubQuery([makeKind0Event(pubKey: 'abc123', name: 'New Name')]);
+        final profile = await repository.getProfile(
+          'abc123',
+          forceRefresh: true,
+        );
+
+        expect(profile, isNotNull);
+        expect(profile!.name, 'New Name');
+      });
+
+      test('populates lastFetchedAt from cache', () async {
+        stubQuery([makeKind0Event(pubKey: 'abc123', name: 'Alice')]);
+        await repository.getProfile('abc123');
+
+        // Read from cache — should have lastFetchedAt set.
+        final profile = await repository.getProfile('abc123');
+
+        expect(profile, isNotNull);
+        expect(profile!.lastFetchedAt, isNotNull);
+      });
     });
 
     group('getProfiles', () {

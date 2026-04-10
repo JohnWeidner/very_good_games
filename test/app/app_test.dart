@@ -26,6 +26,9 @@ class _MockCommunityStatsRepository extends Mock
 class _MockNostrProfileRepository extends Mock
     implements NostrProfileRepository {}
 
+class _MockContactListRepository extends Mock
+    implements ContactListRepository {}
+
 void main() {
   group('App', () {
     late GoRouter router;
@@ -35,6 +38,7 @@ void main() {
     late NostrPublishRepository nostrPublishRepository;
     late NostrDeletionRepository nostrDeletionRepository;
     late CommunityStatsRepository communityStatsRepository;
+    late ContactListRepository contactListRepository;
     late NostrProfileRepository nostrProfileRepository;
 
     setUp(() async {
@@ -47,6 +51,7 @@ void main() {
       nostrPublishRepository = _MockNostrPublishRepository();
       nostrDeletionRepository = _MockNostrDeletionRepository();
       communityStatsRepository = _MockCommunityStatsRepository();
+      contactListRepository = _MockContactListRepository();
       nostrProfileRepository = _MockNostrProfileRepository();
     });
 
@@ -60,6 +65,7 @@ void main() {
           nostrPublishRepository: nostrPublishRepository,
           nostrDeletionRepository: nostrDeletionRepository,
           communityStatsRepository: communityStatsRepository,
+          contactListRepository: contactListRepository,
           nostrProfileRepository: nostrProfileRepository,
         ),
       );
@@ -77,6 +83,7 @@ void main() {
           nostrPublishRepository: nostrPublishRepository,
           nostrDeletionRepository: nostrDeletionRepository,
           communityStatsRepository: communityStatsRepository,
+          contactListRepository: contactListRepository,
           nostrProfileRepository: nostrProfileRepository,
         ),
       );

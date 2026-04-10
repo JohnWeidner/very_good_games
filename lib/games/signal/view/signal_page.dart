@@ -10,6 +10,7 @@ import 'package:very_good_games/nostr/profile/profile.dart';
 import 'package:very_good_games/nostr/sharing/cubit/result_sharing_cubit.dart';
 import 'package:very_good_games/nostr/sharing/repository/nostr_publish_repository.dart';
 import 'package:very_good_games/nostr/stats/cubit/community_stats_cubit.dart';
+import 'package:very_good_games/nostr/stats/cubit/contact_list_cubit.dart';
 import 'package:very_good_games/nostr/stats/cubit/leaderboard_cubit.dart';
 import 'package:very_good_games/nostr/stats/repository/community_stats_repository.dart';
 
@@ -54,6 +55,12 @@ class SignalPage extends StatelessWidget {
         BlocProvider(
           create: (context) => ProfileCubit(
             profileRepository: context.read<NostrProfileRepository>(),
+            identityRepository: context.read<NostrIdentityRepository>(),
+          ),
+        ),
+        BlocProvider(
+          create: (context) => ContactListCubit(
+            contactListRepository: context.read<ContactListRepository>(),
             identityRepository: context.read<NostrIdentityRepository>(),
           ),
         ),
@@ -175,13 +182,11 @@ class _SignalViewState extends State<_SignalView> {
                       ),
                       Text(
                         '${state.moveCount} moves',
-                        style:
-                            Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: 0.6),
-                            ),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       const Expanded(child: SignalGrid()),
@@ -192,8 +197,7 @@ class _SignalViewState extends State<_SignalView> {
                   Positioned.fill(
                     child: SignalResultsOverlay(
                       state: state,
-                      onViewPuzzle: () =>
-                          setState(() => _showResults = false),
+                      onViewPuzzle: () => setState(() => _showResults = false),
                     ),
                   ),
                 if (state.status == SignalStatus.won && !_showResults)
@@ -201,8 +205,7 @@ class _SignalViewState extends State<_SignalView> {
                     bottom: 16,
                     right: 16,
                     child: FloatingActionButton.extended(
-                      onPressed: () =>
-                          setState(() => _showResults = true),
+                      onPressed: () => setState(() => _showResults = true),
                       icon: const Icon(Icons.emoji_events),
                       label: const Text('Results'),
                     ),

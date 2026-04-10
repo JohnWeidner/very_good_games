@@ -14,8 +14,11 @@ class NostrProfile extends Equatable {
     this.name,
     this.picture,
     this.about,
+    this.nip05,
+    this.lud16,
     this.rawJson,
     this.createdAt,
+    this.lastFetchedAt,
   });
 
   /// Parses a [NostrProfile] from a kind-0 [Nip01Event].
@@ -26,6 +29,8 @@ class NostrProfile extends Equatable {
     String? name;
     String? picture;
     String? about;
+    String? nip05;
+    String? lud16;
     String? rawJson;
 
     try {
@@ -33,6 +38,8 @@ class NostrProfile extends Equatable {
       name = json['name'] as String?;
       picture = json['picture'] as String?;
       about = json['about'] as String?;
+      nip05 = json['nip05'] as String?;
+      lud16 = json['lud16'] as String?;
       rawJson = event.content;
     } on FormatException {
       // Malformed JSON — create profile with pubkey only.
@@ -43,6 +50,8 @@ class NostrProfile extends Equatable {
       name: name,
       picture: picture,
       about: about,
+      nip05: nip05,
+      lud16: lud16,
       rawJson: rawJson,
       createdAt: event.createdAt,
     );
@@ -65,6 +74,19 @@ class NostrProfile extends Equatable {
 
   /// Kind-0 event `created_at` timestamp (unix seconds).
   final int? createdAt;
+
+  /// Unix seconds when this profile was last fetched from a relay.
+  final int? lastFetchedAt;
+
+  /// NIP-05 identifier (e.g. `user@domain.com`) from kind-0 JSON.
+  ///
+  /// Parsed eagerly from [rawJson]. Displayed as plain text (unverified).
+  final String? nip05;
+
+  /// Lightning address (e.g. `user@domain.com`) from kind-0 JSON.
+  ///
+  /// Parsed eagerly from [rawJson]. Displayed as informational text only.
+  final String? lud16;
 
   /// Display name with fallback to truncated npub.
   String get displayName => name ?? _truncateHexKey(pubkey);
@@ -101,5 +123,15 @@ class NostrProfile extends Equatable {
   }
 
   @override
-  List<Object?> get props => [pubkey, name, picture, about, rawJson, createdAt];
+  List<Object?> get props => [
+    pubkey,
+    name,
+    picture,
+    about,
+    nip05,
+    lud16,
+    rawJson,
+    createdAt,
+    lastFetchedAt,
+  ];
 }

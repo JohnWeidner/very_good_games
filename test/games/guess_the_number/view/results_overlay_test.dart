@@ -4,11 +4,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/games/guess_the_number/cubit/game_cubit.dart';
 import 'package:very_good_games/games/guess_the_number/models/models.dart';
 import 'package:very_good_games/games/guess_the_number/view/widgets/results_overlay.dart';
 import 'package:very_good_games/nostr/sharing/cubit/result_sharing_cubit.dart';
 import 'package:very_good_games/nostr/stats/cubit/community_stats_cubit.dart';
+import 'package:very_good_games/nostr/stats/cubit/contact_list_cubit.dart';
 import 'package:very_good_games/nostr/stats/cubit/leaderboard_cubit.dart';
 import 'package:very_good_games/nostr/stats/models/community_stats.dart';
 
@@ -21,11 +23,19 @@ class _MockCommunityStatsCubit extends MockCubit<CommunityStatsState>
 class _MockLeaderboardCubit extends MockCubit<LeaderboardState>
     implements LeaderboardCubit {}
 
+class _MockContactListCubit extends MockCubit<ContactListState>
+    implements ContactListCubit {}
+
+class _MockNostrProfileRepository extends Mock
+    implements NostrProfileRepository {}
+
 void main() {
   group('ResultsOverlay', () {
     late ResultSharingCubit sharingCubit;
     late CommunityStatsCubit statsCubit;
     late LeaderboardCubit leaderboardCubit;
+    late ContactListCubit contactListCubit;
+    late NostrProfileRepository nostrProfileRepository;
 
     setUp(() {
       sharingCubit = _MockResultSharingCubit();
@@ -37,6 +47,13 @@ void main() {
       when(
         () => leaderboardCubit.fetchLeaderboard(any()),
       ).thenAnswer((_) async {});
+      contactListCubit = _MockContactListCubit();
+      when(() => contactListCubit.state).thenReturn(const ContactListState());
+      when(() => contactListCubit.loadFollows()).thenAnswer((_) async {});
+      nostrProfileRepository = _MockNostrProfileRepository();
+      when(
+        () => nostrProfileRepository.getProfile(any()),
+      ).thenAnswer((_) async => null);
     });
 
     Widget buildSubject(GameState state) {
@@ -44,13 +61,21 @@ void main() {
         routes: [
           GoRoute(
             path: '/',
-            builder: (_, __) => MultiBlocProvider(
+            builder: (_, __) => MultiRepositoryProvider(
               providers: [
-                BlocProvider<ResultSharingCubit>.value(value: sharingCubit),
-                BlocProvider<CommunityStatsCubit>.value(value: statsCubit),
-                BlocProvider<LeaderboardCubit>.value(value: leaderboardCubit),
+                RepositoryProvider<NostrProfileRepository>.value(
+                  value: nostrProfileRepository,
+                ),
               ],
-              child: Scaffold(body: ResultsOverlay(state: state)),
+              child: MultiBlocProvider(
+                providers: [
+                  BlocProvider<ResultSharingCubit>.value(value: sharingCubit),
+                  BlocProvider<CommunityStatsCubit>.value(value: statsCubit),
+                  BlocProvider<LeaderboardCubit>.value(value: leaderboardCubit),
+                  BlocProvider<ContactListCubit>.value(value: contactListCubit),
+                ],
+                child: Scaffold(body: ResultsOverlay(state: state)),
+              ),
             ),
           ),
         ],

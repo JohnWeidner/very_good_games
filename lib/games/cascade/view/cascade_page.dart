@@ -28,38 +28,36 @@ class CascadePage extends StatelessWidget {
           create: (context) => CascadeCubit(
             dailySeed: dailySeed,
             dateKey: dateKey,
-            storageRepository:
-                context.read<GameStorageRepository>(),
+            storageRepository: context.read<GameStorageRepository>(),
           ),
         ),
         BlocProvider(
           create: (context) => ResultSharingCubit(
-            identityRepository:
-                context.read<NostrIdentityRepository>(),
-            publishRepository:
-                context.read<NostrPublishRepository>(),
+            identityRepository: context.read<NostrIdentityRepository>(),
+            publishRepository: context.read<NostrPublishRepository>(),
           ),
         ),
         BlocProvider(
           create: (context) => CommunityStatsCubit(
-            statsRepository:
-                context.read<CommunityStatsRepository>(),
+            statsRepository: context.read<CommunityStatsRepository>(),
           ),
         ),
         BlocProvider(
           create: (context) => LeaderboardCubit(
-            statsRepository:
-                context.read<CommunityStatsRepository>(),
-            identityRepository:
-                context.read<NostrIdentityRepository>(),
+            statsRepository: context.read<CommunityStatsRepository>(),
+            identityRepository: context.read<NostrIdentityRepository>(),
           ),
         ),
         BlocProvider(
           create: (context) => ProfileCubit(
-            profileRepository:
-                context.read<NostrProfileRepository>(),
-            identityRepository:
-                context.read<NostrIdentityRepository>(),
+            profileRepository: context.read<NostrProfileRepository>(),
+            identityRepository: context.read<NostrIdentityRepository>(),
+          ),
+        ),
+        BlocProvider(
+          create: (context) => ContactListCubit(
+            contactListRepository: context.read<ContactListRepository>(),
+            identityRepository: context.read<NostrIdentityRepository>(),
           ),
         ),
       ],
@@ -113,9 +111,7 @@ class _CascadeViewState extends State<_CascadeView> {
   }
 
   void _fetchCommunityStats(BuildContext context) {
-    context
-        .read<CommunityStatsCubit>()
-        .fetchStats('cascade:${widget.dateKey}');
+    context.read<CommunityStatsCubit>().fetchStats('cascade:${widget.dateKey}');
   }
 
   void _onWin(BuildContext context) {
@@ -154,22 +150,18 @@ class _CascadeViewState extends State<_CascadeView> {
             ),
           IconButton(
             icon: const Icon(Icons.info_outline),
-            onPressed: () =>
-                CascadeInstructionsDialog.show(context),
+            onPressed: () => CascadeInstructionsDialog.show(context),
           ),
         ],
       ),
       body: WinCelebration(
         child: BlocConsumer<CascadeCubit, CascadeState>(
           listenWhen: (prev, curr) =>
-              prev.status != curr.status &&
-              curr.status == CascadeStatus.won,
+              prev.status != curr.status && curr.status == CascadeStatus.won,
           listener: (context, state) => _onWin(context),
           builder: (context, state) {
             if (state.status == CascadeStatus.loading) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
+              return const Center(child: CircularProgressIndicator());
             }
 
             return Stack(
@@ -180,37 +172,29 @@ class _CascadeViewState extends State<_CascadeView> {
                     children: [
                       BallTray(
                         slotAssignments: state.slotAssignments,
-                        onBallAssigned: (ball, slot) => context
-                            .read<CascadeCubit>()
-                            .assignBall(ball, slot),
-                        enabled: state.status ==
-                            CascadeStatus.configuring,
+                        onBallAssigned: (ball, slot) =>
+                            context.read<CascadeCubit>().assignBall(ball, slot),
+                        enabled: state.status == CascadeStatus.configuring,
                       ),
-                      const Expanded(
-                        child: CascadeBoardWidget(),
-                      ),
+                      const Expanded(child: CascadeBoardWidget()),
                       const SizedBox(height: 12),
                       _ActionRow(state: state),
                     ],
                   ),
                 ),
-                if (state.status == CascadeStatus.won &&
-                    _showResults)
+                if (state.status == CascadeStatus.won && _showResults)
                   Positioned.fill(
                     child: CascadeResultsOverlay(
                       state: state,
-                      onViewPuzzle: () =>
-                          setState(() => _showResults = false),
+                      onViewPuzzle: () => setState(() => _showResults = false),
                     ),
                   ),
-                if (state.status == CascadeStatus.won &&
-                    !_showResults)
+                if (state.status == CascadeStatus.won && !_showResults)
                   Positioned(
                     bottom: 16,
                     right: 16,
                     child: FloatingActionButton.extended(
-                      onPressed: () =>
-                          setState(() => _showResults = true),
+                      onPressed: () => setState(() => _showResults = true),
                       icon: const Icon(Icons.emoji_events),
                       label: const Text('Results'),
                     ),
@@ -253,13 +237,11 @@ class _ActionRow extends StatelessWidget {
             child: Text(
               '${state.attempts} '
               '${state.attempts == 1 ? 'attempt' : 'attempts'}',
-              style:
-                  Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.6),
-                  ),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
             ),
           ),
       ],

@@ -6,13 +6,21 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:ndk/ndk.dart';
+import 'package:nostr_identity/nostr_identity.dart';
 import 'package:very_good_games/nostr/profile/profile.dart';
+import 'package:very_good_games/nostr/stats/cubit/contact_list_cubit.dart';
 import 'package:very_good_games/nostr/stats/cubit/leaderboard_cubit.dart';
 import 'package:very_good_games/nostr/stats/models/leaderboard.dart';
 import 'package:very_good_games/nostr/stats/view/leaderboard_section.dart';
 
 class _MockProfileCubit extends MockCubit<ProfileState>
     implements ProfileCubit {}
+
+class _MockContactListCubit extends MockCubit<ContactListState>
+    implements ContactListCubit {}
+
+class _MockNostrProfileRepository extends Mock
+    implements NostrProfileRepository {}
 
 class _MockLeaderboardCubit extends Mock implements LeaderboardCubit {
   final _stateController = StreamController<LeaderboardState>.broadcast();
@@ -34,11 +42,22 @@ void main() {
   group('LeaderboardSection', () {
     late _MockLeaderboardCubit mockCubit;
     late _MockProfileCubit mockProfileCubit;
+    late _MockContactListCubit mockContactListCubit;
+    late _MockNostrProfileRepository mockProfileRepository;
 
     setUp(() {
       mockCubit = _MockLeaderboardCubit();
       mockProfileCubit = _MockProfileCubit();
+      mockContactListCubit = _MockContactListCubit();
+      mockProfileRepository = _MockNostrProfileRepository();
       when(() => mockProfileCubit.state).thenReturn(const ProfileState());
+      when(
+        () => mockContactListCubit.state,
+      ).thenReturn(const ContactListState());
+      when(() => mockContactListCubit.loadFollows()).thenAnswer((_) async {});
+      when(
+        () => mockProfileRepository.getProfile(any()),
+      ).thenAnswer((_) async => null);
     });
 
     tearDown(() {
@@ -51,35 +70,51 @@ void main() {
       mockCubit.emitState(initialState);
 
       return MaterialApp(
-        home: MultiBlocProvider(
+        home: MultiRepositoryProvider(
           providers: [
-            BlocProvider<LeaderboardCubit>.value(value: mockCubit),
-            BlocProvider<ProfileCubit>.value(value: mockProfileCubit),
+            RepositoryProvider<NostrProfileRepository>.value(
+              value: mockProfileRepository,
+            ),
           ],
-          child: const Scaffold(
-            body: LeaderboardSection(dTag: 'test:2026-04-06'),
+          child: MultiBlocProvider(
+            providers: [
+              BlocProvider<LeaderboardCubit>.value(value: mockCubit),
+              BlocProvider<ProfileCubit>.value(value: mockProfileCubit),
+              BlocProvider<ContactListCubit>.value(value: mockContactListCubit),
+            ],
+            child: const Scaffold(
+              body: LeaderboardSection(dTag: 'test:2026-04-06'),
+            ),
           ),
         ),
       );
     }
 
-    testWidgets('shows identity setup prompt when hasIdentity=false', (
-      WidgetTester tester,
-    ) async {
-      const state = LeaderboardState(hasIdentity: false);
+    testWidgets('shows identity setup prompt when hasIdentity=false '
+        'and still shows leaderboard', (tester) async {
+      final npub = Nip19.encodePubKey('a' * 64);
+      final state = LeaderboardState(
+        status: LeaderboardStatus.loaded,
+        hasIdentity: false,
+        leaderboard: Leaderboard(
+          dTag: 'test:2026-04-06',
+          entries: [
+            LeaderboardEntry(npub: npub, score: 100, rank: 1, createdAt: 1000),
+          ],
+        ),
+      );
 
       await tester.pumpWidget(buildTestWidget(state));
 
+      // Both prompt AND leaderboard visible.
       expect(
         find.text('Set up your identity to get ranked on the leaderboard'),
         findsOneWidget,
       );
-      expect(find.byType(FilledButton), findsOneWidget);
+      expect(find.text('100'), findsOneWidget);
     });
 
-    testWidgets('shows loading placeholder while loading', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('shows loading placeholder while loading', (tester) async {
       const state = LeaderboardState(status: LeaderboardStatus.loading);
 
       await tester.pumpWidget(buildTestWidget(state));
@@ -88,7 +123,7 @@ void main() {
     });
 
     testWidgets('shows "no scores yet" when leaderboard is empty', (
-      WidgetTester tester,
+      tester,
     ) async {
       const state = LeaderboardState(
         status: LeaderboardStatus.loaded,
@@ -101,7 +136,7 @@ void main() {
     });
 
     testWidgets('shows unavailable message when status=unavailable', (
-      WidgetTester tester,
+      tester,
     ) async {
       const state = LeaderboardState(status: LeaderboardStatus.unavailable);
 
@@ -110,112 +145,76 @@ void main() {
       expect(find.text('Leaderboard unavailable'), findsOneWidget);
     });
 
-    testWidgets('renders leaderboard table with headers and entries', (
-      WidgetTester tester,
-    ) async {
-      const entry1 = LeaderboardEntry(
-        npub: 'npub1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        score: 100,
-        rank: 1,
-        createdAt: 1000,
-      );
-      const entry2 = LeaderboardEntry(
-        npub: 'npub1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-        score: 90,
-        rank: 2,
-        createdAt: 2000,
-      );
-      const state = LeaderboardState(
+    testWidgets('renders leaderboard with headers and entries', (tester) async {
+      final npubA = Nip19.encodePubKey('a' * 64);
+      final npubB = Nip19.encodePubKey('b' * 64);
+      final state = LeaderboardState(
         status: LeaderboardStatus.loaded,
         leaderboard: Leaderboard(
           dTag: 'test:2026-04-06',
-          entries: [entry1, entry2],
+          entries: [
+            LeaderboardEntry(npub: npubA, score: 100, rank: 1, createdAt: 1000),
+            LeaderboardEntry(npub: npubB, score: 90, rank: 2, createdAt: 2000),
+          ],
         ),
       );
 
       await tester.pumpWidget(buildTestWidget(state));
 
-      // Check headers
-      expect(find.text('Rank'), findsWidgets);
-      expect(find.text('Player'), findsWidgets);
-      expect(find.text('Score'), findsWidgets);
-
-      // Check entries
-      expect(find.text('1'), findsWidgets);
-      expect(find.text('2'), findsWidgets);
+      expect(find.text('Rank'), findsOneWidget);
+      expect(find.text('Player'), findsOneWidget);
+      expect(find.text('Score'), findsOneWidget);
       expect(find.text('100'), findsOneWidget);
       expect(find.text('90'), findsOneWidget);
     });
 
-    testWidgets('highlights user entry when pubkey matches', (
-      WidgetTester tester,
-    ) async {
-      // Use a valid hex pubkey and its encoded npub for the entry.
-      const userHex =
-          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-      final userNpub = Nip19.encodePubKey(userHex);
-      final entry = LeaderboardEntry(
-        npub: userNpub,
-        score: 100,
-        rank: 1,
-        createdAt: 1000,
-      );
+    testWidgets('shows follow indicator for followed entries', (tester) async {
+      final npub = Nip19.encodePubKey('a' * 64);
       final state = LeaderboardState(
         status: LeaderboardStatus.loaded,
-        leaderboard: Leaderboard(dTag: 'test:2026-04-06', entries: [entry]),
-      );
-
-      when(() => mockCubit.state).thenReturn(state);
-      when(() => mockCubit.fetchLeaderboard(any())).thenAnswer((_) async {});
-      mockCubit.emitState(state);
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: MultiBlocProvider(
-            providers: [
-              BlocProvider<LeaderboardCubit>.value(value: mockCubit),
-              BlocProvider<ProfileCubit>.value(value: mockProfileCubit),
-            ],
-            child: const Scaffold(
-              body: LeaderboardSection(
-                dTag: 'test:2026-04-06',
-                userPubKeyHex: userHex,
-              ),
+        leaderboard: Leaderboard(
+          dTag: 'test:2026-04-06',
+          entries: [
+            LeaderboardEntry(
+              npub: npub,
+              score: 100,
+              rank: 1,
+              createdAt: 1000,
+              isFollowed: true,
             ),
-          ),
+          ],
         ),
-      );
-
-      // Verify the user's row has primaryContainer background color.
-      final table = tester.widget<Table>(find.byType(Table));
-      // Row 0 is header, row 1 is the user's data row.
-      final userRow = table.children[1];
-      final decoration = userRow.decoration! as BoxDecoration;
-      expect(decoration.color, isNotNull);
-    });
-
-    testWidgets('displays truncated npub as player name', (
-      WidgetTester tester,
-    ) async {
-      const entry = LeaderboardEntry(
-        npub: 'npub1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        score: 100,
-        rank: 1,
-        createdAt: 1000,
-      );
-      const state = LeaderboardState(
-        status: LeaderboardStatus.loaded,
-        leaderboard: Leaderboard(dTag: 'test:2026-04-06', entries: [entry]),
       );
 
       await tester.pumpWidget(buildTestWidget(state));
 
-      // displayName should be truncated
-      expect(find.text('npub1aaa...'), findsOneWidget);
+      expect(find.byIcon(Icons.how_to_reg), findsOneWidget);
     });
 
-    testWidgets('fetches leaderboard on initial build', (
-      WidgetTester tester,
+    testWidgets('tapping row opens profile bottom sheet', (tester) async {
+      final npub = Nip19.encodePubKey('a' * 64);
+      final state = LeaderboardState(
+        status: LeaderboardStatus.loaded,
+        leaderboard: Leaderboard(
+          dTag: 'test:2026-04-06',
+          entries: [
+            LeaderboardEntry(npub: npub, score: 100, rank: 1, createdAt: 1000),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(buildTestWidget(state));
+
+      // Tap the row (InkWell).
+      await tester.tap(find.byType(InkWell).first);
+      await tester.pumpAndSettle();
+
+      // A modal bottom sheet should appear.
+      expect(find.byType(BottomSheet), findsOneWidget);
+    });
+
+    testWidgets('fetches leaderboard and loads follows on initial build', (
+      tester,
     ) async {
       when(() => mockCubit.state).thenReturn(const LeaderboardState());
       when(() => mockCubit.fetchLeaderboard(any())).thenAnswer((_) async {});
@@ -224,43 +223,7 @@ void main() {
       await tester.pumpAndSettle();
 
       verify(() => mockCubit.fetchLeaderboard('test:2026-04-06')).called(1);
-    });
-
-    testWidgets('renders multiple entries in correct order', (
-      WidgetTester tester,
-    ) async {
-      const entry1 = LeaderboardEntry(
-        npub: 'npub1111',
-        score: 100,
-        rank: 1,
-        createdAt: 1000,
-      );
-      const entry2 = LeaderboardEntry(
-        npub: 'npub2222',
-        score: 90,
-        rank: 2,
-        createdAt: 2000,
-      );
-      const entry3 = LeaderboardEntry(
-        npub: 'npub3333',
-        score: 80,
-        rank: 3,
-        createdAt: 3000,
-      );
-      const state = LeaderboardState(
-        status: LeaderboardStatus.loaded,
-        leaderboard: Leaderboard(
-          dTag: 'test:2026-04-06',
-          entries: [entry1, entry2, entry3],
-        ),
-      );
-
-      await tester.pumpWidget(buildTestWidget(state));
-
-      // Verify all entries are present with scores in correct order
-      expect(find.text('100'), findsOneWidget);
-      expect(find.text('90'), findsOneWidget);
-      expect(find.text('80'), findsOneWidget);
+      verify(() => mockContactListCubit.loadFollows()).called(1);
     });
   });
 }

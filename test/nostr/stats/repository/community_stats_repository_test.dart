@@ -201,6 +201,10 @@ void main() {
   });
 
   group('CommunityStatsRepository.fetchLeaderboard', () {
+    final pubKeyA = 'a' * 64;
+    final pubKeyB = 'b' * 64;
+    final pubKeyC = 'c' * 64;
+
     late Ndk ndk;
     late Requests requests;
     late CommunityStatsRepository repository;
@@ -241,21 +245,9 @@ void main() {
         NdkResponse(
           'test-id',
           Stream.fromIterable([
-            makeEvent(
-              pubKey:
-                  'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-              score: 100,
-            ),
-            makeEvent(
-              pubKey:
-                  'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-              score: 90,
-            ),
-            makeEvent(
-              pubKey:
-                  'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
-              score: 110,
-            ),
+            makeEvent(pubKey: pubKeyA, score: 100),
+            makeEvent(pubKey: pubKeyB, score: 90),
+            makeEvent(pubKey: pubKeyC, score: 110),
           ]),
         ),
       );
@@ -345,6 +337,122 @@ void main() {
       );
 
       expect(leaderboard, isNull);
+    });
+  });
+
+  group('CommunityStatsRepository.fetchScoresForAuthors', () {
+    final pubKeyA = 'a' * 64;
+    final pubKeyB = 'b' * 64;
+
+    late Ndk ndk;
+    late Requests requests;
+    late CommunityStatsRepository repository;
+
+    setUp(() {
+      ndk = _MockNdk();
+      requests = _MockRequests();
+      when(() => ndk.requests).thenReturn(requests);
+      repository = CommunityStatsRepository(ndkProvider: NdkProvider(ndk: ndk));
+    });
+
+    Nip01Event makeEvent({
+      required String pubKey,
+      required int score,
+      int createdAt = 1000,
+    }) {
+      return Nip01Event(
+        pubKey: pubKey,
+        kind: 30042,
+        tags: [
+          ['d', 'test:2026-04-10'],
+          ['l', 'score-$score', 'games.vgg.score'],
+        ],
+        content: 'test',
+        createdAt: createdAt,
+      );
+    }
+
+    test('returns entries for given authors', () async {
+      when(
+        () => requests.query(
+          filter: any(named: 'filter'),
+          explicitRelays: any(named: 'explicitRelays'),
+          cacheRead: any(named: 'cacheRead'),
+          cacheWrite: any(named: 'cacheWrite'),
+        ),
+      ).thenReturn(
+        NdkResponse(
+          'test-id',
+          Stream.fromIterable([
+            makeEvent(pubKey: pubKeyA, score: 100),
+            makeEvent(pubKey: pubKeyB, score: 80),
+          ]),
+        ),
+      );
+
+      final entries = await repository.fetchScoresForAuthors(
+        'test:2026-04-10',
+        [pubKeyA, pubKeyB],
+      );
+
+      expect(entries, hasLength(2));
+      expect(entries[0].score, 100);
+      expect(entries[1].score, 80);
+    });
+
+    test('returns empty list for empty authors', () async {
+      final entries = await repository.fetchScoresForAuthors(
+        'test:2026-04-10',
+        [],
+      );
+
+      expect(entries, isEmpty);
+    });
+
+    test('deduplicates by pubkey keeping oldest', () async {
+      when(
+        () => requests.query(
+          filter: any(named: 'filter'),
+          explicitRelays: any(named: 'explicitRelays'),
+          cacheRead: any(named: 'cacheRead'),
+          cacheWrite: any(named: 'cacheWrite'),
+        ),
+      ).thenReturn(
+        NdkResponse(
+          'test-id',
+          Stream.fromIterable([
+            makeEvent(pubKey: pubKeyA, score: 50, createdAt: 200),
+            makeEvent(pubKey: pubKeyA, score: 100, createdAt: 100),
+          ]),
+        ),
+      );
+
+      final entries = await repository.fetchScoresForAuthors(
+        'test:2026-04-10',
+        [pubKeyA],
+      );
+
+      expect(entries, hasLength(1));
+      // Keeps oldest (createdAt: 100, score: 100).
+      expect(entries[0].score, 100);
+    });
+
+    test('returns partial results on exception', () async {
+      when(
+        () => requests.query(
+          filter: any(named: 'filter'),
+          explicitRelays: any(named: 'explicitRelays'),
+          cacheRead: any(named: 'cacheRead'),
+          cacheWrite: any(named: 'cacheWrite'),
+        ),
+      ).thenThrow(Exception('network error'));
+
+      final entries = await repository.fetchScoresForAuthors(
+        'test:2026-04-10',
+        [pubKeyA],
+      );
+
+      expect(entries, isEmpty);
     });
   });
 }
