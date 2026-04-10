@@ -191,10 +191,7 @@ class ChromixCubit extends Cubit<ChromixState> {
 
       final newCell = ColorCell(mixed);
       final newGrid = state.grid.setCell(row, col, newCell);
-      final record = MoveRecord(
-        cellIndex: cellIndex,
-        previousCell: targetCell,
-      );
+      final record = MoveRecord(cellIndex: cellIndex, previousCell: targetCell);
 
       emit(
         state.copyWith(
@@ -215,10 +212,7 @@ class ChromixCubit extends Cubit<ChromixState> {
       // OVERPOWER immediately: replace secondary with dragged primary.
       final newCell = ColorCell(dragColor);
       final newGrid = state.grid.setCell(row, col, newCell);
-      final record = MoveRecord(
-        cellIndex: cellIndex,
-        previousCell: targetCell,
-      );
+      final record = MoveRecord(cellIndex: cellIndex, previousCell: targetCell);
 
       emit(
         state.copyWith(
@@ -234,10 +228,7 @@ class ChromixCubit extends Cubit<ChromixState> {
     }
   }
 
-  void _startOverpowerTimer(
-    int cellIndex,
-    ChromixColor dragColor,
-  ) {
+  void _startOverpowerTimer(int cellIndex, ChromixColor dragColor) {
     _cancelOverpowerTimer();
     _overpowerCellIndex = cellIndex;
     _overpowerColor = dragColor;
@@ -262,10 +253,7 @@ class ChromixCubit extends Cubit<ChromixState> {
     final newCell = ColorCell(overpowerColor);
     final newGrid = state.grid.setCell(row, col, newCell);
     // This is a SECOND move on the same cell (overpower after mix).
-    final record = MoveRecord(
-      cellIndex: cellIndex,
-      previousCell: currentCell,
-    );
+    final record = MoveRecord(cellIndex: cellIndex, previousCell: currentCell);
 
     emit(
       state.copyWith(
@@ -292,12 +280,7 @@ class ChromixCubit extends Cubit<ChromixState> {
   void endDrag() {
     _cancelOverpowerTimer();
     if (state.dragOrigin != null || state.dragColor != null) {
-      emit(
-        state.copyWith(
-          dragOrigin: () => null,
-          dragColor: () => null,
-        ),
-      );
+      emit(state.copyWith(dragOrigin: () => null, dragColor: () => null));
     }
   }
 
@@ -345,17 +328,14 @@ class ChromixCubit extends Cubit<ChromixState> {
   }
 
   void _checkWinAndPersist() {
-    final distributionMatches =
-        mapEquals(state.currentDistribution, state.target);
+    final distributionMatches = mapEquals(
+      state.currentDistribution,
+      state.target,
+    );
     final contiguous = allGroupsContiguous(state.grid);
     if (state.grid.isFullyFilled && distributionMatches && contiguous) {
       final score = chromixScore(state.moveCount, state.undoCount);
-      emit(
-        state.copyWith(
-          status: ChromixStatus.won,
-          score: () => score,
-        ),
-      );
+      emit(state.copyWith(status: ChromixStatus.won, score: () => score));
       final future = _storageRepository?.saveSession(_storageKey, null);
       if (future != null) unawaited(future);
     } else {
