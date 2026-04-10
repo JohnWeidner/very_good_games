@@ -50,25 +50,13 @@ void main() {
 
     group('invalid combinations return null', () {
       test('same color returns null', () {
-        expect(
-          ColorMixer.mix(ChromixColor.red, ChromixColor.red),
-          isNull,
-        );
-        expect(
-          ColorMixer.mix(ChromixColor.blue, ChromixColor.blue),
-          isNull,
-        );
+        expect(ColorMixer.mix(ChromixColor.red, ChromixColor.red), isNull);
+        expect(ColorMixer.mix(ChromixColor.blue, ChromixColor.blue), isNull);
       });
 
       test('secondary as first input returns null', () {
-        expect(
-          ColorMixer.mix(ChromixColor.orange, ChromixColor.red),
-          isNull,
-        );
-        expect(
-          ColorMixer.mix(ChromixColor.green, ChromixColor.blue),
-          isNull,
-        );
+        expect(ColorMixer.mix(ChromixColor.orange, ChromixColor.red), isNull);
+        expect(ColorMixer.mix(ChromixColor.green, ChromixColor.blue), isNull);
         expect(
           ColorMixer.mix(ChromixColor.purple, ChromixColor.yellow),
           isNull,
@@ -76,17 +64,11 @@ void main() {
       });
 
       test('secondary as second input returns null', () {
-        expect(
-          ColorMixer.mix(ChromixColor.red, ChromixColor.orange),
-          isNull,
-        );
+        expect(ColorMixer.mix(ChromixColor.red, ChromixColor.orange), isNull);
       });
 
       test('two secondaries return null', () {
-        expect(
-          ColorMixer.mix(ChromixColor.orange, ChromixColor.green),
-          isNull,
-        );
+        expect(ColorMixer.mix(ChromixColor.orange, ChromixColor.green), isNull);
       });
     });
   });

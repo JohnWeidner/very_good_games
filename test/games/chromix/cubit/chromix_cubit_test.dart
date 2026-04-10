@@ -12,9 +12,7 @@ class _MockGameStorageRepository extends Mock
 /// Waits for the cubit to finish loading (async puzzle generation).
 Future<void> _waitForReady(ChromixCubit cubit) async {
   if (cubit.state.status != ChromixStatus.loading) return;
-  await cubit.stream.firstWhere(
-    (s) => s.status != ChromixStatus.loading,
-  );
+  await cubit.stream.firstWhere((s) => s.status != ChromixStatus.loading);
 }
 
 /// Finds the first empty cell in the grid, returning (row, col).
@@ -28,11 +26,7 @@ Future<void> _waitForReady(ChromixCubit cubit) async {
 }
 
 /// Finds a primary ColorCell adjacent to a given cell.
-(int, int)? _adjacentPrimaryCell(
-  ChromixGrid grid,
-  int row,
-  int col,
-) {
+(int, int)? _adjacentPrimaryCell(ChromixGrid grid, int row, int col) {
   for (final (dr, dc) in [(0, 1), (0, -1), (1, 0), (-1, 0)]) {
     final nr = row + dr;
     final nc = col + dc;
@@ -156,14 +150,13 @@ void main() {
           await _waitForReady(cubit);
           // First create a secondary by mixing via drag.
           final pair = _adjacentDifferentPrimaries(cubit.state.grid);
-          expect(pair, isNotNull,
-              reason: 'No adjacent different primaries');
+          expect(pair, isNotNull, reason: 'No adjacent different primaries');
+          // Mix two primaries, then try to drag from the secondary.
           cubit
             ..startDrag(pair!.row1, pair.col1)
             ..dragTo(pair.row2, pair.col2)
-            ..endDrag();
-          // Now try to drag from the secondary.
-          cubit.startDrag(pair.row2, pair.col2);
+            ..endDrag()
+            ..startDrag(pair.row2, pair.col2);
         },
         verify: (cubit) {
           expect(cubit.state.dragOrigin, isNull);
@@ -220,10 +213,7 @@ void main() {
             PuzzleGenerator.generate(seed).puzzle,
           );
           if (pair == null) return;
-          final cell = cubit.state.grid.cellAt(
-            pair.emptyRow,
-            pair.emptyCol,
-          );
+          final cell = cubit.state.grid.cellAt(pair.emptyRow, pair.emptyCol);
           expect(cell, isA<ColorCell>());
           expect(cubit.state.moveCount, equals(1));
         },
@@ -280,7 +270,6 @@ void main() {
         }
         await cubit.close();
       });
-
     });
 
     group('endDrag', () {
@@ -309,8 +298,7 @@ void main() {
     });
 
     group('overpower', () {
-      test('mix then timer fires overpowers to dragged primary',
-          () async {
+      test('mix then timer fires overpowers to dragged primary', () async {
         final cubit = ChromixCubit(dailySeed: mixSeed, dateKey: dateKey);
         await _waitForReady(cubit);
 
@@ -318,13 +306,9 @@ void main() {
         expect(pair, isNotNull, reason: 'No adjacent different primaries');
 
         final dragColor =
-            (cubit.state.grid.cellAt(pair!.row1, pair.col1)
-                    as ColorCell)
-                .color;
+            (cubit.state.grid.cellAt(pair!.row1, pair.col1) as ColorCell).color;
         final targetColor =
-            (cubit.state.grid.cellAt(pair.row2, pair.col2)
-                    as ColorCell)
-                .color;
+            (cubit.state.grid.cellAt(pair.row2, pair.col2) as ColorCell).color;
         final mixed = ColorMixer.mix(dragColor, targetColor);
 
         cubit
@@ -333,9 +317,7 @@ void main() {
 
         // After mix, cell should be the mixed color.
         expect(
-          (cubit.state.grid.cellAt(pair.row2, pair.col2)
-                  as ColorCell)
-              .color,
+          (cubit.state.grid.cellAt(pair.row2, pair.col2) as ColorCell).color,
           equals(mixed),
         );
 
@@ -344,9 +326,7 @@ void main() {
 
         // After overpower, cell should be the dragged primary.
         expect(
-          (cubit.state.grid.cellAt(pair.row2, pair.col2)
-                  as ColorCell)
-              .color,
+          (cubit.state.grid.cellAt(pair.row2, pair.col2) as ColorCell).color,
           equals(dragColor),
         );
         // Two moves: mix + overpower.
@@ -363,13 +343,9 @@ void main() {
         expect(pair, isNotNull, reason: 'No adjacent different primaries');
 
         final dragColor =
-            (cubit.state.grid.cellAt(pair!.row1, pair.col1)
-                    as ColorCell)
-                .color;
+            (cubit.state.grid.cellAt(pair!.row1, pair.col1) as ColorCell).color;
         final targetColor =
-            (cubit.state.grid.cellAt(pair.row2, pair.col2)
-                    as ColorCell)
-                .color;
+            (cubit.state.grid.cellAt(pair.row2, pair.col2) as ColorCell).color;
         final mixed = ColorMixer.mix(dragColor, targetColor);
 
         cubit
@@ -381,9 +357,7 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 600));
 
         expect(
-          (cubit.state.grid.cellAt(pair.row2, pair.col2)
-                  as ColorCell)
-              .color,
+          (cubit.state.grid.cellAt(pair.row2, pair.col2) as ColorCell).color,
           equals(mixed),
         );
         expect(cubit.state.moveCount, equals(1));
@@ -391,8 +365,7 @@ void main() {
         await cubit.close();
       });
 
-      test('overpower undo restores mix then restores original',
-          () async {
+      test('overpower undo restores mix then restores original', () async {
         final cubit = ChromixCubit(dailySeed: mixSeed, dateKey: dateKey);
         await _waitForReady(cubit);
 
@@ -400,13 +373,9 @@ void main() {
         expect(pair, isNotNull, reason: 'No adjacent different primaries');
 
         final originalColor =
-            (cubit.state.grid.cellAt(pair!.row2, pair.col2)
-                    as ColorCell)
-                .color;
+            (cubit.state.grid.cellAt(pair!.row2, pair.col2) as ColorCell).color;
         final dragColor =
-            (cubit.state.grid.cellAt(pair.row1, pair.col1)
-                    as ColorCell)
-                .color;
+            (cubit.state.grid.cellAt(pair.row1, pair.col1) as ColorCell).color;
         final mixed = ColorMixer.mix(dragColor, originalColor);
 
         cubit
@@ -419,18 +388,14 @@ void main() {
         // Undo overpower → should be mixed color.
         cubit.undo();
         expect(
-          (cubit.state.grid.cellAt(pair.row2, pair.col2)
-                  as ColorCell)
-              .color,
+          (cubit.state.grid.cellAt(pair.row2, pair.col2) as ColorCell).color,
           equals(mixed),
         );
 
         // Undo mix → should be original color.
         cubit.undo();
         expect(
-          (cubit.state.grid.cellAt(pair.row2, pair.col2)
-                  as ColorCell)
-              .color,
+          (cubit.state.grid.cellAt(pair.row2, pair.col2) as ColorCell).color,
           equals(originalColor),
         );
 
@@ -450,8 +415,7 @@ void main() {
           ..dragTo(pair.row2, pair.col2)
           ..endDrag();
 
-        final mixedCell =
-            cubit.state.grid.cellAt(pair.row2, pair.col2);
+        final mixedCell = cubit.state.grid.cellAt(pair.row2, pair.col2);
         expect(mixedCell, isA<ColorCell>());
         expect((mixedCell as ColorCell).color.isSecondary, isTrue);
 
@@ -475,9 +439,7 @@ void main() {
 
         // Cell should still be the secondary — unchanged.
         expect(
-          (cubit.state.grid.cellAt(pair.row2, pair.col2)
-                  as ColorCell)
-              .color,
+          (cubit.state.grid.cellAt(pair.row2, pair.col2) as ColorCell).color,
           equals(mixedCell.color),
         );
         expect(cubit.state.moveCount, equals(movesBefore));
@@ -566,8 +528,7 @@ void main() {
         await cubit.close();
       });
 
-      test('true when a color at target count is non-contiguous',
-          () {
+      test('true when a color at target count is non-contiguous', () {
         // Directly test the logic function from contiguity_checker.
         // Grid with 2 red cells separated by a blocker:
         //   R . # R
@@ -583,9 +544,7 @@ void main() {
             ...List.filled(12, const BlockerCell()),
           ],
         );
-        final target = <ChromixColor, int>{
-          ChromixColor.red: 2,
-        };
+        final target = <ChromixColor, int>{ChromixColor.red: 2};
         expect(hasContiguityViolation(grid, target), isTrue);
       });
 
@@ -598,9 +557,7 @@ void main() {
             ...List.filled(14, const BlockerCell()),
           ],
         );
-        final target = <ChromixColor, int>{
-          ChromixColor.red: 2,
-        };
+        final target = <ChromixColor, int>{ChromixColor.red: 2};
         expect(hasContiguityViolation(grid, target), isFalse);
       });
     });
@@ -614,9 +571,7 @@ void main() {
 
       test('saves state after drag placement', () async {
         when(() => storage.getSession(any())).thenReturn(null);
-        when(
-          () => storage.saveSession(any(), any()),
-        ).thenAnswer((_) async {});
+        when(() => storage.saveSession(any(), any())).thenAnswer((_) async {});
 
         final cubit = ChromixCubit(
           dailySeed: seed,
@@ -665,9 +620,7 @@ void main() {
         when(
           () => storage.getSession('chromix_state_$dateKey'),
         ).thenReturn(realStorage.lastSavedSession);
-        when(
-          () => storage.saveSession(any(), any()),
-        ).thenAnswer((_) async {});
+        when(() => storage.saveSession(any(), any())).thenAnswer((_) async {});
 
         final cubit2 = ChromixCubit(
           dailySeed: seed,
@@ -689,9 +642,7 @@ void main() {
         when(
           () => storage.getSession('chromix_state_$dateKey'),
         ).thenReturn({'cells': 'invalid'});
-        when(
-          () => storage.saveSession(any(), any()),
-        ).thenAnswer((_) async {});
+        when(() => storage.saveSession(any(), any())).thenAnswer((_) async {});
 
         final cubit = ChromixCubit(
           dailySeed: seed,
@@ -700,10 +651,7 @@ void main() {
         );
         await _waitForReady(cubit);
 
-        expect(
-          cubit.state.status,
-          equals(ChromixStatus.playing),
-        );
+        expect(cubit.state.status, equals(ChromixStatus.playing));
         expect(cubit.state.moveCount, equals(0));
 
         await cubit.close();
@@ -716,22 +664,16 @@ void main() {
 class _RealStorageHelper implements GameStorageRepository {
   final _sessions = <String, Map<String, dynamic>?>{};
 
-  Map<String, dynamic>? get lastSavedSession =>
-      _sessions.values.last;
+  Map<String, dynamic>? get lastSavedSession => _sessions.values.last;
 
   @override
-  Map<String, dynamic>? getSession(String gameId) =>
-      _sessions[gameId];
+  Map<String, dynamic>? getSession(String gameId) => _sessions[gameId];
 
   @override
-  Future<void> saveSession(
-    String gameId,
-    Map<String, dynamic>? session,
-  ) async {
+  Future<void> saveSession(String gameId, Map<String, dynamic>? session) async {
     _sessions[gameId] = session;
   }
 
   @override
-  dynamic noSuchMethod(Invocation invocation) =>
-      super.noSuchMethod(invocation);
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

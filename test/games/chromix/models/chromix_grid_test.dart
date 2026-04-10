@@ -3,8 +3,7 @@ import 'package:very_good_games/games/chromix/models/models.dart';
 
 void main() {
   group('ChromixGrid', () {
-    ChromixGrid makeGrid(List<ChromixCell> cells) =>
-        ChromixGrid(cells: cells);
+    ChromixGrid makeGrid(List<ChromixCell> cells) => ChromixGrid(cells: cells);
 
     // A simple 4x4 grid for testing.
     late ChromixGrid grid;
@@ -36,28 +35,15 @@ void main() {
 
     test('cellAt returns correct cell', () {
       expect(grid.cellAt(0, 0), equals(const EmptyCell()));
-      expect(
-        grid.cellAt(0, 1),
-        equals(const ColorCell(ChromixColor.red)),
-      );
+      expect(grid.cellAt(0, 1), equals(const ColorCell(ChromixColor.red)));
       expect(grid.cellAt(0, 2), equals(const BlockerCell()));
-      expect(
-        grid.cellAt(1, 3),
-        equals(const ColorCell(ChromixColor.green)),
-      );
+      expect(grid.cellAt(1, 3), equals(const ColorCell(ChromixColor.green)));
     });
 
     test('setCell returns new grid with replaced cell', () {
-      final updated = grid.setCell(
-        0,
-        0,
-        const ColorCell(ChromixColor.blue),
-      );
+      final updated = grid.setCell(0, 0, const ColorCell(ChromixColor.blue));
 
-      expect(
-        updated.cellAt(0, 0),
-        equals(const ColorCell(ChromixColor.blue)),
-      );
+      expect(updated.cellAt(0, 0), equals(const ColorCell(ChromixColor.blue)));
       // Original is unchanged.
       expect(grid.cellAt(0, 0), equals(const EmptyCell()));
     });
@@ -74,9 +60,7 @@ void main() {
     });
 
     test('colorDistribution excludes empty and blocker cells', () {
-      final allEmpty = makeGrid(
-        List.filled(16, const EmptyCell()),
-      );
+      final allEmpty = makeGrid(List.filled(16, const EmptyCell()));
       expect(allEmpty.colorDistribution, isEmpty);
     });
 
@@ -94,16 +78,13 @@ void main() {
       expect(full.isFullyFilled, isTrue);
     });
 
-    test(
-      'isFullyFilled returns true with only blockers and colors',
-      () {
-        final full = makeGrid([
-          ...List.filled(4, const BlockerCell()),
-          ...List.filled(12, const ColorCell(ChromixColor.blue)),
-        ]);
-        expect(full.isFullyFilled, isTrue);
-      },
-    );
+    test('isFullyFilled returns true with only blockers and colors', () {
+      final full = makeGrid([
+        ...List.filled(4, const BlockerCell()),
+        ...List.filled(12, const ColorCell(ChromixColor.blue)),
+      ]);
+      expect(full.isFullyFilled, isTrue);
+    });
 
     test('nonBlockerCount excludes blockers', () {
       // 2 blockers in setUp grid.
@@ -111,22 +92,14 @@ void main() {
     });
 
     test('nonBlockerCount for all-blocker grid', () {
-      final allBlockers = makeGrid(
-        List.filled(16, const BlockerCell()),
-      );
+      final allBlockers = makeGrid(List.filled(16, const BlockerCell()));
       expect(allBlockers.nonBlockerCount, equals(0));
     });
 
     test('is equatable', () {
-      final a = makeGrid(
-        List.filled(16, const ColorCell(ChromixColor.red)),
-      );
-      final b = makeGrid(
-        List.filled(16, const ColorCell(ChromixColor.red)),
-      );
-      final c = makeGrid(
-        List.filled(16, const ColorCell(ChromixColor.blue)),
-      );
+      final a = makeGrid(List.filled(16, const ColorCell(ChromixColor.red)));
+      final b = makeGrid(List.filled(16, const ColorCell(ChromixColor.red)));
+      final c = makeGrid(List.filled(16, const ColorCell(ChromixColor.blue)));
 
       expect(a, equals(b));
       expect(a, isNot(equals(c)));

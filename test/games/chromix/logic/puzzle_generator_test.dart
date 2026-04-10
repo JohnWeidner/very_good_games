@@ -35,10 +35,9 @@ void main() {
     test('blocker count is within 1-4 range', () {
       for (var seed = 1; seed <= 20; seed++) {
         final result = PuzzleGenerator.generate(seed);
-        final blockerCount =
-            result.puzzle.cells
-                .whereType<BlockerCell>()
-                .length;
+        final blockerCount = result.puzzle.cells
+            .whereType<BlockerCell>()
+            .length;
         expect(
           blockerCount,
           inInclusiveRange(1, 4),
@@ -50,11 +49,10 @@ void main() {
     test('pre-filled count is within expected range', () {
       for (var seed = 1; seed <= 20; seed++) {
         final result = PuzzleGenerator.generate(seed);
-        final preFilledCount =
-            result.puzzle.cells
-                .whereType<ColorCell>()
-                .where((c) => c.isPreFilled)
-                .length;
+        final preFilledCount = result.puzzle.cells
+            .whereType<ColorCell>()
+            .where((c) => c.isPreFilled)
+            .length;
         expect(
           preFilledCount,
           greaterThan(0),
@@ -94,8 +92,9 @@ void main() {
       GenerateResult? fourBlockerResult;
       for (var seed = 1; seed <= 200; seed++) {
         final result = PuzzleGenerator.generate(seed);
-        final blockerCount =
-            result.puzzle.cells.whereType<BlockerCell>().length;
+        final blockerCount = result.puzzle.cells
+            .whereType<BlockerCell>()
+            .length;
         if (blockerCount == 4) {
           fourBlockerResult = result;
           break;
@@ -105,12 +104,11 @@ void main() {
       if (fourBlockerResult != null) {
         // Verify the puzzle is consistent: target sum matches
         // non-blocker count.
-        final targetSum = fourBlockerResult.target.values
-            .fold<int>(0, (a, b) => a + b);
-        expect(
-          targetSum,
-          equals(fourBlockerResult.puzzle.nonBlockerCount),
+        final targetSum = fourBlockerResult.target.values.fold<int>(
+          0,
+          (a, b) => a + b,
         );
+        expect(targetSum, equals(fourBlockerResult.puzzle.nonBlockerCount));
       }
     });
   });

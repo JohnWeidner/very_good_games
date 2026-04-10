@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:very_good_games/games/chromix/cubit/chromix_cubit.dart';
-import 'package:very_good_games/games/chromix/models/models.dart'
-    as models;
+import 'package:very_good_games/games/chromix/models/models.dart' as models;
 import 'package:very_good_games/games/chromix/view/widgets/chromix_cell_widget.dart';
 
 /// A 4x4 grid of [ChromixCellWidget]s with drag gesture support.
@@ -19,8 +18,7 @@ class ChromixGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<ChromixCubit, ChromixState>(
       buildWhen: (prev, curr) =>
-          prev.grid != curr.grid ||
-          prev.dragOrigin != curr.dragOrigin,
+          prev.grid != curr.grid || prev.dragOrigin != curr.dragOrigin,
       builder: (context, state) {
         return AspectRatio(
           aspectRatio: 1,
@@ -30,20 +28,12 @@ class ChromixGrid extends StatelessWidget {
               final cellSize = gridSize / models.ChromixGrid.size;
 
               return GestureDetector(
-                onPanStart: (details) => _onPanStart(
-                  context,
-                  details.localPosition,
-                  cellSize,
-                ),
-                onPanUpdate: (details) => _onPanUpdate(
-                  context,
-                  details.localPosition,
-                  cellSize,
-                ),
-                onPanEnd: (_) =>
-                    context.read<ChromixCubit>().endDrag(),
-                onPanCancel: () =>
-                    context.read<ChromixCubit>().endDrag(),
+                onPanStart: (details) =>
+                    _onPanStart(context, details.localPosition, cellSize),
+                onPanUpdate: (details) =>
+                    _onPanUpdate(context, details.localPosition, cellSize),
+                onPanEnd: (_) => context.read<ChromixCubit>().endDrag(),
+                onPanCancel: () => context.read<ChromixCubit>().endDrag(),
                 child: _buildGrid(context, state, cellSize),
               );
             },
@@ -53,11 +43,7 @@ class ChromixGrid extends StatelessWidget {
     );
   }
 
-  Widget _buildGrid(
-    BuildContext context,
-    ChromixState state,
-    double cellSize,
-  ) {
+  Widget _buildGrid(BuildContext context, ChromixState state, double cellSize) {
     const size = models.ChromixGrid.size;
     final grid = state.grid;
     final blobs = _computeBlobs(grid);
@@ -70,8 +56,7 @@ class ChromixGrid extends StatelessWidget {
           for (var col = 0; col < size; col++)
             _buildCell(state, grid, row, col, cellSize),
         // Floating blob labels.
-        for (final blob in blobs)
-          _buildBlobLabel(context, blob, cellSize),
+        for (final blob in blobs) _buildBlobLabel(context, blob, cellSize),
       ],
     );
   }
@@ -85,19 +70,16 @@ class ChromixGrid extends StatelessWidget {
   ) {
     final cell = grid.cellAt(row, col);
     final edges = _computeEdges(grid, row, col);
-    final isOrigin = state.dragOrigin != null &&
+    final isOrigin =
+        state.dragOrigin != null &&
         state.dragOrigin!.row == row &&
         state.dragOrigin!.col == col;
 
     const overlap = 0.5;
-    final left =
-        col * cellSize + (edges.left ? -overlap : _gap / 2);
-    final top =
-        row * cellSize + (edges.top ? -overlap : _gap / 2);
-    final right =
-        (col + 1) * cellSize - (edges.right ? -overlap : _gap / 2);
-    final bottom =
-        (row + 1) * cellSize - (edges.bottom ? -overlap : _gap / 2);
+    final left = col * cellSize + (edges.left ? -overlap : _gap / 2);
+    final top = row * cellSize + (edges.top ? -overlap : _gap / 2);
+    final right = (col + 1) * cellSize - (edges.right ? -overlap : _gap / 2);
+    final bottom = (row + 1) * cellSize - (edges.bottom ? -overlap : _gap / 2);
 
     return Positioned(
       left: left,
@@ -112,11 +94,7 @@ class ChromixGrid extends StatelessWidget {
     );
   }
 
-  Widget _buildBlobLabel(
-    BuildContext context,
-    _Blob blob,
-    double cellSize,
-  ) {
+  Widget _buildBlobLabel(BuildContext context, _Blob blob, double cellSize) {
     const size = models.ChromixGrid.size;
     final blobSet = blob.cells.toSet();
 
@@ -232,11 +210,7 @@ class ChromixGrid extends StatelessWidget {
   /// Determines which edges of the cell at ([row], [col]) share a
   /// visual identity with their orthogonal neighbor (same color, or
   /// both blockers).
-  static CellEdges _computeEdges(
-    models.ChromixGrid grid,
-    int row,
-    int col,
-  ) {
+  static CellEdges _computeEdges(models.ChromixGrid grid, int row, int col) {
     final cell = grid.cellAt(row, col);
     if (cell is models.EmptyCell) return CellEdges.none;
 
@@ -292,10 +266,7 @@ class ChromixGrid extends StatelessWidget {
     context.read<ChromixCubit>().dragTo(pos.row, pos.col);
   }
 
-  static ({int row, int col})? _cellFromOffset(
-    Offset offset,
-    double cellSize,
-  ) {
+  static ({int row, int col})? _cellFromOffset(Offset offset, double cellSize) {
     final col = (offset.dx / cellSize).floor();
     final row = (offset.dy / cellSize).floor();
 

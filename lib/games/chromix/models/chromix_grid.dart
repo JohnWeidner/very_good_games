@@ -50,8 +50,7 @@ class ChromixGrid extends Equatable {
   }
 
   /// The number of cells that are not [BlockerCell]s.
-  int get nonBlockerCount =>
-      cells.where((cell) => cell is! BlockerCell).length;
+  int get nonBlockerCount => cells.where((cell) => cell is! BlockerCell).length;
 
   @override
   List<Object?> get props => [cells];

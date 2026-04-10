@@ -1,7 +1,7 @@
-# Code Simplicity Review: Chromix Contiguity + Drag Interaction
+# Code Simplicity Review: Cascade Ball-Routing Puzzle (`lib/games/cascade/`)
 
-**Date**: 2026-04-07
-**Scope**: 22 files (12 source, 10 test) -- drag interaction, contiguity constraint, overpower mechanic, win celebration, puzzle generator rewrite
+**Date**: 2026-04-09
+**Scope**: All files under `lib/games/cascade/` and its subdirectories
 **Reviewer**: Code Simplicity Agent
 
 ---
@@ -10,170 +10,245 @@
 
 ### Core Purpose
 
-Convert Chromix from a tap-to-place interaction to drag-based interaction, add a contiguity constraint (each color must form one connected group), introduce an overpower mechanic (hold after mix to replace with dragged color), add a shared WinCelebration widget with confetti across all games, and rewrite puzzle generation to use forward simulation guaranteeing reachability via drag moves.
+The Cascade game lets a player route three numbered balls into matching target bins by assigning balls to drop slots and flipping levers. The code must:
+
+1. Generate a daily puzzle deterministically from a seed with exactly one winning configuration.
+2. Let the player configure the board (assign balls, flip levers).
+3. Simulate the drop and animate balls traversing the board.
+4. Detect a win, record a score/streak, and show a results overlay.
+
+---
 
 ### Unnecessary Complexity Found
 
-#### 1. [Critical] Duplicate BFS contiguity logic in three places
+#### 1. `unassignBall` method on `CascadeCubit` is never called
 
-**Files**: `lib/games/chromix/cubit/chromix_cubit.dart` (lines 352-386, 467-512), `lib/games/chromix/logic/contiguity_checker.dart` (lines 7-43)
+**File**: `cubit/cascade_cubit.dart`, lines 113–124
 
-The BFS contiguity check is implemented three separate times:
+`unassignBall` is a public method on the cubit that is never invoked anywhere in the view layer. The `BallTray` only calls `onBallAssigned` on drop. Slot removal happens implicitly through `assignBall` (dragging to a new slot swaps). The method has its own guard logic for out-of-bounds indices and null checks — all dead.
 
-- `_isColorContiguous()` in the cubit (instance method, lines 352-386) -- checks a single color via BFS
-- `_computeContiguityViolation()` in the cubit (static method, lines 467-512) -- iterates target colors and runs inline BFS per color
-- `allGroupsContiguous()` in `contiguity_checker.dart` -- iterates all colors via BFS
+**Suggestion**: Remove entirely. If a "drag ball back to tray" interaction is added in the future, introduce this method then.
 
-The cubit's `_recomputeContiguity()` calls `_isColorContiguous()`, then `_checkWinAndPersist()` separately calls `allGroupsContiguous()` from the extracted checker, and `_computeContiguityViolation()` is used during deserialization with yet another inline BFS. This is three implementations of the same core algorithm.
-
-**Suggestion**: The cubit should delegate entirely to `contiguity_checker.dart`. Add a `hasViolationForTargets(ChromixGrid grid, Map<ChromixColor, int> target)` function there. Delete `_isColorContiguous` and `_computeContiguityViolation` from the cubit. Estimated savings: ~80 lines.
+**Estimated savings**: 11 lines of dead public API.
 
 ---
 
-#### 2. [Important] Blob label centroid computation is over-engineered
+#### 2. `CascadeBoard.dropSlotColumns` and `binColumns` are identical constants
 
-**File**: `lib/games/chromix/view/widgets/chromix_grid.dart` (lines 115-178)
+**File**: `models/cascade_board.dart`, lines 32–36
 
-`_buildBlobLabel` computes the "most interior cells" by finding cells with the highest same-blob neighbor count, then averages their centroids. On a 4x4 grid with at most 12 non-blocker cells and blobs of at most ~6 cells, this interior-detection algorithm adds 30 lines of logic that produces visually identical results to a simple centroid of all blob cells.
-
-**Suggestion**: Replace with a plain centroid:
 ```dart
-var cx = 0.0, cy = 0.0;
-for (final idx in blob.cells) {
-  cx += (idx % size + 0.5) * cellSize;
-  cy += (idx ~/ size + 0.5) * cellSize;
-}
-cx /= blob.cells.length;
-cy /= blob.cells.length;
+static const dropSlotColumns = [1, 2, 3];
+static const binColumns = [1, 2, 3];
 ```
-Estimated savings: ~25 lines.
+
+Both constants have identical values and represent the same physical columns on the board. The comment on `binColumns` even acknowledges this: "Bin positions (center 3 columns, same as drop slots)." Two names for the same value forces readers to verify they are the same before trusting either reference.
+
+**Suggestion**: Keep one constant (e.g., `centerColumns`) and use it throughout. Saves 3 lines and removes the unnecessary disambiguation burden.
 
 ---
 
-#### 3. [Important] Repeated win-celebration boilerplate across three game pages
+#### 3. `CascadeBoard.leverAt()` is dead code
 
-**Files**: `lib/games/chromix/view/chromix_page.dart`, `lib/games/signal/view/signal_page.dart`, `lib/games/guess_the_number/view/game_page.dart`
+**File**: `models/cascade_board.dart`, lines 46–51
 
-Each game page has nearly identical code:
-- `_showResults = false` with `addPostFrameCallback` to restore won state on rebuild (~8 lines each)
-- `_onWin` / `_onGameOver` method calling `WinCelebration.of(context)?.trigger(...)` (~8 lines each)
-- Reset handler calling `WinCelebration.of(context)?.reset()` (1 line each)
-- Wrapping `body` with `WinCelebration(child: ...)` (structural change)
+`leverAt(row, col)` returns a `Lever?` by linear scan but is never called. The simulator has its own `_leverIndexAt` because it needs the index (not the lever object) to call `flipLever(index)`. The board-level method cannot serve that need and has no other callers.
 
-The pattern is copied three times with only the cubit type and status enum name differing.
-
-**Suggestion**: Either create a `WinCelebrationMixin` that provides `showResults`, `onWin()`, and `resetCelebration()`, or make `WinCelebration` itself manage the `showResults` boolean and expose it via its state (e.g., `WinCelebration.of(context)?.showResults`). Estimated savings: ~40 lines across three files, and easier onboarding when adding future games.
+**Suggestion**: Remove `leverAt` (6 lines). If index-based lookup is ever needed at the board level, promote `_leverIndexAt` from the simulator.
 
 ---
 
-#### 4. [Important] `_allPrimariesCanGrow` adds ~50 lines of defensive validation
+#### 4. `CascadeColors.binCorrect` color is unused
 
-**File**: `lib/games/chromix/logic/puzzle_generator.dart` (new code, `_allPrimariesCanGrow` method)
+**File**: `theme/cascade_colors.dart`, line 21
 
-This method runs a BFS from every primary cell to verify it can reach an empty cell or same-color cell. However, `_simulateMoves` already handles stuck states by returning null (the simulation collects all valid actions and returns null if none exist). The uniqueness solver then rejects unsolvable puzzles. `_allPrimariesCanGrow` is a fail-fast optimization that duplicates what the simulation already guarantees.
+`CascadeColors.binCorrect` (`Color(0xFF43A047)`) is defined but never referenced. The `BinWidget` uses only `binNeutral`; bins do not change color on win. This is a reserved-for-later constant.
 
-**Suggestion**: Try removing `_allPrimariesCanGrow` and rely on `_simulateMoves` returning null for stuck grids. If generation time regresses noticeably (measure it), add it back with a comment explaining the performance justification. Estimated savings: ~50 lines.
-
----
-
-#### 5. [Important] Trivial fallback puzzle silently serves a degenerate game
-
-**File**: `lib/games/chromix/logic/puzzle_generator.dart` (new code, last-resort in `_generateFallback`)
-
-After 50 fallback attempts, the generator creates a "1-blocker, 15-cell all-red puzzle." This puzzle is unsolvable in any meaningful way and would be a terrible player experience. If this code path is reachable, there is a bug in the generator. Silently serving garbage hides bugs.
-
-**Suggestion**: Replace the trivial fallback with `throw StateError('Puzzle generation failed after all retries')`. In a correctly working generator, this should never trigger. If it does, you want a crash report, not a confused player.
+**Suggestion**: Remove it (2 lines). Add it when green win-state bin coloring is actually implemented.
 
 ---
 
-#### 6. [Suggestion] Unused `mixedColor` parameter in `_startOverpowerTimer`
+#### 5. Mutable pre-drop fields on `CascadeCubit` bypass `CascadeState`
 
-**File**: `lib/games/chromix/cubit/chromix_cubit.dart` (line 222)
+**File**: `cubit/cascade_cubit.dart`, lines 36–39, 145–147, 204–208
 
-`_startOverpowerTimer` accepts `ChromixColor mixedColor` but never reads it. This is a leftover from an earlier design.
+`_preDropBoard` and `_preDropSlots` are nullable instance fields on the cubit that snapshot state at drop time and are consumed by `reset()`. However:
 
-**Suggestion**: Remove the parameter. Update the call site at line 200.
+- The state already carries `initialLevers` for reset.
+- The `reset()` method has fallback paths (`?? state.board.resetLevers(state.initialLevers)` and `?? defaultSlotAssignments`) that already handle the null case correctly.
+- Storing mutable fields outside of `CascadeState` breaks the pattern that all meaningful game state lives in the state object, making the cubit harder to test and reason about.
 
----
+**Suggestion**: Remove `_preDropBoard` and `_preDropSlots`. Use the existing fallback paths in `reset()` unconditionally: reset levers to `state.initialLevers` and slots to `defaultSlotAssignments`. If preserving the exact pre-drop configuration is important, move those fields into `CascadeState` instead. The current fallbacks already do the right thing for the documented behavior ("resets to seed defaults for another attempt").
 
-#### 7. [Suggestion] Neighbor-finding helper duplicated in three files
-
-**Files**: `puzzle_generator.dart` (`_neighbors`), `chromix_grid.dart` (`_neighborsOf`), `contiguity_checker.dart` (`_orthogonalNeighbors`)
-
-Three private implementations of identical "get orthogonal neighbors for a grid index" logic.
-
-**Suggestion**: Add a static `ChromixGrid.neighborsOf(int row, int col)` method in the model layer and use it everywhere. Estimated savings: ~20 lines.
+**Estimated savings**: ~8 lines plus restored cubit purity.
 
 ---
 
-#### 8. [Suggestion] `CellEdges.all` constant is never used
+#### 6. `BallId.label` switch has three arms that mechanically follow the index
 
-**File**: `lib/games/chromix/view/widgets/chromix_cell_widget.dart` (lines 18-24)
+**File**: `models/ball.dart`, lines 13–17
 
-`CellEdges.all` is defined but never referenced in the codebase. `CellEdges.none` is used as a default parameter value (appropriate), but `.all` is speculative.
+```dart
+String get label => switch (this) {
+  BallId.ball1 => '1',
+  BallId.ball2 => '2',
+  BallId.ball3 => '3',
+};
+```
 
-**Suggestion**: Remove it. Estimated savings: 6 lines.
+Each arm returns the 1-based index as a string. The switch will never diverge from ordinal order because the enum members are defined in ordinal order.
+
+**Suggestion**:
+```dart
+String get label => '${index + 1}';
+```
+Saves 4 lines. Self-documenting: the label is the 1-based position.
+
+---
+
+#### 7. `CascadeState.loading()` duplicates default field values
+
+**File**: `cubit/cascade_state.dart`, lines 39–46
+
+The `loading()` named constructor explicitly initializes every field, most of which match the default parameter values declared in the main constructor. This creates two places where defaults live, risking drift.
+
+**Suggestion**: Use a delegating constructor:
+```dart
+CascadeState.loading() : this(
+  board: CascadeBoard(levers: const [], binOrder: const [0, 1, 2]),
+  initialLevers: const [],
+  status: CascadeStatus.loading,
+);
+```
+Saves ~5 lines and keeps defaults in one place.
+
+---
+
+#### 8. Redundant `SizedBox` wrapper in `BinWidget`
+
+**File**: `view/widgets/bin_widget.dart`, lines 32–65
+
+`BinWidget` wraps a `Container` inside a `SizedBox` — both setting `width: cellSize, height: cellSize`. The outer `SizedBox` provides no additional constraint beyond what the `Container` already applies.
+
+**Suggestion**: Remove the outer `SizedBox` and let the `Container` handle sizing. Saves ~4 lines.
+
+---
+
+#### 9. `onViewPuzzle` null guard repeated twice in sequence
+
+**File**: `view/widgets/cascade_results_overlay.dart`, lines 85–91
+
+```dart
+if (onViewPuzzle != null)
+  OutlinedButton(...),
+if (onViewPuzzle != null)
+  const SizedBox(width: 12),
+```
+
+The spacer's visibility is coupled to the button's. This should be expressed as a single conditional block:
+```dart
+if (onViewPuzzle != null) ...[
+  OutlinedButton(...),
+  const SizedBox(width: 12),
+],
+```
+Saves 2 lines and makes the coupling explicit.
+
+---
+
+#### 10. Attempts pluralization duplicated in two widgets
+
+**File**: `view/cascade_page.dart`, lines 257–259; `view/widgets/cascade_results_overlay.dart`, lines 64–66
+
+Both `_ActionRow` and `CascadeResultsOverlay` construct the same inline string:
+```dart
+'${state.attempts} ${state.attempts == 1 ? 'attempt' : 'attempts'}'
+```
+
+**Suggestion**: Extract a one-line helper function or extension:
+```dart
+String attemptsLabel(int n) => '$n ${n == 1 ? 'attempt' : 'attempts'}';
+```
+Minor, but prevents the strings from drifting independently.
 
 ---
 
 ### Code to Remove
 
-| Location | Reason | LOC |
+| Location | Reason | Estimated LOC |
 |---|---|---|
-| `chromix_cubit.dart:352-386` | `_isColorContiguous` duplicates `contiguity_checker.dart` | ~35 |
-| `chromix_cubit.dart:467-512` | `_computeContiguityViolation` duplicates checker + inline BFS | ~45 |
-| `chromix_cell_widget.dart:18-24` | `CellEdges.all` unused constant | 6 |
-| `chromix_cubit.dart:225` | `mixedColor` param unused | 1 |
-| `puzzle_generator.dart` | `_allPrimariesCanGrow` if simulation handles it | ~50 |
-| Estimated total removable | | ~137 |
+| `models/ball.dart:13–17` | Replace switch with `'${index + 1}'` | -4 |
+| `cubit/cascade_cubit.dart:113–124` | `unassignBall` — never called from UI | -11 |
+| `cubit/cascade_cubit.dart:36–39,145–147,204–208` | `_preDropBoard`/`_preDropSlots` mutable fields | -8 |
+| `models/cascade_board.dart:34–36` | Duplicate `binColumns` constant | -3 |
+| `models/cascade_board.dart:46–51` | Dead `leverAt` method | -6 |
+| `theme/cascade_colors.dart:21–22` | Unused `binCorrect` color | -2 |
+| `view/widgets/cascade_results_overlay.dart:86,90` | Repeated `onViewPuzzle` null guard | -2 |
+| `view/widgets/bin_widget.dart:32,65` | Redundant outer `SizedBox` | -4 |
+| **Total** | | **~40 lines** |
+
+---
 
 ### Simplification Recommendations
 
-1. **Consolidate contiguity checking into `contiguity_checker.dart`** (Most impactful)
-   - Current: Three separate BFS implementations across two files
-   - Proposed: Single `contiguity_checker.dart` with `allGroupsContiguous()` and `hasViolationForTargets(grid, target)`; cubit delegates to both
-   - Impact: ~80 LOC saved, single source of truth for a core game rule
+1. **Remove `unassignBall`** (most impactful YAGNI)
+   - Current: Public method with 3 guard checks, zero callers in the view layer.
+   - Proposed: Delete entirely. Add only if drag-back-to-tray is designed and built.
+   - Impact: -11 lines, removes dead public API.
 
-2. **Simplify blob label placement**
-   - Current: Interior-cell detection with best-neighbor-count algorithm (~30 lines)
-   - Proposed: Simple centroid of all blob cells (~5 lines)
-   - Impact: ~25 LOC saved, no visual difference on a 4x4 grid
+2. **Remove mutable pre-drop cubit fields**
+   - Current: `_preDropBoard`/`_preDropSlots` snapshot state outside of `CascadeState`, with fallback paths that already do the right thing.
+   - Proposed: Rely on the existing fallbacks in `reset()`. All game state belongs in `CascadeState`.
+   - Impact: -8 lines, restores cubit purity.
 
-3. **Extract win celebration pattern to reduce cross-game duplication**
-   - Current: ~30 lines of identical boilerplate in each game page
-   - Proposed: Mixin or richer WinCelebration widget that manages showResults state
-   - Impact: ~40 LOC saved across 3 files, easier to add new games
+3. **Collapse `dropSlotColumns`/`binColumns` to one constant**
+   - Current: Two constants with identical values; a comment admits they are the same.
+   - Proposed: Single `static const centerColumns = [1, 2, 3]`.
+   - Impact: -3 lines, removes misleading dual naming.
 
-4. **Unify neighbor-finding helpers**
-   - Current: Three private copies of the same function
-   - Proposed: One shared static method on `ChromixGrid`
-   - Impact: ~20 LOC saved
+4. **Remove dead `leverAt` method**
+   - Current: A board-level lookup that can never serve the simulator's actual need (index) and has no other caller.
+   - Proposed: Delete.
+   - Impact: -6 lines.
+
+5. **Simplify `BallId.label`**
+   - Current: Three-arm switch returning ordinal strings.
+   - Proposed: `'${index + 1}'`.
+   - Impact: -4 lines.
+
+6. **Simplify `CascadeState.loading()` constructor**
+   - Current: Explicit initialization of every field, duplicating defaults from the main constructor.
+   - Proposed: Delegating constructor with only the two non-default fields.
+   - Impact: -5 lines, single source of default values.
+
+---
 
 ### YAGNI Violations
 
-1. **`CellEdges.all` constant** -- Defined but never referenced. Speculative convenience.
+- **`unassignBall`**: Represents a "remove ball from slot" interaction that does not exist in the UI. No design calls for it now.
 
-2. **`_allPrimariesCanGrow` validation in generator** -- Defensive check that duplicates what `_simulateMoves` already handles by returning null. Added complexity without proven performance benefit.
+- **`CascadeColors.binCorrect`**: A green win-state bin color with no current consumer. The bins are neutral-colored regardless of outcome. Add when the visual feature ships.
 
-3. **Trivial fallback puzzle** -- A degenerate all-red puzzle is worse than failing loudly. No player should see this; if they do, something is seriously wrong.
+- **`CascadeBoard.leverAt`**: A convenience accessor whose return type (`Lever?`) cannot serve the only real lookup need (an index for `flipLever`). No caller exists.
 
-### Additional Observations
+---
 
-**Well done aspects of this changeset:**
-- Clean removal of `ColorPalette` (tap-to-select) and its test, replaced with drag semantics
-- The overpower timer mechanic is well-isolated with proper cleanup in `close()`, `endDrag()`, `undo()`, and `resetWithSeed()`
-- Good test coverage for drag interactions, including edge cases (non-adjacent, blocker, secondary, overpower timer, undo of overpower)
-- `WinCelebration` is a reasonable shared widget with clean timer management
-- Session deserialization now validates blocker positions match the generated puzzle, preventing stale data bugs
-- Forward generation strategy is sound and well-documented
-- `_DragAction` / `_ActionType` classes in generator are appropriately scoped as private implementation details
-- CellEdges + blob rendering is a nice visual improvement
+### What Is Appropriately Complex
 
-**Potential concern:**
-- The overpower tests use `Future<void>.delayed(const Duration(milliseconds: 600))` to wait for the 500ms timer. These are real-time waits in tests. If the timer duration changes, the tests silently become flaky or slow. Consider using `fakeAsync` from `package:clock` to control time in tests.
+The following complex code is load-bearing and should not be simplified:
+
+- **`_gravityEase` and `_solveQuadraticTime`** in `CascadeBoardWidget`: Physics-based animation timing is inherently mathematical. The binary search for per-ball start times is called once per drop, not per frame.
+- **`PuzzleGenerator._countSolutions`**: Enumerating 6 permutations × 2^N lever states is the correct approach for a puzzle with a uniqueness requirement. The inner loop is well-commented.
+- **`BallSimulator._simulateBall`**: Wall bounce and bin bounce position lists are load-bearing data for the animation layer. The complexity is justified by the animation precision it enables.
+- **`_interpolatedPosition` in `CascadeBoardWidget`**: Arc math for deflection, wall bounce, and bin bounce is dense but each branch is distinct behavior. The comments adequately explain each case.
+
+---
 
 ### Final Assessment
 
-**Total potential LOC reduction**: ~170 lines (~12% of changed code)
-**Complexity score**: Medium
-**Recommended action**: Proceed with simplifications -- the triplicated BFS logic (Critical) should be consolidated before merging. The important items (blob centroid, win-celebration boilerplate, generator defensiveness) are worth addressing but not blockers. Suggestions are polish.
+**Total potential LOC reduction**: ~40 lines out of ~780 total (~5%)
+**Complexity score**: Low–Medium
+
+The game is well-structured overall. The logic and animation layers carry appropriate complexity for the behavior they deliver. The simplification opportunities are concentrated in dead code (`unassignBall`, `leverAt`, `binCorrect`), a duplicate constant (`binColumns`), and minor structural issues (pre-drop mutable fields, loading constructor, bin widget wrapper).
+
+**Recommended action**: Proceed with simplifications. Items 1–4 (dead code and duplicate constant) are clean removals with no risk. Items 5–6 are polish. The pre-drop field refactor (item 2) is the most architecturally meaningful change and worth doing as a standalone commit.

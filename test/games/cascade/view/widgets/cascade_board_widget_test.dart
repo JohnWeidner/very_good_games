@@ -20,19 +20,13 @@ void main() {
       Lever(row: 4, col: 3, direction: LeverDirection.right),
     ];
 
-    final board = CascadeBoard(
-      levers: levers,
-      binOrder: const [0, 1, 2],
-    );
+    final board = CascadeBoard(levers: levers, binOrder: const [0, 1, 2]);
 
     setUp(() {
       cubit = _MockCascadeCubit();
-      when(() => cubit.state).thenReturn(
-        CascadeState(
-          board: board,
-          initialLevers: levers,
-        ),
-      );
+      when(
+        () => cubit.state,
+      ).thenReturn(CascadeState(board: board, initialLevers: levers));
     });
 
     Widget buildSubject() {
@@ -46,8 +40,7 @@ void main() {
       );
     }
 
-    testWidgets('renders lever widgets in configuring state',
-        (tester) async {
+    testWidgets('renders lever widgets in configuring state', (tester) async {
       await tester.pumpWidget(buildSubject());
 
       expect(find.byType(LeverWidget), findsNWidgets(2));
@@ -59,8 +52,7 @@ void main() {
       expect(find.byType(BinWidget), findsNWidgets(3));
     });
 
-    testWidgets('levers are enabled in configuring state',
-        (tester) async {
+    testWidgets('levers are enabled in configuring state', (tester) async {
       await tester.pumpWidget(buildSubject());
 
       final leverWidgets = tester
@@ -114,8 +106,7 @@ void main() {
       }
     });
 
-    testWidgets('renders drop slots with assigned balls',
-        (tester) async {
+    testWidgets('renders drop slots with assigned balls', (tester) async {
       await tester.pumpWidget(buildSubject());
 
       // Default slot assignments: ball1, ball2, ball3.
@@ -145,8 +136,7 @@ void main() {
       expect(find.byType(BallWidget), findsNWidgets(3));
     });
 
-    testWidgets('tap calls skipAnimation when dropping',
-        (tester) async {
+    testWidgets('tap calls skipAnimation when dropping', (tester) async {
       final result = BallSimulator.simulate(
         board: board,
         slotAssignments: [BallId.ball1, BallId.ball2, BallId.ball3],

@@ -8,10 +8,7 @@ void main() {
     Widget buildSubject(Map<ChromixColor, int> distribution) {
       return MaterialApp(
         home: Scaffold(
-          body: ColorBar(
-            distribution: distribution,
-            label: 'Test',
-          ),
+          body: ColorBar(distribution: distribution, label: 'Test'),
         ),
       );
     }
@@ -22,32 +19,23 @@ void main() {
       expect(find.text('Test'), findsOneWidget);
     });
 
-    testWidgets('renders empty bar for empty distribution', (
-      tester,
-    ) async {
+    testWidgets('renders empty bar for empty distribution', (tester) async {
       await tester.pumpWidget(buildSubject(const {}));
 
       // Should render without errors.
       expect(find.byType(ColorBar), findsOneWidget);
     });
 
-    testWidgets('renders segments with count labels', (
-      tester,
-    ) async {
+    testWidgets('renders segments with count labels', (tester) async {
       await tester.pumpWidget(
-        buildSubject({
-          ChromixColor.red: 3,
-          ChromixColor.blue: 2,
-        }),
+        buildSubject({ChromixColor.red: 3, ChromixColor.blue: 2}),
       );
 
       expect(find.text('3'), findsOneWidget);
       expect(find.text('2'), findsOneWidget);
     });
 
-    testWidgets('renders all six colors when present', (
-      tester,
-    ) async {
+    testWidgets('renders all six colors when present', (tester) async {
       await tester.pumpWidget(
         buildSubject({
           ChromixColor.red: 1,

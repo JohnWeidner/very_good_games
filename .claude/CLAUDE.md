@@ -43,7 +43,6 @@ A Flutter app featuring daily puzzle games with Nostr social sharing. Built with
 ### Linting
 - Uses `very_good_analysis` v7.0.0
 - Run `dart fix --apply` before committing
-- Only pre-existing info-level hint: `avoid_catching_errors` on `StateError` catch in identity cubit (intentional)
 
 ### Adding a New Game
 1. Create `lib/games/<name>/` with models, logic, cubit, view, theme

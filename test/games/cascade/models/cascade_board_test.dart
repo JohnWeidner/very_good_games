@@ -7,10 +7,7 @@ void main() {
       const Lever(row: 1, col: 2, direction: LeverDirection.left),
       const Lever(row: 3, col: 1, direction: LeverDirection.right),
     ];
-    final board = CascadeBoard(
-      levers: levers,
-      binOrder: const [2, 0, 1],
-    );
+    final board = CascadeBoard(levers: levers, binOrder: const [2, 0, 1]);
 
     test('constants are correct', () {
       expect(CascadeBoard.columns, 5);
@@ -21,10 +18,7 @@ void main() {
     test('flipLever returns board with flipped lever', () {
       final flipped = board.flipLever(0);
 
-      expect(
-        flipped.levers[0].direction,
-        LeverDirection.right,
-      );
+      expect(flipped.levers[0].direction, LeverDirection.right);
       // Other lever unchanged.
       expect(flipped.levers[1], board.levers[1]);
       // Bin order unchanged.

@@ -9,10 +9,7 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: BinWidget(
-              expectedBallId: BallId.ball2,
-              cellSize: 60,
-            ),
+            body: BinWidget(expectedBallId: BallId.ball2, cellSize: 60),
           ),
         ),
       );
@@ -24,12 +21,7 @@ void main() {
       for (final ball in BallId.values) {
         await tester.pumpWidget(
           MaterialApp(
-            home: Scaffold(
-              body: BinWidget(
-                expectedBallId: ball,
-                cellSize: 60,
-              ),
-            ),
+            home: Scaffold(body: BinWidget(expectedBallId: ball, cellSize: 60)),
           ),
         );
 
@@ -41,10 +33,7 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: BinWidget(
-              expectedBallId: BallId.ball1,
-              cellSize: 60,
-            ),
+            body: BinWidget(expectedBallId: BallId.ball1, cellSize: 60),
           ),
         ),
       );

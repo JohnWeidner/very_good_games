@@ -24,10 +24,7 @@ class BinWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const side = BorderSide(
-      color: CascadeColors.binNeutral,
-      width: 1.5,
-    );
+    const side = BorderSide(color: CascadeColors.binNeutral, width: 1.5);
 
     return SizedBox(
       width: cellSize,
@@ -40,11 +37,7 @@ class BinWidget extends StatelessWidget {
             bottomLeft: Radius.circular(8),
             bottomRight: Radius.circular(8),
           ),
-          border: Border(
-            left: side,
-            right: side,
-            bottom: side,
-          ),
+          border: Border(left: side, right: side, bottom: side),
         ),
         child: Align(
           alignment: Alignment.topCenter,

@@ -152,8 +152,10 @@ class NostrIdentityCubit extends Cubit<NostrIdentityState> {
       if (pubKeyHex != null) {
         await _profileRepository?.deleteProfile(pubKeyHex);
       }
-    } on StateError {
       // getSigner() throws StateError when no identity exists.
+      // ignore: avoid_catching_errors
+    } on StateError {
+      // Expected when deleting with no active identity.
     } on Exception {
       // Best-effort: proceed to local key deletion regardless.
     }

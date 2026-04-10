@@ -26,9 +26,7 @@ class BallTray extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Balls not assigned to any slot.
-    final unassigned = BallId.values.where(
-      (b) => !slotAssignments.contains(b),
-    );
+    final unassigned = BallId.values.where((b) => !slotAssignments.contains(b));
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),

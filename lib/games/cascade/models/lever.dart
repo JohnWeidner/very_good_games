@@ -19,11 +19,7 @@ enum LeverDirection {
 /// [direction], then the lever flips to the opposite direction.
 class Lever extends Equatable {
   /// Creates a [Lever] at ([row], [col]) pointing in [direction].
-  const Lever({
-    required this.row,
-    required this.col,
-    required this.direction,
-  });
+  const Lever({required this.row, required this.col, required this.direction});
 
   /// Deserializes a [Lever] from JSON.
   factory Lever.fromJson(Map<String, dynamic> json) {

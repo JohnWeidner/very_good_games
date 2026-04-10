@@ -195,13 +195,11 @@ void main() {
               picture: any(named: 'picture'),
               about: any(named: 'about'),
             ),
-          ).thenAnswer(
-            (_) async {
-              // Simulate slow publish.
-              await Future<void>.delayed(const Duration(milliseconds: 50));
-              return true;
-            },
-          );
+          ).thenAnswer((_) async {
+            // Simulate slow publish.
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            return true;
+          });
         },
         build: buildCubit,
         act: (cubit) async {

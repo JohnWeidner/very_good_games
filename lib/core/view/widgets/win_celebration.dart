@@ -6,14 +6,12 @@ import 'package:flutter/material.dart';
 /// Manages the win celebration sequence: a pause to admire the solved
 /// puzzle, then confetti, then a callback to show results.
 ///
-/// Usage: call [trigger] when the game is won. The widget displays
-/// confetti over its child. Call [reset] when starting a new game.
+/// Usage: call [WinCelebrationState.trigger] when the game is won.
+/// The widget displays confetti over its child. Call
+/// [WinCelebrationState.reset] when starting a new game.
 class WinCelebration extends StatefulWidget {
   /// Creates a [WinCelebration].
-  const WinCelebration({
-    required this.child,
-    super.key,
-  });
+  const WinCelebration({required this.child, super.key});
 
   /// The content to display (the game board / stack).
   final Widget child;

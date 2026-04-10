@@ -35,18 +35,12 @@ void main() {
     test('generated board has 3 bins', () {
       final result = PuzzleGenerator.generate(42);
       expect(result.board.binOrder.length, 3);
-      expect(
-        result.board.binOrder.toSet(),
-        containsAll([0, 1, 2]),
-      );
+      expect(result.board.binOrder.toSet(), containsAll([0, 1, 2]));
     });
 
     test('initialLevers match board levers', () {
       final result = PuzzleGenerator.generate(42);
-      expect(
-        result.initialLevers.length,
-        result.board.levers.length,
-      );
+      expect(result.initialLevers.length, result.board.levers.length);
     });
 
     test('all lever positions are within board bounds', () {

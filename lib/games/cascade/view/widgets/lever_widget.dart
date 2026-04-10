@@ -59,9 +59,7 @@ class _LeverWidgetState extends State<LeverWidget>
   }
 
   double get _restingTurns =>
-      widget.lever.direction == LeverDirection.left
-          ? _leftTurns
-          : _rightTurns;
+      widget.lever.direction == LeverDirection.left ? _leftTurns : _rightTurns;
 
   @override
   void didUpdateWidget(LeverWidget oldWidget) {
@@ -91,14 +89,18 @@ class _LeverWidgetState extends State<LeverWidget>
     _rotation = TweenSequence<double>([
       // Phase 1: impact push (quick, 20% of duration).
       TweenSequenceItem(
-        tween: Tween(begin: oldTurns, end: impactTurns)
-            .chain(CurveTween(curve: Curves.easeOut)),
+        tween: Tween(
+          begin: oldTurns,
+          end: impactTurns,
+        ).chain(CurveTween(curve: Curves.easeOut)),
         weight: 20,
       ),
       // Phase 2: spring to new resting position (80% of duration).
       TweenSequenceItem(
-        tween: Tween(begin: impactTurns, end: newTurns)
-            .chain(CurveTween(curve: Curves.elasticOut)),
+        tween: Tween(
+          begin: impactTurns,
+          end: newTurns,
+        ).chain(CurveTween(curve: Curves.elasticOut)),
         weight: 80,
       ),
     ]).animate(_controller);
@@ -152,10 +154,7 @@ class _LeverWidgetState extends State<LeverWidget>
                     decoration: BoxDecoration(
                       color: CascadeColors.leverActive,
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white,
-                        width: 1.5,
-                      ),
+                      border: Border.all(color: Colors.white, width: 1.5),
                     ),
                   ),
                 ],

@@ -538,16 +538,15 @@ void main() {
 
       test('clears session on win', () {
         // Use lessThan with param=401 to eliminate nothing, then guess.
-        final cubit = GameCubit(
-          targetNumber: target,
-          dailySeed: 42,
-          storageRepository: storage,
-        );
-
-        // Ask a question to get a saved session.
-        cubit
-          ..selectQuestion(QuestionType.isOdd)
-          ..confirmQuestion();
+        final cubit =
+            GameCubit(
+                targetNumber: target,
+                dailySeed: 42,
+                storageRepository: storage,
+              )
+              // Ask a question to get a saved session.
+              ..selectQuestion(QuestionType.isOdd)
+              ..confirmQuestion();
         expect(storage.getSession('guess_the_number'), isNotNull);
 
         // Now play until win — use equals with correct number.
@@ -565,16 +564,15 @@ void main() {
       });
 
       test('clears session on loss', () {
-        final cubit = GameCubit(
-          targetNumber: target,
-          dailySeed: 42,
-          storageRepository: storage,
-        );
-
-        // Ask a question to create a saved session.
-        cubit
-          ..selectQuestion(QuestionType.isOdd)
-          ..confirmQuestion();
+        final cubit =
+            GameCubit(
+                targetNumber: target,
+                dailySeed: 42,
+                storageRepository: storage,
+              )
+              // Ask a question to create a saved session.
+              ..selectQuestion(QuestionType.isOdd)
+              ..confirmQuestion();
         expect(storage.getSession('guess_the_number'), isNotNull);
 
         // Guess wrong repeatedly until score hits zero.
@@ -649,14 +647,14 @@ void main() {
 
       test('restore returns cubit with saved state', () async {
         // Play a question and save.
-        final cubit = GameCubit(
-          targetNumber: target,
-          dailySeed: 42,
-          storageRepository: storage,
-        );
-        cubit
-          ..selectQuestion(QuestionType.isOdd)
-          ..confirmQuestion();
+        final cubit =
+            GameCubit(
+                targetNumber: target,
+                dailySeed: 42,
+                storageRepository: storage,
+              )
+              ..selectQuestion(QuestionType.isOdd)
+              ..confirmQuestion();
 
         final savedCells = List<CellState>.from(cubit.state.cells);
         final savedQuestionCount = cubit.state.questionCount;

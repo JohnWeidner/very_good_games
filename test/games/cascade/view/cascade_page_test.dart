@@ -71,9 +71,7 @@ void main() {
 
     Future<void> pumpAndWaitForInit(WidgetTester tester) async {
       await tester.runAsync(() async {
-        await tester.pumpWidget(
-          MaterialApp.router(routerConfig: router),
-        );
+        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
         // Allow compute() isolate and microtasks to complete.
         await Future<void>.delayed(const Duration(seconds: 2));
       });
@@ -100,8 +98,7 @@ void main() {
       expect(find.byType(CascadeBoardWidget), findsOneWidget);
     });
 
-    testWidgets('renders DROP button in configuring state',
-        (tester) async {
+    testWidgets('renders DROP button in configuring state', (tester) async {
       await pumpAndWaitForInit(tester);
       expect(find.text('DROP'), findsOneWidget);
     });
@@ -109,9 +106,7 @@ void main() {
     testWidgets('shows loading indicator initially', (tester) async {
       // Pump once without settling to catch the loading state.
       await tester.runAsync(() async {
-        await tester.pumpWidget(
-          MaterialApp.router(routerConfig: router),
-        );
+        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
       });
       await tester.pump();
       expect(find.byType(CircularProgressIndicator), findsOneWidget);

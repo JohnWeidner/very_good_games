@@ -34,11 +34,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: BallTray(
-              slotAssignments: const [
-                BallId.ball1,
-                BallId.ball2,
-                BallId.ball3,
-              ],
+              slotAssignments: const [BallId.ball1, BallId.ball2, BallId.ball3],
               onBallAssigned: (_, __) {},
               enabled: true,
             ),

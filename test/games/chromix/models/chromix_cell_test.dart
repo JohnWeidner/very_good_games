@@ -14,10 +14,7 @@ void main() {
       });
 
       test('toString', () {
-        expect(
-          ChromixCell.empty.toString(),
-          equals('ChromixCell.empty'),
-        );
+        expect(ChromixCell.empty.toString(), equals('ChromixCell.empty'));
       });
     });
 
@@ -32,10 +29,7 @@ void main() {
       });
 
       test('toString', () {
-        expect(
-          ChromixCell.blocker.toString(),
-          equals('ChromixCell.blocker'),
-        );
+        expect(ChromixCell.blocker.toString(), equals('ChromixCell.blocker'));
       });
     });
 
@@ -90,9 +84,7 @@ void main() {
         const cell = ColorCell(ChromixColor.red);
         expect(
           cell.toString(),
-          equals(
-            'ChromixCell.color(ChromixColor.red, isPreFilled: false)',
-          ),
+          equals('ChromixCell.color(ChromixColor.red, isPreFilled: false)'),
         );
       });
     });
@@ -137,11 +129,7 @@ void main() {
         final json = cell.toJson();
         expect(
           json,
-          equals({
-            'type': 'color',
-            'color': 'orange',
-            'isPreFilled': true,
-          }),
+          equals({'type': 'color', 'color': 'orange', 'isPreFilled': true}),
         );
         expect(ChromixCell.fromJson(json), equals(cell));
       });

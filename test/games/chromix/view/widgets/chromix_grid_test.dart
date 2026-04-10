@@ -4,8 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:very_good_games/games/chromix/cubit/chromix_cubit.dart';
-import 'package:very_good_games/games/chromix/models/models.dart'
-    as models;
+import 'package:very_good_games/games/chromix/models/models.dart' as models;
 import 'package:very_good_games/games/chromix/view/widgets/chromix_cell_widget.dart';
 import 'package:very_good_games/games/chromix/view/widgets/chromix_grid.dart';
 
@@ -21,10 +20,7 @@ void main() {
       when(() => cubit.state).thenReturn(
         ChromixState(
           grid: models.ChromixGrid(
-            cells: List.generate(
-              16,
-              (_) => const models.EmptyCell(),
-            ),
+            cells: List.generate(16, (_) => const models.EmptyCell()),
           ),
           target: const {},
           optimalMoves: 5,
@@ -88,9 +84,7 @@ void main() {
       verify(() => cubit.endDrag()).called(1);
     });
 
-    testWidgets('adjacent same-color cells share edges', (
-      tester,
-    ) async {
+    testWidgets('adjacent same-color cells share edges', (tester) async {
       // Two adjacent red cells should merge visually.
       when(() => cubit.state).thenReturn(
         ChromixState(
@@ -110,9 +104,7 @@ void main() {
 
       // Find both red cells — they should have shared right/left edges.
       final cellWidgets = tester
-          .widgetList<ChromixCellWidget>(
-            find.byType(ChromixCellWidget),
-          )
+          .widgetList<ChromixCellWidget>(find.byType(ChromixCellWidget))
           .toList();
 
       // Cell (0,0) should share right edge.

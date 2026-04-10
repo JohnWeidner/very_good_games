@@ -106,8 +106,7 @@ class _Solver {
     if (solutionCount >= 2) return;
 
     if (decisionIdx == _decisionIndices.length) {
-      if (_matchesTarget() &&
-          allGroupsContiguous(ChromixGrid(cells: _cells))) {
+      if (_matchesTarget() && allGroupsContiguous(ChromixGrid(cells: _cells))) {
         solutionCount++;
         if (bestMoves == null || moves < bestMoves!) {
           bestMoves = moves;

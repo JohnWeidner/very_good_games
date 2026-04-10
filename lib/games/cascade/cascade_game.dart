@@ -15,8 +15,7 @@ class CascadeGame extends GameDefinition {
   String get name => 'Cascade';
 
   @override
-  String get description =>
-      'Route balls through levers in a daily puzzle';
+  String get description => 'Route balls through levers in a daily puzzle';
 
   @override
   IconData get icon => Icons.arrow_downward;

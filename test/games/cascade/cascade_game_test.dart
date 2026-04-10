@@ -12,9 +12,7 @@ void main() {
     late CascadeGame game;
 
     setUp(() {
-      game = CascadeGame(
-        storageRepository: _MockGameStorageRepository(),
-      );
+      game = CascadeGame(storageRepository: _MockGameStorageRepository());
     });
 
     test('id is cascade', () {

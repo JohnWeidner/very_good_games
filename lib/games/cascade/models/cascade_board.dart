@@ -7,11 +7,9 @@ import 'package:very_good_games/games/cascade/models/lever.dart';
 /// and a [binOrder] mapping target bins to ball ids.
 class CascadeBoard extends Equatable {
   /// Creates a [CascadeBoard].
-  CascadeBoard({
-    required List<Lever> levers,
-    required List<int> binOrder,
-  }) : levers = List.unmodifiable(levers),
-       binOrder = List.unmodifiable(binOrder);
+  CascadeBoard({required List<Lever> levers, required List<int> binOrder})
+    : levers = List.unmodifiable(levers),
+      binOrder = List.unmodifiable(binOrder);
 
   /// Deserializes a [CascadeBoard] from JSON.
   factory CascadeBoard.fromJson(Map<String, dynamic> json) {

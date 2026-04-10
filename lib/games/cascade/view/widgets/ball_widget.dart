@@ -12,11 +12,7 @@ Color ballColor(BallId id) => switch (id) {
 /// A circular ball widget displaying its number.
 class BallWidget extends StatelessWidget {
   /// Creates a [BallWidget].
-  const BallWidget({
-    required this.ballId,
-    this.size = 40,
-    super.key,
-  });
+  const BallWidget({required this.ballId, this.size = 40, super.key});
 
   /// Which ball to display.
   final BallId ballId;

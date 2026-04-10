@@ -10,8 +10,7 @@ void main() {
           home: Builder(
             builder: (context) => Scaffold(
               body: ElevatedButton(
-                onPressed: () =>
-                    ChromixInstructionsDialog.show(context),
+                onPressed: () => ChromixInstructionsDialog.show(context),
                 child: const Text('Show'),
               ),
             ),
@@ -24,26 +23,14 @@ void main() {
 
       expect(find.text('How to Play'), findsWidgets);
       expect(find.text('Color Mixing (RYB)'), findsOneWidget);
-      expect(
-        find.textContaining('Red + Yellow = Orange'),
-        findsOneWidget,
-      );
-      expect(
-        find.text('Drag to Spread Color'),
-        findsOneWidget,
-      );
-      expect(
-        find.text('Contiguity Rule'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Red + Yellow = Orange'), findsOneWidget);
+      expect(find.text('Drag to Spread Color'), findsOneWidget);
+      expect(find.text('Contiguity Rule'), findsOneWidget);
 
       await tester.tap(find.text('Got it!'));
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('Color Mixing (RYB)'),
-        findsNothing,
-      );
+      expect(find.text('Color Mixing (RYB)'), findsNothing);
     });
   });
 }

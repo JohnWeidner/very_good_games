@@ -7,11 +7,7 @@ import 'package:very_good_games/games/chromix/theme/theme.dart';
 /// Reusable for both target (static) and current (live) bars.
 class ColorBar extends StatelessWidget {
   /// Creates a [ColorBar].
-  const ColorBar({
-    required this.distribution,
-    required this.label,
-    super.key,
-  });
+  const ColorBar({required this.distribution, required this.label, super.key});
 
   /// Color counts to display.
   final Map<ChromixColor, int> distribution;
@@ -37,10 +33,7 @@ class ColorBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall,
-          ),
+          Text(label, style: Theme.of(context).textTheme.labelSmall),
           const SizedBox(height: 4),
           Container(
             height: 24,

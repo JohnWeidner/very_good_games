@@ -32,47 +32,33 @@ void main() {
     });
 
     testWidgets('renders blocker cell', (tester) async {
-      await tester.pumpWidget(
-        buildSubject(const BlockerCell()),
-      );
+      await tester.pumpWidget(buildSubject(const BlockerCell()));
 
       expect(find.byType(Container), findsWidgets);
     });
 
     testWidgets('renders color cell', (tester) async {
-      await tester.pumpWidget(
-        buildSubject(const ColorCell(ChromixColor.red)),
-      );
+      await tester.pumpWidget(buildSubject(const ColorCell(ChromixColor.red)));
 
       expect(find.byType(Container), findsWidgets);
     });
 
-    testWidgets('renders highlight border when isHighlighted is true',
-        (tester) async {
+    testWidgets('renders highlight border when isHighlighted is true', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        buildSubject(
-          const ColorCell(ChromixColor.red),
-          isHighlighted: true,
-        ),
+        buildSubject(const ColorCell(ChromixColor.red), isHighlighted: true),
       );
 
-      final container = tester.widget<Container>(
-        find.byType(Container).last,
-      );
+      final container = tester.widget<Container>(find.byType(Container).last);
       final decoration = container.decoration! as BoxDecoration;
       expect(decoration.border, isNotNull);
     });
 
-    testWidgets('all corners rounded when no edges shared', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        buildSubject(const ColorCell(ChromixColor.red)),
-      );
+    testWidgets('all corners rounded when no edges shared', (tester) async {
+      await tester.pumpWidget(buildSubject(const ColorCell(ChromixColor.red)));
 
-      final container = tester.widget<Container>(
-        find.byType(Container).last,
-      );
+      final container = tester.widget<Container>(find.byType(Container).last);
       final decoration = container.decoration! as BoxDecoration;
       final br = decoration.borderRadius! as BorderRadius;
 
@@ -82,9 +68,7 @@ void main() {
       expect(br.bottomRight, isNot(Radius.zero));
     });
 
-    testWidgets('corners flattened where edges are shared', (
-      tester,
-    ) async {
+    testWidgets('corners flattened where edges are shared', (tester) async {
       await tester.pumpWidget(
         buildSubject(
           const ColorCell(ChromixColor.red),
@@ -92,9 +76,7 @@ void main() {
         ),
       );
 
-      final container = tester.widget<Container>(
-        find.byType(Container).last,
-      );
+      final container = tester.widget<Container>(find.byType(Container).last);
       final decoration = container.decoration! as BoxDecoration;
       final br = decoration.borderRadius! as BorderRadius;
 

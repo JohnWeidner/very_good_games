@@ -88,8 +88,7 @@ class CascadeState extends Equatable {
       status: status ?? this.status,
       slotAssignments: slotAssignments ?? this.slotAssignments,
       attempts: attempts ?? this.attempts,
-      dropResult:
-          dropResult != null ? dropResult() : this.dropResult,
+      dropResult: dropResult != null ? dropResult() : this.dropResult,
       score: score != null ? score() : this.score,
     );
   }

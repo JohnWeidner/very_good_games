@@ -8,9 +8,7 @@ void main() {
     testWidgets('displays ball label', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(
-            body: BallWidget(ballId: BallId.ball1),
-          ),
+          home: Scaffold(body: BallWidget(ballId: BallId.ball1)),
         ),
       );
 
@@ -21,9 +19,7 @@ void main() {
       for (final ball in BallId.values) {
         await tester.pumpWidget(
           MaterialApp(
-            home: Scaffold(
-              body: BallWidget(ballId: ball),
-            ),
+            home: Scaffold(body: BallWidget(ballId: ball)),
           ),
         );
 

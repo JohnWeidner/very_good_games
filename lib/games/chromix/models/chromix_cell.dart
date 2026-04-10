@@ -12,10 +12,8 @@ sealed class ChromixCell {
   static const blocker = BlockerCell();
 
   /// A cell holding a color.
-  static ColorCell color(
-    ChromixColor color, {
-    bool isPreFilled = false,
-  }) => ColorCell(color, isPreFilled: isPreFilled);
+  static ColorCell color(ChromixColor color, {bool isPreFilled = false}) =>
+      ColorCell(color, isPreFilled: isPreFilled);
 
   /// Deserializes a [ChromixCell] from JSON.
   static ChromixCell fromJson(Map<String, dynamic> json) {

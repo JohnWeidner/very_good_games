@@ -55,26 +55,19 @@ class CascadeCubit extends Cubit<CascadeState> {
         // Deserialization can fail with FormatException, TypeError,
         // or RangeError from corrupted/stale session data.
         on Exception {
-          unawaited(
-            storage.saveSession('$_storagePrefix$dateKey', null),
-          );
+          unawaited(storage.saveSession('$_storagePrefix$dateKey', null));
         }
         // TypeError/RangeError from bad casts on untrusted JSON.
         // ignore: avoid_catching_errors
         on Error {
-          unawaited(
-            storage.saveSession('$_storagePrefix$dateKey', null),
-          );
+          unawaited(storage.saveSession('$_storagePrefix$dateKey', null));
         }
       }
     }
 
     if (isClosed) return;
     emit(
-      CascadeState(
-        board: result.board,
-        initialLevers: result.initialLevers,
-      ),
+      CascadeState(board: result.board, initialLevers: result.initialLevers),
     );
   }
 
@@ -155,12 +148,7 @@ class CascadeCubit extends Cubit<CascadeState> {
 
     if (result.isWin) {
       final score = cascadeScore(state.attempts);
-      emit(
-        state.copyWith(
-          status: CascadeStatus.won,
-          score: () => score,
-        ),
-      );
+      emit(state.copyWith(status: CascadeStatus.won, score: () => score));
       // Clear session on win.
       final future = _storageRepository?.saveSession(_storageKey, null);
       if (future != null) unawaited(future);
@@ -197,9 +185,7 @@ class CascadeCubit extends Cubit<CascadeState> {
   void _persistSession() {
     final future = _storageRepository?.saveSession(_storageKey, {
       'levers': state.board.levers.map((l) => l.toJson()).toList(),
-      'slotAssignments': state.slotAssignments
-          .map((b) => b?.name)
-          .toList(),
+      'slotAssignments': state.slotAssignments.map((b) => b?.name).toList(),
       'attempts': state.attempts,
       'status': state.status.name,
     });
@@ -210,38 +196,30 @@ class CascadeCubit extends Cubit<CascadeState> {
     Map<String, dynamic> session,
     CascadeGenerateResult result,
   ) {
-    final leverJsons =
-        (session['levers'] as List<dynamic>).cast<Map<String, dynamic>>();
+    final leverJsons = (session['levers'] as List<dynamic>)
+        .cast<Map<String, dynamic>>();
     final levers = leverJsons.map(Lever.fromJson).toList();
 
     final slotJsons = (session['slotAssignments'] as List<dynamic>)
         .cast<String?>();
     final slots = slotJsons
-        .map(
-          (name) =>
-              name != null ? BallId.values.byName(name) : null,
-        )
+        .map((name) => name != null ? BallId.values.byName(name) : null)
         .toList();
 
     final attempts = session['attempts'] as int;
     final statusName = session['status'] as String?;
 
     // If the app was backgrounded during dropping, treat as failed.
-    final status =
-        statusName == CascadeStatus.dropping.name
-            ? CascadeStatus.failed
-            : statusName == CascadeStatus.won.name
-                ? CascadeStatus.won
-                : CascadeStatus.configuring;
+    final status = statusName == CascadeStatus.dropping.name
+        ? CascadeStatus.failed
+        : statusName == CascadeStatus.won.name
+        ? CascadeStatus.won
+        : CascadeStatus.configuring;
 
     // If already won, restore with score.
-    final score =
-        status == CascadeStatus.won ? cascadeScore(attempts) : null;
+    final score = status == CascadeStatus.won ? cascadeScore(attempts) : null;
 
-    final board = CascadeBoard(
-      levers: levers,
-      binOrder: result.board.binOrder,
-    );
+    final board = CascadeBoard(levers: levers, binOrder: result.board.binOrder);
 
     return CascadeState(
       board: board,

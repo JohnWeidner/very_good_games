@@ -4,10 +4,7 @@ import 'package:very_good_games/games/chromix/models/models.dart';
 void main() {
   group('MoveRecord', () {
     test('stores cellIndex and previousCell', () {
-      const record = MoveRecord(
-        cellIndex: 5,
-        previousCell: EmptyCell(),
-      );
+      const record = MoveRecord(cellIndex: 5, previousCell: EmptyCell());
       expect(record.cellIndex, equals(5));
       expect(record.previousCell, equals(const EmptyCell()));
     });
@@ -28,10 +25,7 @@ void main() {
 
     group('serialization', () {
       test('round-trip with EmptyCell', () {
-        const record = MoveRecord(
-          cellIndex: 7,
-          previousCell: EmptyCell(),
-        );
+        const record = MoveRecord(cellIndex: 7, previousCell: EmptyCell());
         final json = record.toJson();
         expect(
           json,
@@ -46,20 +40,14 @@ void main() {
       test('round-trip with ColorCell', () {
         const record = MoveRecord(
           cellIndex: 2,
-          previousCell: ColorCell(
-            ChromixColor.purple,
-            isPreFilled: true,
-          ),
+          previousCell: ColorCell(ChromixColor.purple, isPreFilled: true),
         );
         final json = record.toJson();
         expect(MoveRecord.fromJson(json), equals(record));
       });
 
       test('round-trip with BlockerCell', () {
-        const record = MoveRecord(
-          cellIndex: 0,
-          previousCell: BlockerCell(),
-        );
+        const record = MoveRecord(cellIndex: 0, previousCell: BlockerCell());
         final json = record.toJson();
         expect(MoveRecord.fromJson(json), equals(record));
       });

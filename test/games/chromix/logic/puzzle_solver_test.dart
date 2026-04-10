@@ -4,8 +4,7 @@ import 'package:very_good_games/games/chromix/models/models.dart';
 
 void main() {
   group('PuzzleSolver', () {
-    test('board with unique contiguous solution returns isUnique true',
-        () {
+    test('board with unique contiguous solution returns isUnique true', () {
       // Grid: all blockers except two adjacent cells.
       // Target: {red: 2}
       // Only solution: both cells are red (contiguous).
@@ -24,8 +23,7 @@ void main() {
       expect(result.optimalMoves, equals(2));
     });
 
-    test(
-        'board with matching distribution but non-contiguous '
+    test('board with matching distribution but non-contiguous '
         'solution returns isUnique false', () {
       // Two red cells separated by blockers — distribution matches
       // but contiguity fails.
@@ -50,10 +48,7 @@ void main() {
       // One empty cell, target requires orange (secondary) but
       // only primaries can be placed in empty cells.
       final grid = ChromixGrid(
-        cells: [
-          const EmptyCell(),
-          ...List.filled(15, const BlockerCell()),
-        ],
+        cells: [const EmptyCell(), ...List.filled(15, const BlockerCell())],
       );
       final target = <ChromixColor, int>{ChromixColor.orange: 1};
 

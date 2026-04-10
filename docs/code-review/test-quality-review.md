@@ -1,35 +1,52 @@
 # Test Quality Review — Cascade Ball-Routing Puzzle
 
-**Branch**: `feat/cascade-ball-routing-puzzle`
-**Reviewed**: 2026-04-08
+**Reviewed**: 2026-04-09
 **Stack**: Flutter / Dart, bloc_test ^10.0.0, mocktail ^1.0.4, flutter_test
 
 ---
 
 ## Test Run
 
-**Result**: All 62 tests pass (0 failures).
-
-The test suite runs cleanly across all layers. The one failure in the first run was a test runner artefact (coverage output path did not exist) — re-running without the coverage flag produced a clean pass.
+**Result**: All 76 tests pass (0 failures, 0 errors).
 
 ---
 
 ## Coverage Summary
 
-- **Test run**: Pass — 62/62
-- **Files with tests**: 12/18 source files
-- **Missing test files**: 6 (see below)
+- **Test run**: Pass — 76/76
+- **Overall cascade coverage**: 392/934 lines = 42%
+- **Files with tests**: 14/18 source files
+
+### Per-File Coverage
+
+| File | Coverage | Notes |
+|---|---|---|
+| `cubit/cascade_cubit.dart` | 94% (99/105) | 6 lines missed: `resetWithSeed`, `skipAnimation` |
+| `cubit/cascade_state.dart` | 96% (22/23) | `stars` getter not covered |
+| `logic/ball_simulator.dart` | 100% (40/40) | |
+| `logic/puzzle_generator.dart` | 89% (50/56) | Fallback path not covered |
+| `logic/score_calculator.dart` | 100% (4/4) | |
+| `models/ball.dart` | 100% (4/4) | |
+| `models/cascade_board.dart` | 100% (23/23) | |
+| `models/drop_result.dart` | 100% (12/12) | |
+| `models/lever.dart` | 100% (15/15) | |
+| `cascade_game.dart` | 77% (10/13) | Route builder not covered |
+| `view/cascade_page.dart` | 0% (0/126) | **No test file** |
+| `view/widgets/ball_tray.dart` | 100% (17/17) | |
+| `view/widgets/ball_widget.dart` | 100% (20/20) | |
+| `view/widgets/bin_widget.dart` | 100% (13/13) | |
+| `view/widgets/cascade_board_widget.dart` | 0% (1/334) | **No test file** |
+| `view/widgets/cascade_results_overlay.dart` | 0% (0/46) | **No test file** |
+| `view/widgets/instructions_dialog.dart` | 100% (24/24) | |
+| `view/widgets/lever_widget.dart` | 64% (38/59) | Animation path not covered |
 
 ### Missing Test Files
 
-| Source File | Assessment |
+| Source File | Severity |
 |---|---|
-| `lib/games/cascade/cascade_game.dart` | Low priority — `GameDefinition` is thin routing/metadata glue; no custom logic to test. Acceptable to omit. |
-| `lib/games/cascade/cubit/cascade_state.dart` | No dedicated file needed — state is exercised exhaustively through `cascade_cubit_test.dart`. Acceptable. |
-| `lib/games/cascade/view/cascade_page.dart` | **Missing** — see finding below. |
-| `lib/games/cascade/view/widgets/ball_tray.dart` | **Missing** — see finding below. |
-| `lib/games/cascade/view/widgets/cascade_board_widget.dart` | **Missing** — see finding below. |
-| `lib/games/cascade/view/widgets/cascade_results_overlay.dart` | **Missing** — see finding below. |
+| `view/cascade_page.dart` | Critical — top-level page, 0% coverage |
+| `view/widgets/cascade_board_widget.dart` | Critical — most complex widget, 0% coverage |
+| `view/widgets/cascade_results_overlay.dart` | Important — win screen, 0% coverage |
 
 ---
 
@@ -37,60 +54,29 @@ The test suite runs cleanly across all layers. The one failure in the first run 
 
 ### `cascade_cubit_test.dart`
 
-**Overall**: Good coverage of the happy path and most guard conditions. Two important gaps and one pattern deviation.
+**Overall**: Solid coverage of the main lifecycle. Session restoration, corrupted session handling, status guard rails, and persistence are all tested. Several important gaps remain, and the pattern deviates from VGV convention.
 
-#### Pattern Deviation: cubit tested directly instead of with `bloc_test`
+#### Pattern Deviation — `bloc_test` not used for cubit tests
 
-The VGV project convention (per `CLAUDE.md`) is `bloc_test` for cubits. The chromix game (`chromix_cubit_test.dart`) uses direct instantiation rather than `blocTest()` as well, so this is a cross-game inconsistency rather than a per-file problem. The cascade test follows the chromix pattern exactly, so it is internally consistent. That said, `blocTest()` would eliminate the manual `_waitForReady` helper and `cubit.close()` in every test, and would make the state emission sequence explicit. This is flagged as a suggestion.
+The project-wide VGV convention is `bloc_test` for cubit tests (`CLAUDE.md`: "Testing: `bloc_test` for cubits"). The chromix game uses `blocTest<ChromixCubit, ChromixState>(...)` throughout its cubit test. The cascade cubit test uses plain `test()` blocks with direct instantiation, a manual `_waitForReady` helper, and explicit `cubit.close()` calls in every test.
 
-#### Finding 1 — `completeDrop` test does not cover the won branch deterministically (Important)
+This is inconsistent with every other game in the project. `blocTest()` removes the need for the helper, makes the expected state emission sequence explicit and checked, and enforces teardown automatically. This is flagged as an important fix, not merely a suggestion, because it is a documented convention.
 
-```dart
-// cascade_cubit_test.dart:174
-cubit..drop()..completeDrop();
-expect(
-  cubit.state.status,
-  anyOf(CascadeStatus.won, CascadeStatus.failed),
-);
-```
+**Fix**: Migrate all cubit tests to `blocTest<CascadeCubit, CascadeState>(...)`. The `_waitForReady` helper is not needed with `blocTest` because the `wait` parameter handles async initialization.
 
-`anyOf(won, failed)` accepts any outcome. The test always passes regardless of whether `completeDrop` computes a correct score on win, clears the session on win, or handles `dropResult == null` gracefully. The won branch — which sets `score`, clears storage, and persists no session — is never asserted. A seed with a known-win configuration (identity slot assignment `[ball1, ball2, ball3]` with identity `binOrder [0,1,2]` and no levers) would produce a deterministic win in one drop. The failed path also has no assertion beyond the status field.
+#### Finding 1 — `skipAnimation` is not tested (Important)
 
-**Fix**: Create two separate tests — one using a seed/board that guarantees a win (or construct `CascadeState` directly) and one that guarantees a failure. Assert `score` is non-null and matches `cascadeScore(1)` on win; assert `score` is null on failure; verify `saveSession(key, null)` is called on win.
+`skipAnimation` is a public cubit method that the board widget calls when the user taps during animation. It is currently at 0% coverage (lines 191–193). A regression that broke the guard condition (`state.status != CascadeStatus.dropping`) would go undetected.
 
-#### Finding 2 — `reset` test is conditionally skipped if seed 42 produces a first-attempt win (Important)
+**Fix**: Add a test verifying (a) in `dropping` status `skipAnimation` transitions to `won` or `failed`, and (b) in `configuring` status `skipAnimation` is a no-op.
 
-```dart
-// cascade_cubit_test.dart:204
-if (cubit.state.status == CascadeStatus.failed) {
-  cubit.reset();
-  // assertions...
-}
-```
+#### Finding 2 — `resetWithSeed` is not tested (Important)
 
-If seed 42 happens to produce a win on the first drop, the entire `reset` body is silently skipped and the test reports passing with zero assertions. This is an anti-pattern: the test provides false confidence because it can succeed without verifying anything. The `reset` method is non-trivial — it restores `_preDropBoard`, `_preDropSlots`, preserves `attempts`, and re-emits `configuring` — and it deserves a test that actually runs.
+`resetWithSeed` (lines 82–84) is at 0% coverage. It is gated behind `kDebugMode` in the view but is a public cubit method with its own code path — it re-emits `loading` and re-initializes with no storage. A test confirming the loading-then-configuring transition would cover the method and guard against regressions in the debug reload flow.
 
-**Fix**: Use a seed that is guaranteed to fail on the default slot arrangement (or flip a lever to ensure failure), so that the reset assertions always execute. Alternatively, construct the cubit state directly with a `DropResult(isWin: false)` to remove the dependency on the puzzle generator.
+#### Finding 3 — `stars` getter on `CascadeState` not covered (Suggestion)
 
-#### Finding 3 — Session restoration path is entirely untested (Important)
-
-`CascadeCubit._initialize` contains a full deserialization path: it reads a stored session, calls `_deserializeState`, and emits the restored state. There is no test that:
-- Sets up `storageRepository.getSession()` to return a valid session map
-- Verifies the cubit emits the restored state (correct levers, attempts, status)
-- Covers the `dropping → failed` status normalisation on deserialization
-- Covers the corrupted-data `on Object` catch block (which calls `saveSession(key, null)`)
-
-The storage mock always returns `null` in `setUp`, so this entire branch is dead in the test suite. Given that session restoration is the primary persistence mechanism, this is a significant gap.
-
-**Fix**: Add at least three tests: (1) valid session restores state correctly, (2) a session with status `dropping` is normalised to `failed`, (3) a corrupted session (e.g. missing key) triggers `saveSession(key, null)` and falls through to a fresh puzzle.
-
-#### Finding 4 — `skipAnimation` is not tested (Suggestion)
-
-`skipAnimation` is a one-line guard that delegates to `completeDrop`. It does nothing if status is not `dropping`. Given it is a public method and part of the UI interaction contract (tapping the board during a drop), it warrants a dedicated test verifying that: (a) it triggers `completeDrop` when dropping, and (b) it is a no-op in other statuses.
-
-#### Finding 5 — `resetWithSeed` is not tested (Suggestion)
-
-`resetWithSeed` is gated by `kDebugMode` in the view but is a public cubit method. Its async initialization path is identical to the main initializer and is fully reachable. A test confirming it emits loading then transitions to configuring with a new board would prevent regressions in the dev-only debug flow.
+`CascadeState.stars` (line 73) returns `cascadeStars(attempts)` when `score != null`, else `0`. The zero branch is never reached in any test. A simple state-level test checking `stars == 0` pre-win and `stars == 3` post-win-on-first-attempt would complete coverage of this getter.
 
 ---
 
@@ -98,35 +84,33 @@ The storage mock always returns `null` in `setUp`, so this entire branch is dead
 
 ### `ball_simulator_test.dart`
 
-**Overall**: Good foundation. Happy paths and basic win/loss detection are covered. Two logic gaps.
+**Overall**: Good. Happy path, win detection, loss detection, drop ordering, and the wall-bounce path are all covered. Two meaningful gaps remain.
 
-#### Finding 6 — Wall bounce path is partially tested but not asserted on `wallBounces` (Important)
+#### Finding 4 — `leverFlips` are asserted for count and index but `step` is never checked (Important)
 
-The test `'lever at wall edge does not deflect but still flips'` constructs a board that causes a wall bounce and checks `finalBin`, but never asserts that `path.wallBounces` is non-empty. The `wallBounces` set drives the animation (two extra positions are added per bounce), so an incorrect value would silently produce a broken animation while all assertions still pass.
+The test `'lever deflects ball and records leverFlip'` checks `leverFlips.length == 1` and `leverFlips[0].leverIndex == 0`, but never asserts `leverFlips[0].step`. The `step` field determines at which position in the animation the lever visual updates. An off-by-one in `step` would produce a visual glitch (lever flips a frame too early or too late) while all assertions still pass.
 
-**Fix**: Add `expect(result.paths[0].wallBounces, isNotEmpty)` and verify the exact number of extra positions added (3 instead of 1 for a bounce row).
+**Fix**: Add `expect(result.paths[1].leverFlips[0].step, <expected_index>)`. The expected value is the index in `positions` where the ball arrives at the lever row — in the two-lever test case this is deterministic.
 
-#### Finding 7 — `leverFlips` are never asserted in any test (Important)
+#### Finding 5 — Wall bounce `wallBounces` set is asserted for size but not for the correct step index (Suggestion)
 
-`BallPath.leverFlips` records which lever flipped at which step, and `CascadeBoardWidget._animatedLevers` depends on this to replay lever animations. None of the simulator tests assert on `leverFlips`. A regression that cleared or mis-populated the list would not be caught.
+The `'wall bounce records wallBounces and extra positions'` test checks `path.wallBounces.length == 1` and total position count. It does not verify which step index is recorded in `wallBounces`. Like the lever flip step, this value drives animation timing. The step index is deterministic from the board layout used in the test, so asserting it would not add fragility.
 
-**Fix**: In the existing `'lever deflects ball and flips'` test, add assertions that `result.paths[1].leverFlips` has length 1 and that `leverFlips[0].leverIndex == 0` and `leverFlips[0].step` points to the correct position index.
+#### Finding 6 — `_generateFallback` path in `puzzle_generator.dart` is not tested (Suggestion)
 
-#### Finding 8 — Sequential lever flip interaction is not fully asserted (Suggestion)
-
-The test `'sequential drops: first ball flips lever for second'` checks final bin positions but does not verify the board state after the first ball. The core mechanic of Cascade — lever state carries across balls — should have at least one explicit check that the lever direction post-first-ball differs from the initial direction, confirming that `BallSimulator.simulate` passes the mutated board forward.
-
-### `puzzle_generator_test.dart`
-
-**Overall**: Strong. Determinism, bounds, uniqueness, and bin structure are all covered. One gap.
-
-#### Finding 9 — Uniqueness property (single solution) is not verified (Suggestion)
-
-The generator's primary contract is that it produces a puzzle with exactly one winning configuration. This is checked internally by `_countSolutions`, but no test verifies it from the outside. The test could call `BallSimulator.simulate` across all permutations for a generated puzzle and count wins, expecting exactly 1. Without this, a regression that made `_countSolutions` always return 0 would silently fall through to the fallback without any test failing.
+`PuzzleGenerator._generateFallback` (lines 175–188) is the last-resort path executed when 100 seed retries all fail. It is at 0% coverage. This path is difficult to trigger through the public `generate()` API, but it can be reached indirectly by passing a seed that exhausts all retries. Alternatively, the existence of the fallback board could be tested by checking that `generate()` always returns a board with 3 bins and 6 levers regardless of seed — a property test across a wide seed range would implicitly cover both paths.
 
 ### `score_calculator_test.dart`
 
-**Overall**: Excellent. All discrete score values are tested with named tests, boundary and beyond-boundary cases are covered, and the test names read as specification. No issues.
+**Overall**: Excellent. All discrete values, boundary cases, and beyond-boundary cases are covered with clearly named tests. No issues.
+
+### `puzzle_generator_test.dart`
+
+**Overall**: Strong. Determinism, bounds, uniqueness of lever positions, and bin structure are covered. One gap.
+
+#### Finding 7 — Single-solution uniqueness is not verified (Suggestion)
+
+The generator's primary contract is exactly one winning configuration per puzzle. `_countSolutions` enforces this internally, but no test verifies the contract from the outside. A regression where `_countSolutions` always returned 0 would silently fall through to the fallback without any test failing. A test that runs `BallSimulator.simulate` across all 6 × 2^n configurations for a generated puzzle and counts wins — expecting exactly 1 — would close this gap.
 
 ---
 
@@ -134,23 +118,15 @@ The generator's primary contract is that it produces a puzzle with exactly one w
 
 ### `lever_test.dart`
 
-**Overall**: Strong. Covers equality, serialization round-trip, flip, and double-flip. No issues.
+**Overall**: Strong. Covers `opposite`, `flip`, double-flip, equality, and serialization round-trip. No issues.
 
 ### `cascade_board_test.dart`
 
-**Overall**: Good. Covers constants, `leverAt`, `flipLever`, `resetLevers`, equality, serialization round-trip, and unmodifiable list guard. One minor gap.
+**Overall**: Good. Covers all public methods, equality, serialization, and the unmodifiable list guard. No issues.
 
-#### Finding 10 — `fromJson` with an invalid direction string is not tested (Suggestion)
+### `drop_result_test.dart` and `ball_test.dart`
 
-`Lever.fromJson` and `CascadeBoard.fromJson` use `LeverDirection.values.byName()` which throws `ArgumentError` on an unknown string. This is the most likely serialization failure mode (e.g. a schema migration). Testing the error path would complement the existing round-trip test.
-
-### `drop_result_test.dart`
-
-**Overall**: Thin but adequate for pure value types. Tests equality only. No issues for models that have no methods beyond Equatable.
-
-### `ball_test.dart`
-
-**Overall**: Adequate. Tests `label`, `index`, and count. No issues.
+**Overall**: Adequate for pure value types. Equality is tested; no additional logic to cover.
 
 ---
 
@@ -158,120 +134,92 @@ The generator's primary contract is that it produces a puzzle with exactly one w
 
 ### `ball_widget_test.dart`
 
-**Overall**: Good. Tests label rendering for all three balls and that `ballColor` returns distinct colors. The distinct-color assertion could be stronger (checking specific colors) but the current form catches regressions.
+**Overall**: Good. Labels for all three balls are verified. `ballColor` returns distinct values for each ball. One minor improvement available: the distinct-color test does not verify which specific colors are returned, only that three unique values exist. This is acceptable.
 
 ### `bin_widget_test.dart`
 
-**Overall**: Thin. Two tests exist but one is essentially a smoke test.
+**Overall**: Good. Three tests: label rendering per ball, and three-sided border verification via `BoxDecoration` inspection. No issues.
 
-#### Finding 11 — Tautological assertion in second `BinWidget` test (Important)
+### `ball_tray_test.dart`
 
-```dart
-// bin_widget_test.dart:23
-testWidgets('renders without isCorrect set', (tester) async {
-  await tester.pumpWidget(/* ... BinWidget ... */);
-  expect(find.byType(BinWidget), findsOneWidget);
-});
-```
-
-Finding a widget you just explicitly pumped into the tree proves nothing about its rendering. The assertion cannot fail under any non-catastrophic circumstance. It inflates coverage without catching bugs.
-
-**Fix**: Assert on rendered content (e.g. `expect(find.text('1'), findsOneWidget)` for `BallId.ball1`), or remove this test entirely if it adds no distinct coverage over the first test.
+**Overall**: Good. Covers unassigned balls visible, all-assigned shows nothing, draggable when enabled, and non-draggable when disabled. All four meaningful states of `BallTray` are tested.
 
 ### `lever_widget_test.dart`
 
-**Overall**: Good. Tests tap callback when enabled and tap suppression when disabled. The animation behaviour (`didUpdateWidget` triggering `_triggerImpactAnimation`) is not tested, which is acceptable for a visual-only animation.
+**Overall**: Adequate for interaction. Tap fires callback when enabled; tap is suppressed when disabled. The animation path (`didUpdateWidget` triggering `_triggerImpactAnimation`) is at 0% coverage, which is acceptable — visual-only animation behavior is low-value to widget-test.
 
 ### `instructions_dialog_test.dart`
 
-**Overall**: Good. Tests show, content presence, and dismiss flow in a single test. Adequate for a static content dialog.
+**Overall**: Good. Tests show, all section headings visible, and dismiss flow in one test.
 
 ---
 
 ## Missing Widget Tests
 
-### Finding 12 — `cascade_page.dart` has no test (Important)
+### Finding 8 — `cascade_page.dart` has no test (Critical)
 
-`CascadePage` is the top-level page and the integration point for all cubits. It handles the `loading` state (shows a progress indicator), the `won` state (shows results overlay and FAB), the `failed` state (shows reset button), and the `configuring` state (shows the board and drop button). None of these states are covered by a widget test. At minimum the following states should be tested:
+`CascadePage` / `_CascadeView` is the integration point for five BlocProviders, the `WinCelebration`, instructions auto-show, streak persistence, and the win listener. At 0% coverage, the following behaviors are entirely unverified:
 
-- Loading state renders `CircularProgressIndicator`
-- Configuring state renders the drop button enabled when all balls are assigned
-- Configuring state renders the drop button disabled when a ball is unassigned
-- Won state renders the results overlay (or FAB if `_showResults` is false)
-- Failed state renders the reset button
+- `loading` state renders `CircularProgressIndicator`
+- `configuring` state renders the Drop button (enabled when all balls assigned, disabled otherwise)
+- `failed` state renders the Reset button
+- `won` state renders the Results FAB and, when tapped, the `CascadeResultsOverlay`
+- Instructions are shown on first launch (`hasSeenInstructions` returns false)
+- Instructions are not reshown after `markInstructionsSeen` is called
 
-These tests require providing a mock `CascadeCubit` seeded with a known state, using `BlocProvider.value`.
+These tests require mocking the five cubit/repository dependencies and seeding `CascadeCubit` with known states via `BlocProvider.value` wrapping a `MockCascadeCubit`.
 
-### Finding 13 — `ball_tray.dart` has no test (Important)
+### Finding 9 — `cascade_board_widget.dart` has no test (Critical)
 
-`BallTray` has meaningful conditional rendering: unassigned balls appear as draggable when `enabled`, and as non-interactive when `enabled: false`. It also filters out balls that are already assigned (`slotAssignments.contains(b)`). Neither path is tested.
+`CascadeBoardWidget` is the most complex widget in the game: it owns an `AnimationController`, reacts to `dropping` state transitions, builds drag-drop targets, renders `LeverWidget` per lever (enabled/disabled by status), renders `BinWidget` per bin, and handles skip-animation taps. At 0% coverage (334 lines untested), this is the largest risk in the test suite.
 
-**Fix**: Add tests for:
-- All three balls appear when no slots are assigned
-- An assigned ball does not appear in the tray
-- Balls are wrapped in `Draggable` when `enabled: true`
-- Balls are not wrapped in `Draggable` when `enabled: false`
+Minimum viable tests:
 
-### Finding 14 — `cascade_board_widget.dart` has no test (Important)
+- In `configuring` state: lever widgets are present, `LeverWidget.enabled == true`, drop slots contain assigned ball widgets
+- In `dropping` state: tapping the board calls `skipAnimation` on the cubit
+- In `won`/`failed` state: `LeverWidget.enabled == false`; landed balls are rendered
 
-`CascadeBoardWidget` is the most complex widget in the game. It manages its own animation controller, subscribes to cubit state, starts/stops the drop animation, handles skip-animation taps, builds drop slots with drag targets, renders levers and bins, and computes `_animatedLevers`. None of this is tested.
+### Finding 10 — `cascade_results_overlay.dart` has no test (Important)
 
-A full end-to-end animation test is not required, but the following states should be covered:
+`CascadeResultsOverlay` renders the win screen: score, attempt count, `StarRating`, `ShareResultButton`, and conditionally "View Puzzle" / "Back to Hub" buttons. The `onViewPuzzle` callback is only wired up when non-null.
 
-- Configuring state: drop slots render with assigned balls; lever widgets are present and tappable
-- Dropping state: a tap on the board calls `skipAnimation` (via `completeDrop`)
-- Won/Failed state: landed balls are rendered via `_buildLandedBalls`; lever widgets have `enabled: false`
+Minimum viable tests:
 
-These tests require a mock cubit seeded with known states and a `MediaQuery` ancestor.
-
-### Finding 15 — `cascade_results_overlay.dart` has no test (Important)
-
-`CascadeResultsOverlay` renders score, attempts, star rating, and action buttons. The `onViewPuzzle` callback path (showing the "View Puzzle" button) is conditionally rendered only when `onViewPuzzle != null`. None of this is tested.
-
-**Fix**: Add tests for:
-- Score and attempt count are displayed correctly
+- Score and attempt count are displayed
 - `StarRating` widget is present
-- "View Puzzle" button appears when `onViewPuzzle` is provided and is absent when it is null
+- "View Puzzle" button is visible when `onViewPuzzle` is provided, absent when null
 - "Back to Hub" button is always present
+
+These tests require a mock `ResultSharingCubit`, `CommunityStatsCubit`, `LeaderboardCubit`, and the Nostr identity/profile dependencies (or a narrow `BlocProvider.value` + mock setup).
 
 ---
 
 ## Anti-Patterns Found
 
-### `test/games/cascade/view/widgets/bin_widget_test.dart:23` — Tautological Assertion
-
-**Anti-pattern**: No meaningful assertion
-**Issue**: `expect(find.byType(BinWidget), findsOneWidget)` finds the widget you just pumped. It cannot fail under any working implementation and verifies nothing about rendering.
-**Fix**: Assert on content or remove.
-
-### `test/games/cascade/cubit/cascade_cubit_test.dart:204` — Conditional Test Body
-
-**Anti-pattern**: Assertions hidden inside a conditional that can silently not execute
-**Issue**: The `reset()` assertions only run if seed 42 yields a failure. If it yields a win, the test passes with zero assertions executed.
-**Fix**: Use a deterministic failing board so the reset assertions always run.
-
-### `test/games/cascade/cubit/cascade_cubit_test.dart:174` — Vacuous `anyOf` Assertion
-
-**Anti-pattern**: Assertion that accepts the full range of possible outcomes
-**Issue**: `anyOf(CascadeStatus.won, CascadeStatus.failed)` passes for any working or partially broken implementation. Neither the won nor failed branch is meaningfully exercised.
-**Fix**: Split into two separate deterministic tests that each assert on the specific expected outcome and its side effects.
+No tautological assertions, mock-everything, or implementation-mirroring patterns were found in the existing tests. The cubit test has one structural issue described separately (conditional test body is not applicable anymore — the existing reset test now uses `_findLosingPermutation` to guarantee the failed state before calling `reset`).
 
 ---
 
 ## Recommendations
 
-1. **Add deterministic win and fail tests for `completeDrop` and `reset`** — Use a zero-lever board with identity `binOrder [0,1,2]` and `slotAssignments [ball1, ball2, ball3]` for a guaranteed win in one drop. Use any mis-routed configuration for a guaranteed fail. This eliminates the conditional test body and vacuous `anyOf` anti-patterns in one pass.
+1. **Migrate `cascade_cubit_test.dart` to `blocTest`** — This is a documented VGV convention. Every other game in the project uses it. The manual `_waitForReady` + `cubit.close()` pattern is not idiomatic here. (Important)
 
-2. **Add session restoration tests to `cascade_cubit_test.dart`** — Set up `storageRepository.getSession()` to return a serialized session map and verify the cubit emits the correct restored state. This is currently a complete blind spot for the only persistence path.
+2. **Add tests for `cascade_page.dart`** — Loading, configuring (Drop button enabled/disabled), failed (Reset button), and won (overlay or FAB) are all user-visible states with no coverage. This is the highest-risk gap. (Critical)
 
-3. **Add tests for `cascade_page.dart`, `ball_tray.dart`, `cascade_results_overlay.dart`, and `cascade_board_widget.dart`** — Four widgets with meaningful conditional rendering have no coverage. Start with `CascadePage` (loading, configuring, won states) and `CascadeResultsOverlay` (score display, button visibility) as these are highest user-visible risk.
+3. **Add tests for `cascade_board_widget.dart`** — At minimum: lever enabled/disabled by status, skip-animation tap in dropping state, landed balls shown post-drop. (Critical)
 
-4. **Assert on `leverFlips` and `wallBounces` in `ball_simulator_test.dart`** — These fields drive the animation layer. An uncaught regression here would produce a visually broken game with all tests still green.
+4. **Add tests for `cascade_results_overlay.dart`** — Score display, conditional "View Puzzle" button, always-present "Back to Hub" button. (Important)
 
-5. **Remove or replace the tautological `BinWidget` test** — `expect(find.byType(BinWidget), findsOneWidget)` provides zero signal. Replace it with an assertion on content or remove it.
+5. **Add tests for `skipAnimation` and `resetWithSeed`** — Both are public cubit methods at 0% coverage. (Important)
+
+6. **Assert `leverFlips[0].step` in `ball_simulator_test.dart`** — The step value drives animation timing; an off-by-one is not currently catchable. (Important)
 
 ---
 
 ## Verdict
 
-**Needs work before merging.** The logic layer (simulator, generator, score calculator) and models are well-tested. The cubit test structure is sound but has three important gaps: a non-deterministic reset test, a vacuous `completeDrop` assertion, and zero session-restoration coverage. Four UI widgets — `cascade_page.dart`, `ball_tray.dart`, `cascade_board_widget.dart`, and `cascade_results_overlay.dart` — are shipped with no test coverage at all. The tautological assertion in `bin_widget_test.dart` should be corrected. The logic test gaps for `leverFlips` and `wallBounces` are lower risk but should be addressed before the animation behaviour can be considered verified.
+**Needs work before merging.** The logic layer (simulator, score calculator) and all models are well-tested at or near 100% coverage. The cubit test is comprehensive for the core game lifecycle — session restoration, corruption recovery, and all status transitions are covered — but `skipAnimation` and `resetWithSeed` are untested public methods. The cubit tests also deviate from the project's `blocTest` convention used by every other game. The most significant gap is the UI layer: `cascade_page.dart` (0%, 126 lines) and `cascade_board_widget.dart` (0%, 334 lines) are completely untested, and `cascade_results_overlay.dart` (0%, 46 lines) has no coverage either. Taken together, the entire interactive surface of the game — how states are rendered, how user interactions are wired — has no widget test coverage.
+
+**Critical issues**: 2 (missing tests for `cascade_page.dart`, `cascade_board_widget.dart`)
+**Important issues**: 5 (missing `cascade_results_overlay.dart` tests, untested `skipAnimation`/`resetWithSeed`, `leverFlips.step` not asserted, `blocTest` convention deviation)
+**Suggestions**: 5 (stars getter, wall-bounce step, fallback path, uniqueness property, sequential lever state assertion)

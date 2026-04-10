@@ -7,8 +7,11 @@ import 'package:very_good_games/games/chromix/logic/puzzle_solver.dart';
 import 'package:very_good_games/games/chromix/models/models.dart';
 
 /// Result of puzzle generation.
-typedef GenerateResult =
-    ({ChromixGrid puzzle, Map<ChromixColor, int> target, int optimalMoves});
+typedef GenerateResult = ({
+  ChromixGrid puzzle,
+  Map<ChromixColor, int> target,
+  int optimalMoves,
+});
 
 /// Deterministic puzzle generator for Chromix.
 ///
@@ -46,8 +49,9 @@ class PuzzleGenerator {
     final blockerIndices = positions.take(blockerCount).toSet();
 
     // Step 2: Validate non-blocker cells form a single connected component.
-    final nonBlockerIndices =
-        positions.where((i) => !blockerIndices.contains(i)).toList();
+    final nonBlockerIndices = positions
+        .where((i) => !blockerIndices.contains(i))
+        .toList();
     if (!_isConnected(nonBlockerIndices)) return null;
 
     // Need enough cells for at least 5 seed colors + room to fill.
@@ -293,11 +297,7 @@ class PuzzleGenerator {
 
     switch (action.type) {
       case _ActionType.spread:
-        return grid.setCell(
-          targetRow,
-          targetCol,
-          ColorCell(sourceCell.color),
-        );
+        return grid.setCell(targetRow, targetCol, ColorCell(sourceCell.color));
       case _ActionType.mix:
         final targetCell = grid.cells[action.targetIdx] as ColorCell;
         final mixed = ColorMixer.mix(sourceCell.color, targetCell.color);
@@ -348,8 +348,9 @@ class PuzzleGenerator {
       final positions = List.generate(16, (i) => i)..shuffle(random);
       final blockerIndices = positions.take(blockerCount).toSet();
 
-      final nonBlockerIndices =
-          positions.where((i) => !blockerIndices.contains(i)).toList();
+      final nonBlockerIndices = positions
+          .where((i) => !blockerIndices.contains(i))
+          .toList();
       if (nonBlockerIndices.length < 8) continue;
 
       final startGrid = _buildStartGrid(
@@ -365,10 +366,7 @@ class PuzzleGenerator {
       final target = filledGrid.colorDistribution;
       if (target.length < 5) continue;
 
-      final solveResult = PuzzleSolver.solve(
-        grid: startGrid,
-        target: target,
-      );
+      final solveResult = PuzzleSolver.solve(grid: startGrid, target: target);
 
       return (
         puzzle: startGrid,

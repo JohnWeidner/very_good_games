@@ -5,10 +5,7 @@ import 'package:very_good_games/games/cascade/models/models.dart';
 void main() {
   group('BallSimulator', () {
     test('ball falls straight down with no levers', () {
-      final board = CascadeBoard(
-        levers: const [],
-        binOrder: const [0, 1, 2],
-      );
+      final board = CascadeBoard(levers: const [], binOrder: const [0, 1, 2]);
 
       final result = BallSimulator.simulate(
         board: board,
@@ -27,9 +24,7 @@ void main() {
 
     test('lever deflects ball and records leverFlip', () {
       final board = CascadeBoard(
-        levers: const [
-          Lever(row: 2, col: 2, direction: LeverDirection.right),
-        ],
+        levers: const [Lever(row: 2, col: 2, direction: LeverDirection.right)],
         binOrder: const [0, 1, 2],
       );
 
@@ -80,9 +75,7 @@ void main() {
 
     test('sequential drops: first ball flips lever for second', () {
       final board = CascadeBoard(
-        levers: const [
-          Lever(row: 2, col: 2, direction: LeverDirection.right),
-        ],
+        levers: const [Lever(row: 2, col: 2, direction: LeverDirection.right)],
         binOrder: const [0, 1, 2],
       );
 
@@ -97,10 +90,7 @@ void main() {
     });
 
     test('win detection: all balls in correct bins', () {
-      final board = CascadeBoard(
-        levers: const [],
-        binOrder: const [0, 1, 2],
-      );
+      final board = CascadeBoard(levers: const [], binOrder: const [0, 1, 2]);
 
       final result = BallSimulator.simulate(
         board: board,
@@ -111,10 +101,7 @@ void main() {
     });
 
     test('win detection: wrong assignment is not a win', () {
-      final board = CascadeBoard(
-        levers: const [],
-        binOrder: const [0, 1, 2],
-      );
+      final board = CascadeBoard(levers: const [], binOrder: const [0, 1, 2]);
 
       final result = BallSimulator.simulate(
         board: board,
@@ -125,10 +112,7 @@ void main() {
     });
 
     test('drops in ball-ID order regardless of slot assignment', () {
-      final board = CascadeBoard(
-        levers: const [],
-        binOrder: const [0, 1, 2],
-      );
+      final board = CascadeBoard(levers: const [], binOrder: const [0, 1, 2]);
 
       // Assign ball3 to slot 0, ball1 to slot 1, ball2 to slot 2.
       final result = BallSimulator.simulate(

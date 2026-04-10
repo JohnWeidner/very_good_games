@@ -48,50 +48,43 @@ class ChromixResultsOverlay extends StatelessWidget {
                   children: [
                     Text(
                       'Puzzle Solved!',
-                      style:
-                          theme.textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 24),
                     Text(
                       '$score total',
-                      style:
-                          theme.textTheme.displayMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
-                          ),
+                      style: theme.textTheme.displayMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
                     ),
                     Text(
                       '${state.moveCount} moves, '
                       '${state.undoCount} undos',
                       style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.6),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
                     StarRating(stars: stars),
                     const SizedBox(height: 16),
-                    ShareResultButton(
-                      onShare: () => _share(context),
-                    ),
+                    ShareResultButton(onShare: () => _share(context)),
                     const CommunityStatsSection(),
-                    LeaderboardSection(
-                      dTag: 'chromix:${utcDateKey()}',
-                    ),
+                    LeaderboardSection(dTag: 'chromix:${utcDateKey()}'),
                     const SizedBox(height: 24),
                     Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         if (onViewPuzzle != null)
                           OutlinedButton(
                             onPressed: onViewPuzzle,
                             child: const Text('View Puzzle'),
                           ),
-                        if (onViewPuzzle != null)
-                          const SizedBox(width: 12),
+                        if (onViewPuzzle != null) const SizedBox(width: 12),
                         FilledButton(
                           onPressed: () => context.go('/'),
                           child: const Text('Back to Hub'),

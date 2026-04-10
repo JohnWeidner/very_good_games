@@ -10,8 +10,7 @@ void main() {
           home: Builder(
             builder: (context) => Scaffold(
               body: ElevatedButton(
-                onPressed: () =>
-                    CascadeInstructionsDialog.show(context),
+                onPressed: () => CascadeInstructionsDialog.show(context),
                 child: const Text('Show'),
               ),
             ),

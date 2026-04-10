@@ -14,11 +14,7 @@ void main() {
 
   group('Lever', () {
     test('flip returns lever with opposite direction', () {
-      const lever = Lever(
-        row: 2,
-        col: 3,
-        direction: LeverDirection.left,
-      );
+      const lever = Lever(row: 2, col: 3, direction: LeverDirection.left);
       final flipped = lever.flip();
 
       expect(flipped.row, 2);
@@ -27,11 +23,7 @@ void main() {
     });
 
     test('double flip returns original', () {
-      const lever = Lever(
-        row: 1,
-        col: 1,
-        direction: LeverDirection.right,
-      );
+      const lever = Lever(row: 1, col: 1, direction: LeverDirection.right);
       expect(lever.flip().flip(), lever);
     });
 
@@ -45,11 +37,7 @@ void main() {
     });
 
     test('serialization round-trip', () {
-      const lever = Lever(
-        row: 3,
-        col: 4,
-        direction: LeverDirection.right,
-      );
+      const lever = Lever(row: 3, col: 4, direction: LeverDirection.right);
       final json = lever.toJson();
       final restored = Lever.fromJson(json);
 

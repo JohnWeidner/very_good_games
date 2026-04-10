@@ -17,12 +17,10 @@ class ColorMixer {
     if (a.isSecondary || b.isSecondary) return null;
 
     final pair = {a, b};
-    if (pair.contains(ChromixColor.red) &&
-        pair.contains(ChromixColor.yellow)) {
+    if (pair.contains(ChromixColor.red) && pair.contains(ChromixColor.yellow)) {
       return ChromixColor.orange;
     }
-    if (pair.contains(ChromixColor.red) &&
-        pair.contains(ChromixColor.blue)) {
+    if (pair.contains(ChromixColor.red) && pair.contains(ChromixColor.blue)) {
       return ChromixColor.purple;
     }
     if (pair.contains(ChromixColor.yellow) &&

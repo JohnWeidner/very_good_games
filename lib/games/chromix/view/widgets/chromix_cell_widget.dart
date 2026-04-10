@@ -95,5 +95,4 @@ class ChromixCellWidget extends StatelessWidget {
     ChromixColor.green => ChromixColors.green,
     ChromixColor.purple => ChromixColors.purple,
   };
-
 }

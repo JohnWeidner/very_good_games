@@ -49,8 +49,7 @@ void main() {
       expect(resultsCalled, isFalse);
     });
 
-    testWidgets('trigger calls onShowResults after 1.4s total',
-        (tester) async {
+    testWidgets('trigger calls onShowResults after 1.4s total', (tester) async {
       await tester.pumpWidget(buildSubject());
 
       var resultsCalled = false;
@@ -67,8 +66,7 @@ void main() {
       expect(resultsCalled, isTrue);
     });
 
-    testWidgets('reset cancels timers and hides confetti',
-        (tester) async {
+    testWidgets('reset cancels timers and hides confetti', (tester) async {
       await tester.pumpWidget(buildSubject());
 
       var resultsCalled = false;

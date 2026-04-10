@@ -82,10 +82,7 @@ bool isColorGroupContiguous(ChromixGrid grid, ChromixColor color) {
 ///
 /// Only checks colors whose placed count matches their [target] count,
 /// to avoid noisy feedback on partially-filled grids.
-bool hasContiguityViolation(
-  ChromixGrid grid,
-  Map<ChromixColor, int> target,
-) {
+bool hasContiguityViolation(ChromixGrid grid, Map<ChromixColor, int> target) {
   final distribution = grid.colorDistribution;
   for (final entry in target.entries) {
     final color = entry.key;

@@ -12,11 +12,7 @@ import 'package:very_good_games/games/chromix/theme/theme.dart';
 /// and includes empty cells as gray.
 class ColorPieChart extends StatelessWidget {
   /// Creates a [ColorPieChart] from pre-built slices.
-  const ColorPieChart._({
-    required this.slices,
-    required this.label,
-    super.key,
-  });
+  const ColorPieChart._({required this.slices, required this.label, super.key});
 
   /// Creates a pie chart from a simple color distribution.
   ///
@@ -117,9 +113,7 @@ class ColorPieChart extends StatelessWidget {
           fraction: count / nonBlockerCount,
           color: _colorFor(color),
           label: '$count',
-          textColor: color == ChromixColor.yellow
-              ? Colors.black
-              : Colors.white,
+          textColor: color == ChromixColor.yellow ? Colors.black : Colors.white,
         ),
       );
     }
@@ -168,9 +162,7 @@ class ColorPieChart extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                 )
-              : CustomPaint(
-                  painter: _PiePainter(slices: slices),
-                ),
+              : CustomPaint(painter: _PiePainter(slices: slices)),
         ),
         const SizedBox(height: 4),
         Text(label, style: Theme.of(context).textTheme.labelSmall),
@@ -269,6 +261,5 @@ class _PiePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_PiePainter oldDelegate) =>
-      slices != oldDelegate.slices;
+  bool shouldRepaint(_PiePainter oldDelegate) => slices != oldDelegate.slices;
 }

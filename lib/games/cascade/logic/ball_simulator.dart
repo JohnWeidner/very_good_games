@@ -74,9 +74,7 @@ class BallSimulator {
         // instant the ball starts its bounce/deflection.
         final arrivalIndex = positions.length - 1;
         currentBoard = currentBoard.flipLever(leverIndex);
-        leverFlips.add(
-          (leverIndex: leverIndex, step: arrivalIndex),
-        );
+        leverFlips.add((leverIndex: leverIndex, step: arrivalIndex));
 
         if (targetCol >= 0 && targetCol < CascadeBoard.columns) {
           // Successful deflection: slide horizontally.

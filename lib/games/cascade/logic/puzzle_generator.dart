@@ -86,10 +86,7 @@ class PuzzleGenerator {
   /// Places [count] levers on distinct grid cells.
   ///
   /// Returns a list of (row, col) pairs, or null if placement failed.
-  static List<(int, int)>? _generateLeverPositions(
-    Random random,
-    int count,
-  ) {
+  static List<(int, int)>? _generateLeverPositions(Random random, int count) {
     final allPositions = <(int, int)>[];
     // Start at row 1 — row 0 is the drop slot row where balls are
     // dragged, so placing levers there conflicts with drag targets.
@@ -161,8 +158,9 @@ class PuzzleGenerator {
   static CascadeBoard _boardWithLeverMask(CascadeBoard board, int mask) {
     final newLevers = <Lever>[];
     for (var i = 0; i < board.levers.length; i++) {
-      final direction =
-          (mask >> i) & 1 == 0 ? LeverDirection.left : LeverDirection.right;
+      final direction = (mask >> i) & 1 == 0
+          ? LeverDirection.left
+          : LeverDirection.right;
       final lever = board.levers[i];
       newLevers.add(
         Lever(row: lever.row, col: lever.col, direction: direction),

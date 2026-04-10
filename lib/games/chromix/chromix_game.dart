@@ -15,8 +15,7 @@ class ChromixGame extends GameDefinition {
   String get name => 'Chromix';
 
   @override
-  String get description =>
-      'Mix colors to match the target in a daily puzzle';
+  String get description => 'Mix colors to match the target in a daily puzzle';
 
   @override
   IconData get icon => Icons.palette;

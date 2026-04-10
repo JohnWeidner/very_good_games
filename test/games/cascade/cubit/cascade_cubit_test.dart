@@ -11,9 +11,7 @@ class _MockGameStorageRepository extends Mock
 /// Waits for the cubit to finish loading.
 Future<void> _waitForReady(CascadeCubit cubit) async {
   if (cubit.state.status != CascadeStatus.loading) return;
-  await cubit.stream.firstWhere(
-    (s) => s.status != CascadeStatus.loading,
-  );
+  await cubit.stream.firstWhere((s) => s.status != CascadeStatus.loading);
 }
 
 /// Finds a slot assignment permutation that loses for seed 42.
@@ -28,10 +26,7 @@ List<BallId>? _findLosingPermutation(CascadeBoard board) {
     [BallId.ball3, BallId.ball2, BallId.ball1],
   ];
   for (final perm in perms) {
-    final result = BallSimulator.simulate(
-      board: board,
-      slotAssignments: perm,
-    );
+    final result = BallSimulator.simulate(board: board, slotAssignments: perm);
     if (!result.isWin) return perm;
   }
   return null;
@@ -70,10 +65,11 @@ void main() {
 
       expect(cubit.state.status, CascadeStatus.configuring);
       expect(cubit.state.board.levers, isNotEmpty);
-      expect(
-        cubit.state.slotAssignments,
-        [BallId.ball1, BallId.ball2, BallId.ball3],
-      );
+      expect(cubit.state.slotAssignments, [
+        BallId.ball1,
+        BallId.ball2,
+        BallId.ball3,
+      ]);
       expect(cubit.state.attempts, 0);
       await cubit.close();
     });
@@ -94,21 +90,6 @@ void main() {
       await cubit.close();
     });
 
-    test('unassignBall removes ball from slot', () async {
-      final cubit = CascadeCubit(
-        dailySeed: 42,
-        dateKey: '2026-04-08',
-        storageRepository: storageRepository,
-      );
-      await _waitForReady(cubit);
-
-      cubit.unassignBall(0);
-
-      expect(cubit.state.slotAssignments[0], isNull);
-      expect(cubit.state.slotAssignments[1], BallId.ball2);
-      await cubit.close();
-    });
-
     test('flipLever toggles lever direction', () async {
       final cubit = CascadeCubit(
         dailySeed: 42,
@@ -120,31 +101,11 @@ void main() {
       final originalDir = cubit.state.board.levers[0].direction;
       cubit.flipLever(0);
 
-      expect(
-        cubit.state.board.levers[0].direction,
-        originalDir.opposite,
-      );
+      expect(cubit.state.board.levers[0].direction, originalDir.opposite);
       await cubit.close();
     });
 
-    test('drop requires all balls assigned', () async {
-      final cubit = CascadeCubit(
-        dailySeed: 42,
-        dateKey: '2026-04-08',
-        storageRepository: storageRepository,
-      );
-      await _waitForReady(cubit);
-
-      cubit
-        ..unassignBall(2)
-        ..drop();
-
-      expect(cubit.state.status, CascadeStatus.configuring);
-      await cubit.close();
-    });
-
-    test('drop transitions to dropping and increments attempts',
-        () async {
+    test('drop transitions to dropping and increments attempts', () async {
       final cubit = CascadeCubit(
         dailySeed: 42,
         dateKey: '2026-04-08',
@@ -160,8 +121,7 @@ void main() {
       await cubit.close();
     });
 
-    test('completeDrop transitions to failed on wrong assignment',
-        () async {
+    test('completeDrop transitions to failed on wrong assignment', () async {
       final cubit = CascadeCubit(
         dailySeed: 42,
         dateKey: '2026-04-08',
@@ -216,8 +176,10 @@ void main() {
             levers: levers,
             binOrder: generated.board.binOrder,
           );
-          final result =
-              BallSimulator.simulate(board: board, slotAssignments: perm);
+          final result = BallSimulator.simulate(
+            board: board,
+            slotAssignments: perm,
+          );
           if (result.isWin) {
             winningPerm = perm;
             // Identify which levers need to be flipped from initial.
@@ -257,7 +219,7 @@ void main() {
       await cubit.close();
     });
 
-    test('reset restores pre-drop state', () async {
+    test('reset restores initial levers and default slots', () async {
       final cubit = CascadeCubit(
         dailySeed: 42,
         dateKey: '2026-04-08',
@@ -265,21 +227,18 @@ void main() {
       );
       await _waitForReady(cubit);
 
+      final initialLevers = cubit.state.initialLevers;
+
       // Find a losing permutation to guarantee failed state.
       final losingPerm = _findLosingPermutation(cubit.state.board);
       expect(losingPerm, isNotNull, reason: 'No losing perm found');
 
       // Flip a lever and apply losing assignment before dropping.
-      final lever0Before = cubit.state.board.levers[0].direction;
       cubit.flipLever(0);
 
       for (var i = 0; i < losingPerm!.length; i++) {
         cubit.assignBall(losingPerm[i], i);
       }
-
-      final preDropLevers = cubit.state.board.levers.toList();
-      final preDropSlots =
-          List<BallId?>.of(cubit.state.slotAssignments);
 
       cubit
         ..drop()
@@ -290,15 +249,11 @@ void main() {
 
       cubit.reset();
       expect(cubit.state.status, CascadeStatus.configuring);
-      expect(cubit.state.slotAssignments, preDropSlots);
-      expect(
-        cubit.state.board.levers[0].direction,
-        lever0Before.opposite,
-      );
-      for (var i = 0; i < preDropLevers.length; i++) {
+      expect(cubit.state.slotAssignments, defaultSlotAssignments);
+      for (var i = 0; i < initialLevers.length; i++) {
         expect(
           cubit.state.board.levers[i].direction,
-          preDropLevers[i].direction,
+          initialLevers[i].direction,
         );
       }
       expect(cubit.state.attempts, 1);
@@ -370,10 +325,11 @@ void main() {
 
       expect(cubit.state.status, CascadeStatus.configuring);
       expect(cubit.state.attempts, 2);
-      expect(
-        cubit.state.slotAssignments,
-        [BallId.ball3, BallId.ball1, BallId.ball2],
-      );
+      expect(cubit.state.slotAssignments, [
+        BallId.ball3,
+        BallId.ball1,
+        BallId.ball2,
+      ]);
       await cubit.close();
     });
 
@@ -400,8 +356,7 @@ void main() {
       await cubit.close();
     });
 
-    test('corrupted session is cleared and fresh puzzle emitted',
-        () async {
+    test('corrupted session is cleared and fresh puzzle emitted', () async {
       when(
         () => storageRepository.getSession('cascade_state_2026-04-08'),
       ).thenReturn({'invalid': 'data'});
@@ -417,12 +372,66 @@ void main() {
       expect(cubit.state.attempts, 0);
 
       verify(
-        () => storageRepository.saveSession(
-          'cascade_state_2026-04-08',
-          null,
-        ),
+        () => storageRepository.saveSession('cascade_state_2026-04-08', null),
       ).called(1);
 
+      await cubit.close();
+    });
+
+    test('skipAnimation completes drop when dropping', () async {
+      final cubit = CascadeCubit(
+        dailySeed: 42,
+        dateKey: '2026-04-08',
+        storageRepository: storageRepository,
+      );
+      await _waitForReady(cubit);
+
+      cubit
+        ..drop()
+        ..skipAnimation();
+
+      expect(
+        cubit.state.status,
+        anyOf(CascadeStatus.won, CascadeStatus.failed),
+      );
+      await cubit.close();
+    });
+
+    test('skipAnimation is no-op when not dropping', () async {
+      final cubit = CascadeCubit(
+        dailySeed: 42,
+        dateKey: '2026-04-08',
+        storageRepository: storageRepository,
+      );
+      await _waitForReady(cubit);
+
+      cubit.skipAnimation();
+
+      expect(cubit.state.status, CascadeStatus.configuring);
+      await cubit.close();
+    });
+
+    test('resetWithSeed transitions through loading to configuring', () async {
+      final cubit = CascadeCubit(
+        dailySeed: 42,
+        dateKey: '2026-04-08',
+        storageRepository: storageRepository,
+      );
+      await _waitForReady(cubit);
+
+      // Increment attempts so we can verify they reset.
+      cubit.drop();
+      expect(cubit.state.attempts, 1);
+
+      cubit.resetWithSeed(12345);
+
+      expect(cubit.state.status, CascadeStatus.loading);
+
+      await cubit.stream.firstWhere((s) => s.status != CascadeStatus.loading);
+
+      expect(cubit.state.status, CascadeStatus.configuring);
+      expect(cubit.state.attempts, 0);
+      expect(cubit.state.board.levers, isNotEmpty);
       await cubit.close();
     });
   });
