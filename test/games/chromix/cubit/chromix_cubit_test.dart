@@ -25,19 +25,6 @@ Future<void> _waitForReady(ChromixCubit cubit) async {
   throw StateError('No empty cell found');
 }
 
-/// Finds a primary ColorCell adjacent to a given cell.
-(int, int)? _adjacentPrimaryCell(ChromixGrid grid, int row, int col) {
-  for (final (dr, dc) in [(0, 1), (0, -1), (1, 0), (-1, 0)]) {
-    final nr = row + dr;
-    final nc = col + dc;
-    if (nr < 0 || nr >= ChromixGrid.size) continue;
-    if (nc < 0 || nc >= ChromixGrid.size) continue;
-    final cell = grid.cellAt(nr, nc);
-    if (cell is ColorCell && cell.color.isPrimary) return (nr, nc);
-  }
-  return null;
-}
-
 /// Finds a primary cell that has an adjacent empty cell.
 ({int row, int col, int emptyRow, int emptyCol})? _primaryWithAdjacentEmpty(
   ChromixGrid grid,
@@ -402,7 +389,44 @@ void main() {
         await cubit.close();
       });
 
-      test('drag onto secondary cell is no-op (locked)', () async {
+      test('component primary overpowers secondary', () async {
+        final cubit = ChromixCubit(dailySeed: mixSeed, dateKey: dateKey);
+        await _waitForReady(cubit);
+
+        // Create a secondary by mixing two adjacent primaries.
+        final pair = _adjacentDifferentPrimaries(cubit.state.grid);
+        expect(pair, isNotNull, reason: 'No adjacent different primaries');
+
+        final sourceColor =
+            (cubit.state.grid.cellAt(pair!.row1, pair.col1) as ColorCell).color;
+
+        cubit
+          ..startDrag(pair.row1, pair.col1)
+          ..dragTo(pair.row2, pair.col2)
+          ..endDrag();
+
+        final mixedCell =
+            cubit.state.grid.cellAt(pair.row2, pair.col2) as ColorCell;
+        expect(mixedCell.color.isSecondary, isTrue);
+
+        // The source primary is a component of the resulting secondary.
+        // Dragging it onto the secondary should overpower.
+        final movesBefore = cubit.state.moveCount;
+        cubit
+          ..startDrag(pair.row1, pair.col1)
+          ..dragTo(pair.row2, pair.col2)
+          ..endDrag();
+
+        expect(
+          (cubit.state.grid.cellAt(pair.row2, pair.col2) as ColorCell).color,
+          equals(sourceColor),
+        );
+        expect(cubit.state.moveCount, equals(movesBefore + 1));
+
+        await cubit.close();
+      });
+
+      test('non-component primary onto secondary is no-op', () async {
         final cubit = ChromixCubit(dailySeed: mixSeed, dateKey: dateKey);
         await _waitForReady(cubit);
 
@@ -415,25 +439,35 @@ void main() {
           ..dragTo(pair.row2, pair.col2)
           ..endDrag();
 
-        final mixedCell = cubit.state.grid.cellAt(pair.row2, pair.col2);
-        expect(mixedCell, isA<ColorCell>());
-        expect((mixedCell as ColorCell).color.isSecondary, isTrue);
+        final mixedCell =
+            cubit.state.grid.cellAt(pair.row2, pair.col2) as ColorCell;
+        expect(mixedCell.color.isSecondary, isTrue);
 
-        // Now try to drag a primary onto the secondary — should be
-        // no-op because secondaries are locked.
-        final adjPrimary = _adjacentPrimaryCell(
-          cubit.state.grid,
-          pair.row2,
-          pair.col2,
-        );
-        if (adjPrimary == null) {
+        // Find an adjacent primary that is NOT a component of the secondary.
+        (int, int)? nonComponent;
+        for (final (dr, dc) in [(0, 1), (0, -1), (1, 0), (-1, 0)]) {
+          final nr = pair.row2 + dr;
+          final nc = pair.col2 + dc;
+          if (nr < 0 || nr >= ChromixGrid.size) continue;
+          if (nc < 0 || nc >= ChromixGrid.size) continue;
+          final cell = cubit.state.grid.cellAt(nr, nc);
+          if (cell is ColorCell &&
+              cell.color.isPrimary &&
+              !ColorMixer.isComponentOf(cell.color, mixedCell.color)) {
+            nonComponent = (nr, nc);
+            break;
+          }
+        }
+
+        if (nonComponent == null) {
+          markTestSkipped('No non-component primary adjacent to secondary');
           await cubit.close();
-          return; // No adjacent primary to test with.
+          return;
         }
 
         final movesBefore = cubit.state.moveCount;
         cubit
-          ..startDrag(adjPrimary.$1, adjPrimary.$2)
+          ..startDrag(nonComponent.$1, nonComponent.$2)
           ..dragTo(pair.row2, pair.col2)
           ..endDrag();
 
@@ -443,6 +477,37 @@ void main() {
           equals(mixedCell.color),
         );
         expect(cubit.state.moveCount, equals(movesBefore));
+
+        await cubit.close();
+      });
+
+      test('undo after component-overpower restores secondary', () async {
+        final cubit = ChromixCubit(dailySeed: mixSeed, dateKey: dateKey);
+        await _waitForReady(cubit);
+
+        // Create a secondary by mixing two adjacent primaries.
+        final pair = _adjacentDifferentPrimaries(cubit.state.grid);
+        expect(pair, isNotNull, reason: 'No adjacent different primaries');
+
+        cubit
+          ..startDrag(pair!.row1, pair.col1)
+          ..dragTo(pair.row2, pair.col2)
+          ..endDrag();
+
+        final mixedColor =
+            (cubit.state.grid.cellAt(pair.row2, pair.col2) as ColorCell).color;
+        expect(mixedColor.isSecondary, isTrue);
+
+        // Component-overpower the secondary, then undo.
+        cubit
+          ..startDrag(pair.row1, pair.col1)
+          ..dragTo(pair.row2, pair.col2)
+          ..endDrag()
+          ..undo();
+        expect(
+          (cubit.state.grid.cellAt(pair.row2, pair.col2) as ColorCell).color,
+          equals(mixedColor),
+        );
 
         await cubit.close();
       });

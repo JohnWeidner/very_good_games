@@ -181,7 +181,12 @@ class ChromixCubit extends Cubit<ChromixState> {
     ColorCell targetCell,
     ChromixColor dragColor,
   ) {
-    if (targetCell.isLocked) return; // Secondary cells are locked.
+    // Secondary cells are locked unless the drag color is a component
+    // of the secondary (component-overpower).
+    if (targetCell.isLocked &&
+        !ColorMixer.isComponentOf(dragColor, targetCell.color)) {
+      return;
+    }
     if (targetCell.color == dragColor) return; // Same color — no-op.
 
     if (dragColor.isPrimary && targetCell.color.isPrimary) {

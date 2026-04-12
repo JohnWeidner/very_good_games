@@ -52,7 +52,8 @@ final class EmptyCell extends ChromixCell {
 
 /// A cell holding a [ChromixColor].
 ///
-/// Locked if the color is secondary (secondaries cannot be modified).
+/// Locked if the color is secondary — secondaries can only be replaced
+/// by a component primary via component-overpower.
 /// Pre-filled primaries can be layered with another primary to produce
 /// a secondary.
 @immutable

@@ -48,6 +48,92 @@ void main() {
       });
     });
 
+    group('isComponentOf', () {
+      test('red is a component of orange', () {
+        expect(
+          ColorMixer.isComponentOf(ChromixColor.red, ChromixColor.orange),
+          isTrue,
+        );
+      });
+
+      test('yellow is a component of orange', () {
+        expect(
+          ColorMixer.isComponentOf(ChromixColor.yellow, ChromixColor.orange),
+          isTrue,
+        );
+      });
+
+      test('red is a component of purple', () {
+        expect(
+          ColorMixer.isComponentOf(ChromixColor.red, ChromixColor.purple),
+          isTrue,
+        );
+      });
+
+      test('blue is a component of purple', () {
+        expect(
+          ColorMixer.isComponentOf(ChromixColor.blue, ChromixColor.purple),
+          isTrue,
+        );
+      });
+
+      test('yellow is a component of green', () {
+        expect(
+          ColorMixer.isComponentOf(ChromixColor.yellow, ChromixColor.green),
+          isTrue,
+        );
+      });
+
+      test('blue is a component of green', () {
+        expect(
+          ColorMixer.isComponentOf(ChromixColor.blue, ChromixColor.green),
+          isTrue,
+        );
+      });
+
+      test('blue is not a component of orange', () {
+        expect(
+          ColorMixer.isComponentOf(ChromixColor.blue, ChromixColor.orange),
+          isFalse,
+        );
+      });
+
+      test('yellow is not a component of purple', () {
+        expect(
+          ColorMixer.isComponentOf(ChromixColor.yellow, ChromixColor.purple),
+          isFalse,
+        );
+      });
+
+      test('red is not a component of green', () {
+        expect(
+          ColorMixer.isComponentOf(ChromixColor.red, ChromixColor.green),
+          isFalse,
+        );
+      });
+
+      test('secondary as primary input returns false', () {
+        expect(
+          ColorMixer.isComponentOf(ChromixColor.orange, ChromixColor.purple),
+          isFalse,
+        );
+      });
+
+      test('primary as secondary input returns false', () {
+        expect(
+          ColorMixer.isComponentOf(ChromixColor.red, ChromixColor.blue),
+          isFalse,
+        );
+      });
+
+      test('same secondary returns false', () {
+        expect(
+          ColorMixer.isComponentOf(ChromixColor.orange, ChromixColor.orange),
+          isFalse,
+        );
+      });
+    });
+
     group('invalid combinations return null', () {
       test('same color returns null', () {
         expect(ColorMixer.mix(ChromixColor.red, ChromixColor.red), isNull);

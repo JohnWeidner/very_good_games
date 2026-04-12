@@ -81,9 +81,10 @@ class PuzzleGenerator {
     if (target.length < 5) return null;
     if (!allGroupsContiguous(filledGrid)) return null;
 
-    // Step 6: Verify unique solution.
+    // Step 6: Verify unique solution with at least 3 moves.
     final solveResult = PuzzleSolver.solve(grid: startGrid, target: target);
     if (!solveResult.isUnique) return null;
+    if (solveResult.optimalMoves < 3) return null;
 
     return (
       puzzle: startGrid,
@@ -211,6 +212,13 @@ class PuzzleGenerator {
           break;
         }
         if (neighbor is ColorCell && neighbor.color == cell.color) {
+          hasOpenNeighbor = true;
+          break;
+        }
+        // A primary adjacent to its parent secondary can overpower it,
+        // so it is not trapped.
+        if (neighbor is ColorCell &&
+            ColorMixer.isComponentOf(cell.color, neighbor.color)) {
           hasOpenNeighbor = true;
           break;
         }
@@ -367,6 +375,7 @@ class PuzzleGenerator {
       if (target.length < 5) continue;
 
       final solveResult = PuzzleSolver.solve(grid: startGrid, target: target);
+      if (solveResult.optimalMoves < 3) continue;
 
       return (
         puzzle: startGrid,
