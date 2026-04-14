@@ -165,6 +165,105 @@ void main() {
       expect(stats.avgScore, equals(3.0));
     });
 
+    test('computes avgTime from time tags', () async {
+      when(
+        () => requests.query(
+          filter: any(named: 'filter'),
+          explicitRelays: any(named: 'explicitRelays'),
+          cacheRead: any(named: 'cacheRead'),
+          cacheWrite: any(named: 'cacheWrite'),
+        ),
+      ).thenReturn(
+        NdkResponse(
+          'test-id',
+          Stream.fromIterable([
+            Nip01Event(
+              pubKey: 'alice',
+              kind: 30042,
+              tags: [
+                ['d', 'chromix:2026-04-12'],
+                ['l', 'score-10', 'games.vgg.score'],
+                ['l', 'time-60', 'games.vgg.score'],
+              ],
+              content: 'test',
+            ),
+            Nip01Event(
+              pubKey: 'bob',
+              kind: 30042,
+              tags: [
+                ['d', 'chromix:2026-04-12'],
+                ['l', 'score-8', 'games.vgg.score'],
+                ['l', 'time-120', 'games.vgg.score'],
+              ],
+              content: 'test',
+            ),
+          ]),
+        ),
+      );
+
+      final stats = await repository.fetchStats('chromix:2026-04-12');
+
+      expect(stats, isNotNull);
+      expect(stats!.avgTime, equals(90.0));
+    });
+
+    test('avgTime is null when no events have time tags', () async {
+      when(
+        () => requests.query(
+          filter: any(named: 'filter'),
+          explicitRelays: any(named: 'explicitRelays'),
+          cacheRead: any(named: 'cacheRead'),
+          cacheWrite: any(named: 'cacheWrite'),
+        ),
+      ).thenReturn(
+        NdkResponse(
+          'test-id',
+          Stream.fromIterable([makeEvent(pubKey: 'alice', score: 3)]),
+        ),
+      );
+
+      final stats = await repository.fetchStats('no-time:2026-04-12');
+
+      expect(stats, isNotNull);
+      expect(stats!.avgTime, isNull);
+    });
+
+    test('avgTime excludes events without time tags', () async {
+      when(
+        () => requests.query(
+          filter: any(named: 'filter'),
+          explicitRelays: any(named: 'explicitRelays'),
+          cacheRead: any(named: 'cacheRead'),
+          cacheWrite: any(named: 'cacheWrite'),
+        ),
+      ).thenReturn(
+        NdkResponse(
+          'test-id',
+          Stream.fromIterable([
+            Nip01Event(
+              pubKey: 'alice',
+              kind: 30042,
+              tags: [
+                ['d', 'mixed:2026-04-12'],
+                ['l', 'score-10', 'games.vgg.score'],
+                ['l', 'time-100', 'games.vgg.score'],
+              ],
+              content: 'test',
+            ),
+            // Bob has score but no time tag.
+            makeEvent(pubKey: 'bob', score: 5),
+          ]),
+        ),
+      );
+
+      final stats = await repository.fetchStats('mixed:2026-04-12');
+
+      expect(stats, isNotNull);
+      expect(stats!.playerCount, equals(2));
+      // Only alice has a time tag.
+      expect(stats.avgTime, equals(100.0));
+    });
+
     test('caches results by d tag', () async {
       when(
         () => requests.query(

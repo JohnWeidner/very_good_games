@@ -54,15 +54,22 @@ class EventBuilder {
     required int stars,
     required int moves,
     required int undos,
+    required int elapsedSeconds,
     required String date,
   }) {
     final starEmoji = '\u2b50' * stars;
+    final minutes = elapsedSeconds ~/ 60;
+    final seconds = elapsedSeconds % 60;
+    final timeText =
+        '${minutes.toString().padLeft(2, '0')}:'
+        '${seconds.toString().padLeft(2, '0')}';
 
     final content =
         '\ud83c\udfa8 Very Good Games \u2014 Chromix\n'
         '\ud83c\udfaf $stars Stars \u00b7 $starEmoji\n'
         '\ud83e\udde9 $score total '
-        '($moves moves, $undos undos)\n\n$date';
+        '($moves moves, $undos undos) \u00b7 '
+        '\u23f1 $timeText\n\n$date';
 
     return Nip01Event(
       pubKey: pubKeyHex,
@@ -76,6 +83,7 @@ class EventBuilder {
         ['l', 'stars-$stars', 'games.vgg.score'],
         ['l', 'moves-$moves', 'games.vgg.score'],
         ['l', 'undos-$undos', 'games.vgg.score'],
+        ['l', 'time-$elapsedSeconds', 'games.vgg.score'],
       ],
       content: content,
     );
@@ -87,15 +95,22 @@ class EventBuilder {
     required int score,
     required int stars,
     required int attempts,
+    required int elapsedSeconds,
     required String date,
   }) {
     final starEmoji = '\u2b50' * stars;
+    final minutes = elapsedSeconds ~/ 60;
+    final seconds = elapsedSeconds % 60;
+    final timeText =
+        '${minutes.toString().padLeft(2, '0')}:'
+        '${seconds.toString().padLeft(2, '0')}';
 
     final content =
         '\ud83c\udfb1 Very Good Games \u2014 Cascade\n'
         '\ud83c\udfaf $stars Stars \u00b7 $starEmoji\n'
         '\ud83e\udde9 $score points '
-        '($attempts ${attempts == 1 ? 'attempt' : 'attempts'})\n\n$date';
+        '($attempts ${attempts == 1 ? 'attempt' : 'attempts'}) \u00b7 '
+        '\u23f1 $timeText\n\n$date';
 
     return Nip01Event(
       pubKey: pubKeyHex,
@@ -108,6 +123,7 @@ class EventBuilder {
         ['l', 'score-$score', 'games.vgg.score'],
         ['l', 'stars-$stars', 'games.vgg.score'],
         ['l', 'attempts-$attempts', 'games.vgg.score'],
+        ['l', 'time-$elapsedSeconds', 'games.vgg.score'],
       ],
       content: content,
     );
@@ -119,14 +135,21 @@ class EventBuilder {
     required int score,
     required int stars,
     required int moveCount,
+    required int elapsedSeconds,
     required String date,
   }) {
     final starEmoji = '\u2b50' * stars;
+    final minutes = elapsedSeconds ~/ 60;
+    final seconds = elapsedSeconds % 60;
+    final timeText =
+        '${minutes.toString().padLeft(2, '0')}:'
+        '${seconds.toString().padLeft(2, '0')}';
 
     final content =
         '\ud83d\udce1 Very Good Games \u2014 Signal\n'
         '\ud83c\udfaf $score points \u00b7 $starEmoji $stars Stars\n'
-        '\ud83e\uddf1 $moveCount moves\n\n$date';
+        '\ud83e\uddf1 $moveCount moves \u00b7 '
+        '\u23f1 $timeText\n\n$date';
 
     return Nip01Event(
       pubKey: pubKeyHex,
@@ -139,6 +162,7 @@ class EventBuilder {
         ['l', 'score-$score', 'games.vgg.score'],
         ['l', 'stars-$stars', 'games.vgg.score'],
         ['l', 'moves-$moveCount', 'games.vgg.score'],
+        ['l', 'time-$elapsedSeconds', 'games.vgg.score'],
       ],
       content: content,
     );

@@ -79,12 +79,14 @@ class _ChromixView extends StatefulWidget {
   State<_ChromixView> createState() => _ChromixViewState();
 }
 
-class _ChromixViewState extends State<_ChromixView> {
+class _ChromixViewState extends State<_ChromixView>
+    with WidgetsBindingObserver {
   bool _showResults = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _showInstructionsIfFirstTime();
 
     // If already won on restore, show results immediately.
@@ -105,6 +107,23 @@ class _ChromixViewState extends State<_ChromixView> {
       await ChromixInstructionsDialog.show(context);
       await repo.markInstructionsSeen('chromix');
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final cubit = context.read<ChromixCubit>();
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      cubit.pauseTimer();
+    } else if (state == AppLifecycleState.resumed) {
+      cubit.resumeTimer();
+    }
   }
 
   void _persistStreak(BuildContext context) {
@@ -193,9 +212,9 @@ class _ChromixViewState extends State<_ChromixView> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 16),
                       const Expanded(child: ChromixGrid()),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       if (state.hasContiguityViolation)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
@@ -244,6 +263,7 @@ class _UndoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final timeText = formatElapsedTime(state.elapsedSeconds);
     return Column(
       children: [
         TextButton.icon(
@@ -253,13 +273,19 @@ class _UndoRow extends StatelessWidget {
           icon: const Icon(Icons.undo),
           label: const Text('UNDO'),
         ),
-        Text(
-          '${state.moveCount} moves · '
-          '${state.undoCount} undos',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurface.withValues(alpha: 0.6),
+        Semantics(
+          label:
+              '${state.elapsedSeconds ~/ 60} minutes and '
+              '${state.elapsedSeconds % 60} seconds elapsed',
+          child: Text(
+            '${state.moveCount} moves · '
+            '${state.undoCount} undos · '
+            '$timeText',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
           ),
         ),
       ],

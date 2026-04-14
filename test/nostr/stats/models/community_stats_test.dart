@@ -12,9 +12,16 @@ void main() {
       expect(a, isNot(equals(c)));
     });
 
-    test('props contains playerCount and avgScore', () {
+    test('props contains playerCount, avgScore, and avgTime', () {
       const stats = CommunityStats(playerCount: 10, avgScore: 2.5);
-      expect(stats.props, equals([10, 2.5]));
+      expect(stats.props, equals([10, 2.5, null]));
+
+      const statsWithTime = CommunityStats(
+        playerCount: 10,
+        avgScore: 2.5,
+        avgTime: 45.5,
+      );
+      expect(statsWithTime.props, equals([10, 2.5, 45.5]));
     });
   });
 }

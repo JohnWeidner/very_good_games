@@ -79,12 +79,13 @@ class _SignalView extends StatefulWidget {
   State<_SignalView> createState() => _SignalViewState();
 }
 
-class _SignalViewState extends State<_SignalView> {
+class _SignalViewState extends State<_SignalView> with WidgetsBindingObserver {
   bool _showResults = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _showInstructionsIfFirstTime();
 
     // If already won on restore, show results immediately.
@@ -105,6 +106,23 @@ class _SignalViewState extends State<_SignalView> {
       await SignalInstructionsDialog.show(context);
       await repo.markInstructionsSeen('signal');
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final cubit = context.read<SignalCubit>();
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      cubit.pauseTimer();
+    } else if (state == AppLifecycleState.resumed) {
+      cubit.resumeTimer();
+    }
   }
 
   void _persistStreak(BuildContext context) {
@@ -180,12 +198,19 @@ class _SignalViewState extends State<_SignalView> {
                         '${state.solutionWallCount}',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      Text(
-                        '${state.moveCount} moves',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.6),
+                      Semantics(
+                        label:
+                            '${state.elapsedSeconds ~/ 60} minutes and '
+                            '${state.elapsedSeconds % 60} seconds elapsed',
+                        child: Text(
+                          '${state.moveCount} moves · '
+                          '${formatElapsedTime(state.elapsedSeconds)}',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.6),
+                              ),
                         ),
                       ),
                       const SizedBox(height: 16),

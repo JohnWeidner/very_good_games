@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:very_good_games/core/daily_seed/date_key.dart';
+import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/core/view/widgets/star_rating.dart';
 import 'package:very_good_games/games/chromix/cubit/chromix_cubit.dart';
 import 'package:very_good_games/games/chromix/logic/logic.dart';
@@ -62,7 +62,8 @@ class ChromixResultsOverlay extends StatelessWidget {
                     ),
                     Text(
                       '${state.moveCount} moves, '
-                      '${state.undoCount} undos',
+                      '${state.undoCount} undos, '
+                      '${formatElapsedTime(state.elapsedSeconds)}',
                       style: theme.textTheme.bodyLarge?.copyWith(
                         color: theme.colorScheme.onSurface.withValues(
                           alpha: 0.6,
@@ -113,6 +114,7 @@ class ChromixResultsOverlay extends StatelessWidget {
             stars: stars,
             moves: state.moveCount,
             undos: state.undoCount,
+            elapsedSeconds: state.elapsedSeconds,
             date: date,
           ),
     );

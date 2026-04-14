@@ -75,12 +75,14 @@ class _CascadeView extends StatefulWidget {
   State<_CascadeView> createState() => _CascadeViewState();
 }
 
-class _CascadeViewState extends State<_CascadeView> {
+class _CascadeViewState extends State<_CascadeView>
+    with WidgetsBindingObserver {
   bool _showResults = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _showInstructionsIfFirstTime();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -100,6 +102,23 @@ class _CascadeViewState extends State<_CascadeView> {
       await CascadeInstructionsDialog.show(context);
       await repo.markInstructionsSeen('cascade');
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final cubit = context.read<CascadeCubit>();
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      cubit.pauseTimer();
+    } else if (state == AppLifecycleState.resumed) {
+      cubit.resumeTimer();
+    }
   }
 
   void _persistStreak(BuildContext context) {
@@ -234,13 +253,19 @@ class _ActionRow extends StatelessWidget {
         if (state.attempts > 0)
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '${state.attempts} '
-              '${state.attempts == 1 ? 'attempt' : 'attempts'}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.6),
+            child: Semantics(
+              label:
+                  '${state.elapsedSeconds ~/ 60} minutes and '
+                  '${state.elapsedSeconds % 60} seconds elapsed',
+              child: Text(
+                '${state.attempts} '
+                '${state.attempts == 1 ? 'attempt' : 'attempts'}'
+                ' · ${formatElapsedTime(state.elapsedSeconds)}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
               ),
             ),
           ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/nostr/stats/cubit/community_stats_cubit.dart';
 
 /// Displays community stats (player count and average score) from Nostr.
@@ -19,11 +20,15 @@ class CommunityStatsSection extends StatelessWidget {
         }
 
         final stats = state.stats!;
+        final timeText = stats.avgTime != null
+            ? ', ~${formatElapsedTime(stats.avgTime!.round())} avg time'
+            : '';
         return Padding(
           padding: const EdgeInsets.only(top: 16),
           child: Text(
             '~${stats.playerCount} players, '
-            '~${stats.avgScore.toStringAsFixed(0)} avg score',
+            '~${stats.avgScore.toStringAsFixed(0)} avg score'
+            '$timeText',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(
                 context,

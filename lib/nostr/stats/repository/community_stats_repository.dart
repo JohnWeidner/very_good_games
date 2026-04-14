@@ -31,14 +31,21 @@ class CommunityStatsRepository {
       final byPubkey = await _fetchDedupedEvents(dTag);
       if (byPubkey == null) return null;
 
-      // Extract scores from NIP-32 labels.
+      // Extract scores and times from NIP-32 labels.
       var totalScore = 0;
       var validCount = 0;
+      var totalTime = 0;
+      var timeCount = 0;
       for (final event in byPubkey.values) {
         final score = _extractScore(event);
         if (score != null) {
           totalScore += score;
           validCount++;
+        }
+        final time = _extractTime(event);
+        if (time != null) {
+          totalTime += time;
+          timeCount++;
         }
       }
 
@@ -47,6 +54,7 @@ class CommunityStatsRepository {
       final stats = CommunityStats(
         playerCount: validCount,
         avgScore: totalScore / validCount,
+        avgTime: timeCount > 0 ? totalTime / timeCount : null,
       );
 
       _statsCache[dTag] = stats;
@@ -209,6 +217,19 @@ class CommunityStatsRepository {
           tag[2] == 'games.vgg.score' &&
           tag[1].startsWith('score-')) {
         return int.tryParse(tag[1].substring(6));
+      }
+    }
+    return null;
+  }
+
+  /// Extracts the elapsed time from an event's NIP-32 `l` tags.
+  static int? _extractTime(Nip01Event event) {
+    for (final tag in event.tags) {
+      if (tag.length >= 3 &&
+          tag[0] == 'l' &&
+          tag[2] == 'games.vgg.score' &&
+          tag[1].startsWith('time-')) {
+        return int.tryParse(tag[1].substring(5));
       }
     }
     return null;

@@ -13,7 +13,7 @@ part 'signal_state.dart';
 ///
 /// Handles cell toggling, drag painting/erasing, win detection,
 /// and state persistence.
-class SignalCubit extends Cubit<SignalState> {
+class SignalCubit extends Cubit<SignalState> with GameTimerMixin<SignalState> {
   /// Creates a [SignalCubit] that generates a puzzle from [dailySeed].
   ///
   /// Starts in [SignalStatus.loading] and generates the puzzle
@@ -59,6 +59,10 @@ class SignalCubit extends Cubit<SignalState> {
           );
           if (restoredState != null) {
             emit(restoredState);
+            initTimer(
+              initialSeconds: restoredState.elapsedSeconds,
+              alreadyStarted: restoredState.timerStarted,
+            );
             return;
           }
         } on Object {
@@ -85,6 +89,7 @@ class SignalCubit extends Cubit<SignalState> {
 
   /// Resets with a new puzzle from [seed]. For playtesting only.
   void resetWithSeed(int seed) {
+    resetTimer();
     emit(SignalState.loading());
     _initializeFromSeed(seed);
   }
@@ -117,6 +122,7 @@ class SignalCubit extends Cubit<SignalState> {
     final isPlacingWall = cell is! WallCell;
     if (isPlacingWall && state.atWallLimit) return;
 
+    startTimer();
     final newCell = isPlacingWall ? Cell.wall : Cell.empty;
     final newGrid = state.grid.setCell(row, col, newCell);
     final signals = SignalCalculator.calculate(newGrid);
@@ -127,6 +133,7 @@ class SignalCubit extends Cubit<SignalState> {
         grid: newGrid,
         towerSignals: signals,
         moveCount: newMoveCount,
+        timerStarted: true,
       ),
     );
 
@@ -147,6 +154,7 @@ class SignalCubit extends Cubit<SignalState> {
     }
 
     if (isWin) {
+      disposeTimer();
       emit(
         state.copyWith(
           status: SignalStatus.won,
@@ -159,6 +167,8 @@ class SignalCubit extends Cubit<SignalState> {
       final future = _storageRepository?.saveSession(_storageKey, {
         'cells': state.grid.cells.map(_serializeCell).toList(),
         'moveCount': state.moveCount,
+        'elapsedSeconds': state.elapsedSeconds,
+        'timerStarted': state.timerStarted,
       });
       if (future != null) unawaited(future);
     }
@@ -202,11 +212,28 @@ class SignalCubit extends Cubit<SignalState> {
     final signals = SignalCalculator.calculate(grid);
     final moveCount = session['moveCount'] as int;
 
+    final savedElapsedSeconds = session['elapsedSeconds'] as int? ?? 0;
+    final savedTimerStarted = session['timerStarted'] as bool? ?? false;
+
     return SignalState(
       grid: grid,
       towerSignals: signals,
       moveCount: moveCount,
       solutionWallCount: solutionWallCount,
+      elapsedSeconds: savedElapsedSeconds,
+      timerStarted: savedTimerStarted,
     );
+  }
+
+  @override
+  void onTimerTick(int elapsedSeconds) {
+    if (state.status != SignalStatus.playing) return;
+    emit(state.copyWith(elapsedSeconds: elapsedSeconds));
+  }
+
+  @override
+  Future<void> close() {
+    disposeTimer();
+    return super.close();
   }
 }

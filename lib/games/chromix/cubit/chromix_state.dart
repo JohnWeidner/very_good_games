@@ -27,6 +27,8 @@ class ChromixState extends Equatable {
     this.dragColor,
     this.hasContiguityViolation = false,
     this.score,
+    this.elapsedSeconds = 0,
+    this.timerStarted = false,
   });
 
   /// Creates a loading state before the puzzle is generated.
@@ -41,7 +43,9 @@ class ChromixState extends Equatable {
       dragOrigin = null,
       dragColor = null,
       hasContiguityViolation = false,
-      score = null;
+      score = null,
+      elapsedSeconds = 0,
+      timerStarted = false;
 
   /// The current grid with the player's placements.
   final ChromixGrid grid;
@@ -76,6 +80,12 @@ class ChromixState extends Equatable {
   /// Final score, computed on win.
   final int? score;
 
+  /// Seconds elapsed since the first color placement.
+  final int elapsedSeconds;
+
+  /// Whether the timer has started (first placement occurred).
+  final bool timerStarted;
+
   /// Current color distribution (delegates to grid).
   Map<ChromixColor, int> get currentDistribution => grid.colorDistribution;
 
@@ -95,6 +105,8 @@ class ChromixState extends Equatable {
     ChromixColor? Function()? dragColor,
     bool? hasContiguityViolation,
     int? Function()? score,
+    int? elapsedSeconds,
+    bool? timerStarted,
   }) {
     return ChromixState(
       grid: grid ?? this.grid,
@@ -109,6 +121,8 @@ class ChromixState extends Equatable {
       hasContiguityViolation:
           hasContiguityViolation ?? this.hasContiguityViolation,
       score: score != null ? score() : this.score,
+      elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
+      timerStarted: timerStarted ?? this.timerStarted,
     );
   }
 
@@ -125,5 +139,7 @@ class ChromixState extends Equatable {
     dragColor,
     hasContiguityViolation,
     score,
+    elapsedSeconds,
+    timerStarted,
   ];
 }

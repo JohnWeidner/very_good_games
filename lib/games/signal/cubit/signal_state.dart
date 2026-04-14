@@ -22,6 +22,8 @@ class SignalState extends Equatable {
     this.status = SignalStatus.playing,
     this.moveCount = 0,
     this.score,
+    this.elapsedSeconds = 0,
+    this.timerStarted = false,
   });
 
   /// Creates a loading state before the puzzle is generated.
@@ -31,7 +33,9 @@ class SignalState extends Equatable {
       solutionWallCount = 0,
       status = SignalStatus.loading,
       moveCount = 0,
-      score = null;
+      score = null,
+      elapsedSeconds = 0,
+      timerStarted = false;
 
   /// The current grid with the player's wall placements.
   final Grid grid;
@@ -50,6 +54,12 @@ class SignalState extends Equatable {
 
   /// Final score, computed on win.
   final int? score;
+
+  /// Seconds elapsed since the first cell toggle.
+  final int elapsedSeconds;
+
+  /// Whether the timer has started (first toggle occurred).
+  final bool timerStarted;
 
   /// Number of walls currently placed on the grid.
   int get wallCount => grid.cells.whereType<WallCell>().length;
@@ -91,6 +101,8 @@ class SignalState extends Equatable {
     SignalStatus? status,
     int? moveCount,
     int? Function()? score,
+    int? elapsedSeconds,
+    bool? timerStarted,
   }) {
     return SignalState(
       grid: grid ?? this.grid,
@@ -99,6 +111,8 @@ class SignalState extends Equatable {
       status: status ?? this.status,
       moveCount: moveCount ?? this.moveCount,
       score: score != null ? score() : this.score,
+      elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
+      timerStarted: timerStarted ?? this.timerStarted,
     );
   }
 
@@ -110,5 +124,7 @@ class SignalState extends Equatable {
     status,
     moveCount,
     score,
+    elapsedSeconds,
+    timerStarted,
   ];
 }

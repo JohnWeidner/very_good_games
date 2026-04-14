@@ -13,7 +13,8 @@ part 'cascade_state.dart';
 ///
 /// Handles ball assignment, lever flipping, drop simulation,
 /// reset, win detection, and state persistence.
-class CascadeCubit extends Cubit<CascadeState> {
+class CascadeCubit extends Cubit<CascadeState>
+    with GameTimerMixin<CascadeState> {
   /// Creates a [CascadeCubit] that generates a puzzle from [dailySeed].
   CascadeCubit({
     required int dailySeed,
@@ -49,6 +50,10 @@ class CascadeCubit extends Cubit<CascadeState> {
           final restoredState = _deserializeState(session, result);
           if (restoredState != null) {
             emit(restoredState);
+            initTimer(
+              initialSeconds: restoredState.elapsedSeconds,
+              alreadyStarted: restoredState.timerStarted,
+            );
             return;
           }
         }
@@ -73,6 +78,7 @@ class CascadeCubit extends Cubit<CascadeState> {
 
   /// Resets with a new puzzle from [seed]. For playtesting only.
   void resetWithSeed(int seed) {
+    resetTimer();
     emit(CascadeState.loading());
     _initialize(seed, _dateKey, null);
   }
@@ -99,7 +105,8 @@ class CascadeCubit extends Cubit<CascadeState> {
     }
     slots[slotIndex] = ball;
 
-    emit(state.copyWith(slotAssignments: slots));
+    startTimer();
+    emit(state.copyWith(slotAssignments: slots, timerStarted: true));
     _persistSession();
   }
 
@@ -110,7 +117,13 @@ class CascadeCubit extends Cubit<CascadeState> {
       return;
     }
 
-    emit(state.copyWith(board: state.board.flipLever(leverIndex)));
+    startTimer();
+    emit(
+      state.copyWith(
+        board: state.board.flipLever(leverIndex),
+        timerStarted: true,
+      ),
+    );
     _persistSession();
   }
 
@@ -147,6 +160,7 @@ class CascadeCubit extends Cubit<CascadeState> {
     if (result == null) return;
 
     if (result.isWin) {
+      disposeTimer();
       final score = cascadeScore(state.attempts);
       emit(state.copyWith(status: CascadeStatus.won, score: () => score));
       // Clear session on win.
@@ -188,6 +202,8 @@ class CascadeCubit extends Cubit<CascadeState> {
       'slotAssignments': state.slotAssignments.map((b) => b?.name).toList(),
       'attempts': state.attempts,
       'status': state.status.name,
+      'elapsedSeconds': state.elapsedSeconds,
+      'timerStarted': state.timerStarted,
     });
     if (future != null) unawaited(future);
   }
@@ -221,6 +237,9 @@ class CascadeCubit extends Cubit<CascadeState> {
 
     final board = CascadeBoard(levers: levers, binOrder: result.board.binOrder);
 
+    final savedElapsedSeconds = session['elapsedSeconds'] as int? ?? 0;
+    final savedTimerStarted = session['timerStarted'] as bool? ?? false;
+
     return CascadeState(
       board: board,
       initialLevers: result.initialLevers,
@@ -228,6 +247,23 @@ class CascadeCubit extends Cubit<CascadeState> {
       slotAssignments: slots,
       attempts: attempts,
       score: score,
+      elapsedSeconds: savedElapsedSeconds,
+      timerStarted: savedTimerStarted,
     );
+  }
+
+  @override
+  void onTimerTick(int elapsedSeconds) {
+    if (state.status == CascadeStatus.won ||
+        state.status == CascadeStatus.dropping) {
+      return;
+    }
+    emit(state.copyWith(elapsedSeconds: elapsedSeconds));
+  }
+
+  @override
+  Future<void> close() {
+    disposeTimer();
+    return super.close();
   }
 }

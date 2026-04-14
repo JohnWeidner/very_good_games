@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:very_good_games/core/daily_seed/date_key.dart';
+import 'package:very_good_games/core/core.dart';
 import 'package:very_good_games/core/view/widgets/star_rating.dart';
 import 'package:very_good_games/games/signal/cubit/signal_cubit.dart';
 import 'package:very_good_games/games/signal/logic/logic.dart';
@@ -69,7 +69,8 @@ class SignalResultsOverlay extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      '${state.moveCount} moves',
+                      '${state.moveCount} moves, '
+                      '${formatElapsedTime(state.elapsedSeconds)}',
                       style: theme.textTheme.bodyLarge,
                     ),
                     const SizedBox(height: 16),
@@ -116,6 +117,7 @@ class SignalResultsOverlay extends StatelessWidget {
             score: score,
             stars: stars,
             moveCount: moveCount,
+            elapsedSeconds: state.elapsedSeconds,
             date: date,
           ),
     );

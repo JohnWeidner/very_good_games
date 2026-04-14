@@ -92,6 +92,7 @@ void main() {
           stars: 2,
           moves: 10,
           undos: 2,
+          elapsedSeconds: 95,
           date: '2026-04-07',
         );
         result = {
@@ -120,14 +121,15 @@ void main() {
         expect(tTags[1][1], equals('chromix'));
       });
 
-      test('includes NIP-32 labels for score, stars, moves, undos', () {
+      test('includes NIP-32 labels for score, stars, moves, undos, time', () {
         final tags = result['tags'] as List<List<String>>;
         final labels = tags.where((t) => t[0] == 'l').toList();
-        expect(labels.length, equals(4));
+        expect(labels.length, equals(5));
         expect(labels[0][1], equals('score-12'));
         expect(labels[1][1], equals('stars-2'));
         expect(labels[2][1], equals('moves-10'));
         expect(labels[3][1], equals('undos-2'));
+        expect(labels[4][1], equals('time-95'));
       });
 
       test('content includes Chromix game info', () {
@@ -137,6 +139,7 @@ void main() {
         expect(content, contains('12 total'));
         expect(content, contains('10 moves'));
         expect(content, contains('2 undos'));
+        expect(content, contains('01:35'));
         expect(content, contains('2026-04-07'));
       });
 
@@ -155,6 +158,7 @@ void main() {
           score: 400,
           stars: 3,
           moveCount: 5,
+          elapsedSeconds: 45,
           date: '2026-04-03',
         );
         result = {
@@ -183,13 +187,14 @@ void main() {
         expect(tTags[1][1], equals('signal'));
       });
 
-      test('includes NIP-32 labels for score, stars, moves', () {
+      test('includes NIP-32 labels for score, stars, moves, time', () {
         final tags = result['tags'] as List<List<String>>;
         final labels = tags.where((t) => t[0] == 'l').toList();
-        expect(labels.length, equals(3));
+        expect(labels.length, equals(4));
         expect(labels[0][1], equals('score-400'));
         expect(labels[1][1], equals('stars-3'));
         expect(labels[2][1], equals('moves-5'));
+        expect(labels[3][1], equals('time-45'));
       });
 
       test('content includes Signal game info', () {
@@ -198,7 +203,67 @@ void main() {
         expect(content, contains('400 points'));
         expect(content, contains('3 Stars'));
         expect(content, contains('5 moves'));
+        expect(content, contains('00:45'));
         expect(content, contains('2026-04-03'));
+      });
+    });
+
+    group('buildCascadeResult', () {
+      late Map<String, dynamic> result;
+
+      setUp(() {
+        final event = EventBuilder.buildCascadeResult(
+          pubKeyHex: 'abc123',
+          score: 100,
+          stars: 3,
+          attempts: 1,
+          elapsedSeconds: 120,
+          date: '2026-04-08',
+        );
+        result = {
+          'kind': event.kind,
+          'pubKey': event.pubKey,
+          'tags': event.tags,
+          'content': event.content,
+        };
+      });
+
+      test('uses kind 30042', () {
+        expect(result['kind'], equals(30042));
+      });
+
+      test('includes d tag with cascade and date', () {
+        final tags = result['tags'] as List<List<String>>;
+        final dTag = tags.firstWhere((t) => t[0] == 'd');
+        expect(dTag[1], equals('cascade:2026-04-08'));
+      });
+
+      test('includes t tags for vgg and cascade', () {
+        final tags = result['tags'] as List<List<String>>;
+        final tTags = tags.where((t) => t[0] == 't').toList();
+        expect(tTags.length, equals(2));
+        expect(tTags[0][1], equals('vgg'));
+        expect(tTags[1][1], equals('cascade'));
+      });
+
+      test('includes NIP-32 labels for score, stars, attempts, time', () {
+        final tags = result['tags'] as List<List<String>>;
+        final labels = tags.where((t) => t[0] == 'l').toList();
+        expect(labels.length, equals(4));
+        expect(labels[0][1], equals('score-100'));
+        expect(labels[1][1], equals('stars-3'));
+        expect(labels[2][1], equals('attempts-1'));
+        expect(labels[3][1], equals('time-120'));
+      });
+
+      test('content includes Cascade game info', () {
+        final content = result['content'] as String;
+        expect(content, contains('Cascade'));
+        expect(content, contains('3 Stars'));
+        expect(content, contains('100 points'));
+        expect(content, contains('1 attempt'));
+        expect(content, contains('02:00'));
+        expect(content, contains('2026-04-08'));
       });
     });
   });

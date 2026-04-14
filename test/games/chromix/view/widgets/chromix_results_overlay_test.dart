@@ -111,7 +111,7 @@ void main() {
     testWidgets('shows moves and undos breakdown', (tester) async {
       await tester.pumpWidget(buildSubject(winState()));
 
-      expect(find.text('6 moves, 2 undos'), findsOneWidget);
+      expect(find.text('6 moves, 2 undos, 0:00'), findsOneWidget);
     });
 
     testWidgets('shows star rating', (tester) async {

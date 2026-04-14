@@ -371,35 +371,7 @@ void main() {
       );
     });
 
-    group('tick', () {
-      blocTest<GameCubit, GameState>(
-        'is a no-op before timer has started',
-        build: () => GameCubit(targetNumber: target),
-        act: (cubit) => cubit.tick(),
-        expect: () => <GameState>[],
-      );
-
-      blocTest<GameCubit, GameState>(
-        'increments elapsed seconds after timer started',
-        build: () => GameCubit(targetNumber: target),
-        seed: () => GameState(
-          cells: List.filled(400, CellState.possible),
-          targetNumber: target,
-          timerStarted: true,
-        ),
-        act: (cubit) {
-          cubit
-            ..tick()
-            ..tick()
-            ..tick();
-        },
-        expect: () => [
-          isA<GameState>().having((s) => s.elapsedSeconds, 'elapsedSeconds', 1),
-          isA<GameState>().having((s) => s.elapsedSeconds, 'elapsedSeconds', 2),
-          isA<GameState>().having((s) => s.elapsedSeconds, 'elapsedSeconds', 3),
-        ],
-      );
-
+    group('onTimerTick', () {
       blocTest<GameCubit, GameState>(
         'is a no-op after winning',
         build: () => GameCubit(targetNumber: target),
@@ -409,12 +381,33 @@ void main() {
             ..highlightCell(targetIndex)
             ..lockParam()
             ..confirmQuestion()
-            ..tick();
+            ..onTimerTick(1);
         },
         verify: (cubit) {
           expect(cubit.state.status, equals(GameStatus.won));
           expect(cubit.state.elapsedSeconds, equals(0));
         },
+      );
+
+      blocTest<GameCubit, GameState>(
+        'emits updated elapsed seconds',
+        build: () => GameCubit(targetNumber: target),
+        seed: () => GameState(
+          cells: List.filled(400, CellState.possible),
+          targetNumber: target,
+          timerStarted: true,
+        ),
+        act: (cubit) {
+          cubit
+            ..onTimerTick(1)
+            ..onTimerTick(2)
+            ..onTimerTick(3);
+        },
+        expect: () => [
+          isA<GameState>().having((s) => s.elapsedSeconds, 'elapsedSeconds', 1),
+          isA<GameState>().having((s) => s.elapsedSeconds, 'elapsedSeconds', 2),
+          isA<GameState>().having((s) => s.elapsedSeconds, 'elapsedSeconds', 3),
+        ],
       );
 
       blocTest<GameCubit, GameState>(
@@ -429,13 +422,15 @@ void main() {
           questionCount: 11,
           elapsedSeconds: 24,
         ),
-        act: (cubit) => cubit.tick(),
+        act: (cubit) => cubit.onTimerTick(25),
         verify: (cubit) {
           expect(cubit.state.status, equals(GameStatus.lost));
           expect(cubit.state.score, equals(0));
         },
       );
+    });
 
+    group('confirmQuestion loss', () {
       blocTest<GameCubit, GameState>(
         'triggers lost when question cost pushes score to zero',
         build: () => GameCubit(targetNumber: target),
@@ -583,8 +578,9 @@ void main() {
           ..confirmQuestion();
 
         // Tick until score reaches zero.
+        var seconds = cubit.state.elapsedSeconds;
         while (cubit.state.status != GameStatus.lost) {
-          cubit.tick();
+          cubit.onTimerTick(++seconds);
         }
 
         expect(cubit.state.status, equals(GameStatus.lost));

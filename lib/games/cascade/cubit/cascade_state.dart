@@ -33,6 +33,8 @@ class CascadeState extends Equatable {
     this.attempts = 0,
     this.dropResult,
     this.score,
+    this.elapsedSeconds = 0,
+    this.timerStarted = false,
   });
 
   /// Creates a loading state before the puzzle is generated.
@@ -43,7 +45,9 @@ class CascadeState extends Equatable {
       slotAssignments = defaultSlotAssignments,
       attempts = 0,
       dropResult = null,
-      score = null;
+      score = null,
+      elapsedSeconds = 0,
+      timerStarted = false;
 
   /// The current board with lever states.
   final CascadeBoard board;
@@ -66,6 +70,12 @@ class CascadeState extends Equatable {
   /// Final score, computed on win.
   final int? score;
 
+  /// Seconds elapsed since the first ball assignment or lever flip.
+  final int elapsedSeconds;
+
+  /// Whether the timer has started (first interaction occurred).
+  final bool timerStarted;
+
   /// Whether all 3 balls have been assigned to slots.
   bool get allBallsAssigned => slotAssignments.every((s) => s != null);
 
@@ -81,6 +91,8 @@ class CascadeState extends Equatable {
     int? attempts,
     DropResult? Function()? dropResult,
     int? Function()? score,
+    int? elapsedSeconds,
+    bool? timerStarted,
   }) {
     return CascadeState(
       board: board ?? this.board,
@@ -90,6 +102,8 @@ class CascadeState extends Equatable {
       attempts: attempts ?? this.attempts,
       dropResult: dropResult != null ? dropResult() : this.dropResult,
       score: score != null ? score() : this.score,
+      elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
+      timerStarted: timerStarted ?? this.timerStarted,
     );
   }
 
@@ -102,5 +116,7 @@ class CascadeState extends Equatable {
     attempts,
     dropResult,
     score,
+    elapsedSeconds,
+    timerStarted,
   ];
 }

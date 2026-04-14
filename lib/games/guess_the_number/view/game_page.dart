@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -95,17 +93,13 @@ class _GameView extends StatefulWidget {
   State<_GameView> createState() => _GameViewState();
 }
 
-class _GameViewState extends State<_GameView> {
-  Timer? _timer;
+class _GameViewState extends State<_GameView> with WidgetsBindingObserver {
   bool _showResults = false;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) => context.read<GameCubit>().tick(),
-    );
+    WidgetsBinding.instance.addObserver(this);
     _showInstructionsIfFirstTime();
 
     // If already finished on restore, show results immediately.
@@ -130,8 +124,19 @@ class _GameViewState extends State<_GameView> {
 
   @override
   void dispose() {
-    _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final cubit = context.read<GameCubit>();
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      cubit.pauseTimer();
+    } else if (state == AppLifecycleState.resumed) {
+      cubit.resumeTimer();
+    }
   }
 
   void _persistStreak(BuildContext context) {
@@ -149,7 +154,6 @@ class _GameViewState extends State<_GameView> {
   }
 
   void _onGameOver(BuildContext context, GameState state) {
-    _timer?.cancel();
     _fetchCommunityStats(context);
 
     if (state.status == GameStatus.won) {
@@ -189,14 +193,10 @@ class _GameViewState extends State<_GameView> {
               tooltip: 'New Game',
               onPressed: () {
                 WinCelebration.of(context)?.reset();
-                _timer?.cancel();
-                _timer = Timer.periodic(
-                  const Duration(seconds: 1),
-                  (_) => context.read<GameCubit>().tick(),
-                );
-                context.read<GameCubit>().resetWithSeed(
-                  DateTime.now().microsecondsSinceEpoch,
-                );
+                final cubit = context.read<GameCubit>();
+                cubit
+                  ..resetTimer()
+                  ..resetWithSeed(DateTime.now().microsecondsSinceEpoch);
                 setState(() => _showResults = false);
               },
             ),

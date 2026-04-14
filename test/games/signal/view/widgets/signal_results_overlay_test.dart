@@ -106,7 +106,7 @@ void main() {
     testWidgets('shows move count', (tester) async {
       await tester.pumpWidget(buildSubject(winState(moveCount: 7)));
 
-      expect(find.text('7 moves'), findsOneWidget);
+      expect(find.text('7 moves, 0:00'), findsOneWidget);
     });
 
     testWidgets('shows star rating', (tester) async {

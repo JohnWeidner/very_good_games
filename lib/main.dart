@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:bloc/bloc.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:nostr_identity/nostr_identity.dart';
 import 'package:path/path.dart' as p;
@@ -22,6 +23,10 @@ import 'package:very_good_games/nostr/stats/repository/community_stats_repositor
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
   Bloc.observer = const AppBlocObserver();
 
   final preferences = await SharedPreferences.getInstance();

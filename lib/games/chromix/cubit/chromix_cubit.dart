@@ -13,7 +13,8 @@ part 'chromix_state.dart';
 ///
 /// Handles drag interaction, color mixing, overpower, undo,
 /// win detection, contiguity checking, and state persistence.
-class ChromixCubit extends Cubit<ChromixState> {
+class ChromixCubit extends Cubit<ChromixState>
+    with GameTimerMixin<ChromixState> {
   /// Creates a [ChromixCubit] that generates a puzzle from [dailySeed].
   ChromixCubit({
     required int dailySeed,
@@ -54,6 +55,10 @@ class ChromixCubit extends Cubit<ChromixState> {
           final restoredState = _deserializeState(session, result);
           if (restoredState != null) {
             emit(restoredState);
+            initTimer(
+              initialSeconds: restoredState.elapsedSeconds,
+              alreadyStarted: restoredState.timerStarted,
+            );
             return;
           }
         }
@@ -85,6 +90,7 @@ class ChromixCubit extends Cubit<ChromixState> {
   /// Resets with a new puzzle from [seed]. For playtesting only.
   void resetWithSeed(int seed) {
     _cancelOverpowerTimer();
+    resetTimer();
     emit(ChromixState.loading());
     _initializeFromSeed(seed);
   }
@@ -157,6 +163,7 @@ class ChromixCubit extends Cubit<ChromixState> {
     EmptyCell cell,
     ChromixColor dragColor,
   ) {
+    startTimer();
     final newCell = ColorCell(dragColor);
     final newGrid = state.grid.setCell(row, col, newCell);
     final record = MoveRecord(cellIndex: cellIndex, previousCell: cell);
@@ -168,6 +175,7 @@ class ChromixCubit extends Cubit<ChromixState> {
         moveHistory: [...state.moveHistory, record],
         dragOrigin: () => null,
         dragColor: () => null,
+        timerStarted: true,
       ),
     );
 
@@ -191,6 +199,7 @@ class ChromixCubit extends Cubit<ChromixState> {
 
     if (dragColor.isPrimary && targetCell.color.isPrimary) {
       // MIX: place the secondary.
+      startTimer();
       final mixed = ColorMixer.mix(targetCell.color, dragColor);
       if (mixed == null) return;
 
@@ -205,6 +214,7 @@ class ChromixCubit extends Cubit<ChromixState> {
           moveHistory: [...state.moveHistory, record],
           dragOrigin: () => null,
           dragColor: () => null,
+          timerStarted: true,
         ),
       );
 
@@ -215,6 +225,7 @@ class ChromixCubit extends Cubit<ChromixState> {
       }
     } else if (dragColor.isPrimary && targetCell.color.isSecondary) {
       // OVERPOWER immediately: replace secondary with dragged primary.
+      startTimer();
       final newCell = ColorCell(dragColor);
       final newGrid = state.grid.setCell(row, col, newCell);
       final record = MoveRecord(cellIndex: cellIndex, previousCell: targetCell);
@@ -226,6 +237,7 @@ class ChromixCubit extends Cubit<ChromixState> {
           moveHistory: [...state.moveHistory, record],
           dragOrigin: () => null,
           dragColor: () => null,
+          timerStarted: true,
         ),
       );
 
@@ -339,6 +351,7 @@ class ChromixCubit extends Cubit<ChromixState> {
     );
     final contiguous = allGroupsContiguous(state.grid);
     if (state.grid.isFullyFilled && distributionMatches && contiguous) {
+      disposeTimer();
       final score = chromixScore(state.moveCount, state.undoCount);
       emit(state.copyWith(status: ChromixStatus.won, score: () => score));
       final future = _storageRepository?.saveSession(_storageKey, null);
@@ -356,6 +369,8 @@ class ChromixCubit extends Cubit<ChromixState> {
       'moveCount': state.moveCount,
       'undoCount': state.undoCount,
       'moveHistory': state.moveHistory.map((m) => m.toJson()).toList(),
+      'elapsedSeconds': state.elapsedSeconds,
+      'timerStarted': state.timerStarted,
     });
     if (future != null) unawaited(future);
   }
@@ -385,6 +400,8 @@ class ChromixCubit extends Cubit<ChromixState> {
 
     final moveCount = session['moveCount'] as int;
     final undoCount = session['undoCount'] as int? ?? 0;
+    final savedElapsedSeconds = session['elapsedSeconds'] as int? ?? 0;
+    final savedTimerStarted = session['timerStarted'] as bool? ?? false;
 
     final historyJsons = (session['moveHistory'] as List<dynamic>?)
         ?.cast<Map<String, dynamic>>();
@@ -402,12 +419,21 @@ class ChromixCubit extends Cubit<ChromixState> {
       undoCount: undoCount,
       moveHistory: moveHistory,
       hasContiguityViolation: violation,
+      elapsedSeconds: savedElapsedSeconds,
+      timerStarted: savedTimerStarted,
     );
+  }
+
+  @override
+  void onTimerTick(int elapsedSeconds) {
+    if (state.status != ChromixStatus.playing) return;
+    emit(state.copyWith(elapsedSeconds: elapsedSeconds));
   }
 
   @override
   Future<void> close() {
     _cancelOverpowerTimer();
+    disposeTimer();
     return super.close();
   }
 }

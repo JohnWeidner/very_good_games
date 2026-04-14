@@ -110,13 +110,13 @@ void main() {
     testWidgets('shows attempt count', (tester) async {
       await tester.pumpWidget(buildSubject(winState()));
 
-      expect(find.text('1 attempt'), findsOneWidget);
+      expect(find.text('1 attempt, 0:00'), findsOneWidget);
     });
 
     testWidgets('shows plural attempts', (tester) async {
       await tester.pumpWidget(buildSubject(winState(attempts: 3)));
 
-      expect(find.text('3 attempts'), findsOneWidget);
+      expect(find.text('3 attempts, 0:00'), findsOneWidget);
     });
 
     testWidgets('shows star rating', (tester) async {

@@ -59,7 +59,8 @@ class CascadeResultsOverlay extends StatelessWidget {
                     ),
                     Text(
                       '${state.attempts} '
-                      '${state.attempts == 1 ? 'attempt' : 'attempts'}',
+                      '${state.attempts == 1 ? 'attempt' : 'attempts'}, '
+                      '${formatElapsedTime(state.elapsedSeconds)}',
                       style: theme.textTheme.bodyLarge?.copyWith(
                         color: theme.colorScheme.onSurface.withValues(
                           alpha: 0.6,
@@ -109,6 +110,7 @@ class CascadeResultsOverlay extends StatelessWidget {
             score: score,
             stars: stars,
             attempts: state.attempts,
+            elapsedSeconds: state.elapsedSeconds,
             date: date,
           ),
     );

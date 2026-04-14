@@ -19,7 +19,7 @@ part 'game_state.dart';
 ///
 /// For no-parameter questions, [selectQuestion] goes straight to
 /// [GameStatus.readyToConfirm].
-class GameCubit extends Cubit<GameState> {
+class GameCubit extends Cubit<GameState> with GameTimerMixin<GameState> {
   /// Creates a [GameCubit] with the given [targetNumber].
   ///
   /// The target must be between 1 and 400 inclusive.
@@ -96,6 +96,9 @@ class GameCubit extends Cubit<GameState> {
         restoredState: restoredState,
         dailySeed: dailySeed,
         storageRepository: storageRepository,
+      )..initTimer(
+        initialSeconds: restoredState.elapsedSeconds,
+        alreadyStarted: restoredState.timerStarted,
       );
     } on Object {
       // Corrupted session data — discard and start fresh.
@@ -245,6 +248,7 @@ class GameCubit extends Cubit<GameState> {
     final isWin = remaining <= 1;
 
     if (isWin) {
+      disposeTimer();
       // Mark the target cell as revealed.
       final winCells = List<CellState>.from(result.cells);
       winCells[state.targetNumber - 1] = CellState.target;
@@ -274,6 +278,8 @@ class GameCubit extends Cubit<GameState> {
         seconds: state.elapsedSeconds,
       );
       final isLost = liveScore <= 0;
+
+      startTimer();
 
       emit(
         state.copyWith(
@@ -317,25 +323,21 @@ class GameCubit extends Cubit<GameState> {
     if (future != null) unawaited(future);
   }
 
-  /// Increments the elapsed time by one second.
-  ///
-  /// Only counts after the first question has been played.
-  /// Triggers a loss if the score reaches zero.
-  void tick() {
+  @override
+  void onTimerTick(int elapsedSeconds) {
     if (state.status == GameStatus.won) return;
     if (state.status == GameStatus.lost) return;
-    if (!state.timerStarted) return;
 
-    final newSeconds = state.elapsedSeconds + 1;
     final newScore = ScoreCalculator.calculate(
       questions: state.questionCount,
-      seconds: newSeconds,
+      seconds: elapsedSeconds,
     );
 
     if (newScore <= 0) {
+      disposeTimer();
       emit(
         state.copyWith(
-          elapsedSeconds: newSeconds,
+          elapsedSeconds: elapsedSeconds,
           status: GameStatus.lost,
           score: () => 0,
         ),
@@ -344,6 +346,12 @@ class GameCubit extends Cubit<GameState> {
       return;
     }
 
-    emit(state.copyWith(elapsedSeconds: newSeconds));
+    emit(state.copyWith(elapsedSeconds: elapsedSeconds));
+  }
+
+  @override
+  Future<void> close() {
+    disposeTimer();
+    return super.close();
   }
 }
